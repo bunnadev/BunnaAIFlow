@@ -1,0 +1,52 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: #070b14;
+}
+
+body {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+.node-container { background: #0d1424; border: 1px solid rgba(241, 100, 30, 0.15); border-radius: 0.8rem; box-shadow: 0 5px 25px rgba(0, 0, 0, 0.6); transition: border-color 0.3s ease, box-shadow 0.3s ease; }
+.node-container:hover { border-color: rgba(241, 100, 30, 0.4); box-shadow: 0 10px 35px rgba(0, 0, 0, 0.8); }
+
+/* NODE SELECTED STYLING */
+.react-flow__node.selected .node-container { border-color: #ffffff !important; box-shadow: 0 0 20px rgba(255, 255, 255, 0.1); }
+
+.react-flow__edge-path { stroke-width: 2.5; transition: stroke 0.2s, stroke-width 0.2s; cursor: pointer; }
+.react-flow__edge:hover .react-flow__edge-path { stroke-width: 4; stroke: #F1641E !important; }
+.react-flow__handle { width: 8px !important; height: 8px !important; border: 1.5px solid #0d1424 !important; }
+.react-flow__controls button { background: #0d1424 !important; border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important; fill: #94a3b8 !important; }
+.react-flow__controls button:hover { background: #F1641E !important; fill: #000 !important; }
+
+.custom-scrollbar::-webkit-scrollbar { width: 3px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(241, 100, 30, 0.2); border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(241, 100, 30, 0.5); }
+
+@keyframes slide-in-panel { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slide-in-panel-left { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.animate-slide-panel { animation: slide-in-panel 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.animate-slide-panel-left { animation: slide-in-panel-left 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+
+.mode-hand .react-flow__pane { cursor: grab !important; }
+.mode-hand .react-flow__pane:active { cursor: grabbing !important; }
+
+@keyframes dropdown-fade { from { opacity: 0; transform: translateY(-10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.animate-dropdown-fast { animation: dropdown-fade 0.2s cubic-bezier(0, 0, 0.2, 1) forwards; }
+
+@keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@utility animate-shimmer {
+  animation: shimmer 1.5s infinite;
+}
