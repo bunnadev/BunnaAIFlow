@@ -21,6 +21,7 @@ onChangeConcurrency: (val: number) => void;
 onRunPipeline: () => void;
 onStopPipeline: () => void;
 isStopping: boolean;
+isRunning: boolean;
 filenamePrefix: string;
 onChangePrefix: (val: string) => void;
 flowStatus: FlowStatus | null;
@@ -37,7 +38,7 @@ onOpenSettings: () => void;
 
 const WorkspaceManager: React.FC<Props> = ({
 workspaces, activeId,
-onRunPipeline, onStopPipeline, isStopping,
+onRunPipeline, onStopPipeline, isStopping, isRunning,
 filenamePrefix, onChangePrefix, flowStatus, onClearFlowStatus,
 onSelect, onAdd, onDelete, onRename, onOpenLog, onOpenSettings
 }) => {
@@ -156,19 +157,23 @@ LOGS
 </button>
 
 <div className="flex items-center gap-1.5 px-2 bg-[#050a10] border border-white/10 rounded-xl h-7.5 group">
-<span className="text-[8px] font-black text-[#94a3b8]/40 uppercase tracking-widest">PREFIX</span>
+<span className="text-[8px] font-black text-[#94a3b8]/40 uppercase tracking-widest">FILE PREFIX</span>
 <input type="text" value={filenamePrefix} onChange={(e) => onChangePrefix(e.target.value)} className="bg-transparent border-none outline-none text-[9px] font-black text-white w-16 uppercase" />
 </div>
 
+{!isRunning && (
 <button onClick={onRunPipeline} className="flex items-center gap-1.5 px-3 h-7.5 rounded-xl bg-[#F1641E] text-black hover:bg-[#F1641E]/80 transition-all shadow-md font-black text-[8px] uppercase tracking-widest">
 <span className="material-symbols-outlined text-[16px]">bolt</span>
 START
 </button>
+)}
 
+{isRunning && (
 <button onClick={onStopPipeline} disabled={isStopping} className="flex items-center gap-1.5 px-2.5 h-7.5 rounded-xl bg-white/[0.03] border border-white/10 text-red-400 hover:bg-red-500 hover:text-white transition-all disabled:opacity-20 font-black text-[8px] uppercase tracking-widest">
 <span className="material-symbols-outlined text-[16px]">stop</span>
 STOP
 </button>
+)}
 </div>
 </div>
 );

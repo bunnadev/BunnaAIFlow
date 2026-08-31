@@ -744,7 +744,7 @@ const ids = new Set<string>();
 dirty.forEach(n => { ids.add(n.id); getDescendants(n.id, currentNodes, currentEdges).forEach(d => ids.add(d)); });
 executeWorkflow(Array.from(ids));
 }}
-onStopPipeline={() => { stopFlagRef.current = true; setIsStopping(true); }} isStopping={isStopping}
+onStopPipeline={() => { stopFlagRef.current = true; setIsStopping(true); }} isStopping={isStopping} isRunning={runningChain}
 filenamePrefix={filenamePrefix} onChangePrefix={setFilenamePrefix}
 flowStatus={flowStatus} onClearFlowStatus={() => setFlowStatus(null)}
 onSelect={handleSelectWorkspace} onAdd={handleAddWorkspace} onDelete={handleDeleteWorkspace} onRename={handleRenameWorkspace}
@@ -764,12 +764,8 @@ className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all
 <div className="flex flex-col gap-2">
 <ToolbarButton active={interactionMode === 'select'} icon="near_me" label="SELECT" onClick={() => setInteractionMode('select')} />
 <ToolbarButton active={interactionMode === 'hand'} icon="pan_tool" label="PAN" onClick={() => setInteractionMode('hand')} />
-<ToolbarButton active={interactionMode === 'connect'} icon="link" label="LINK" onClick={() => setInteractionMode('connect')} />
 </div>
 <div className="w-8 h-[1px] bg-white/10 my-1" />
-<button onClick={() => setIsBatchCombinedModalOpen(true)} className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#F1641E]/10 border border-[#F1641E]/20 hover:bg-[#F1641E]/20 transition-all text-[#F1641E]">
-<span className="material-symbols-outlined text-[18px]">dynamic_feed</span>
-</button>
 <button onClick={handleResetAllResults} title="Reset kết quả" className="w-9 h-9 rounded-lg flex items-center justify-center bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-all text-red-400">
 <span className="material-symbols-outlined text-[18px]">restart_alt</span>
 </button>
@@ -795,6 +791,7 @@ onPaneClick={() => { setMenuState(null); setIsNodeLibraryOpen(false); setActiveS
 onNodesDelete={onNodesDelete} onEdgesDelete={onEdgesDelete}
 nodeTypes={NODE_TYPES} edgeTypes={EDGE_TYPES} snapToGrid snapGrid={[10, 10]}
 panOnDrag={interactionMode === 'hand' ? true : [1, 2]} selectionOnDrag={interactionMode === 'select'} selectionMode={SelectionMode.Partial} panOnScroll zoomOnScroll minZoom={0.05} maxZoom={4}
+proOptions={{ hideAttribution: true }}
 >
 <Background variant={BackgroundVariant.Dots} gap={10} size={1} color="#333" />
 <Controls showInteractive={false} position="bottom-left" />
