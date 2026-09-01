@@ -31,6 +31,8 @@ if (!node) return null;
 const isImage = node.type === 'imageGen';
 const isVideo = node.type === 'videoGen';
 const isText = node.type === 'textGen';
+const isStt = node.type === 'stt';
+const isTextReview = node.type === 'textReview';
 const isMediaSource = node.type === 'mediaSource';
 const data = node.data;
 
@@ -45,9 +47,9 @@ return (
 <div className="absolute top-0 left-0 h-full w-[288px] bg-[#0b1019] border-r border-[#F1641E]/20 z-30 flex flex-col shadow-2xl animate-slide-panel">
 <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
 <div className="flex items-center gap-2.5">
-<div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : isText ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
+<div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : isText ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : isStt ? 'bg-[#22c55e]/10 text-[#22c55e]' : isTextReview ? 'bg-[#a855f7]/10 text-[#a855f7]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
 <span className="material-symbols-outlined text-[19px]">
-{isImage ? 'palette' : isVideo ? 'movie' : isText ? 'data_object' : isMediaSource ? 'perm_media' : 'settings'}
+{isImage ? 'palette' : isVideo ? 'movie' : isText ? 'data_object' : isStt ? 'graphic_eq' : isTextReview ? 'edit_note' : isMediaSource ? 'perm_media' : 'settings'}
 </span>
 </div>
 <div>
@@ -92,7 +94,33 @@ className="w-full h-[134px] bg-[#050a10] border border-white/5 hover:border-whit
 </>
 )}
 
-{!isMediaSource && !isText && (
+{isStt && (
+<>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Cấu hình Model</SectionLabel>
+<FieldDropdown label="Mẫu AI" value={data.model} options={TEXT_MODELS} onChange={(v) => updateNode('model', v)} />
+</div>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Chỉ dẫn tuỳ chỉnh (không bắt buộc)</SectionLabel>
+<textarea
+value={data.localPrompt}
+onChange={(e) => updateNode('localPrompt', e.target.value)}
+placeholder="Mặc định: yêu cầu Gemini trả về nguyên văn transcript tiếng Việt. Chỉ điền nếu muốn đổi cách yêu cầu."
+className="w-full h-[100px] bg-[#050a10] border border-white/5 hover:border-white/10 rounded-xl p-3 text-[12px] text-white outline-none transition-all custom-scrollbar leading-relaxed placeholder:text-white/20"
+/>
+</div>
+</>
+)}
+
+{isTextReview && (
+<div className="flex flex-col gap-2 px-1">
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Node này không gọi AI — chỉ giữ bản text bạn tự sửa tay. Bấm “Lấy từ input” ngay trên node để tải transcript mới nhất, rồi chỉnh sửa trực tiếp trong khung text của node.
+</p>
+</div>
+)}
+
+{!isMediaSource && !isText && !isStt && !isTextReview && (
 <>
 <div className="flex flex-col gap-3.5">
 <SectionLabel>Cấu hình Model</SectionLabel>

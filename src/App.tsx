@@ -21,6 +21,8 @@ import MediaSourceNode from './components/nodes/MediaSourceNode';
 import ImageGenNode from './components/nodes/ImageGenNode';
 import VideoGenNode from './components/nodes/VideoGenNode';
 import TextGenNode from './components/nodes/TextGenNode';
+import SttNode from './components/nodes/SttNode';
+import TextReviewNode from './components/nodes/TextReviewNode';
 import StyleNode from './components/nodes/StyleNode';
 import DeleteEdge from './components/nodes/DeleteEdge';
 import WorkspaceManager from './components/WorkspaceManager';
@@ -54,7 +56,7 @@ import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 
 export const getNodeFileName = (node: Node, index: number, prefix: string = 'BUNNA_FLOW') => {
-const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : (node.type === 'textGen' ? 'TXT' : 'RES'));
+const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES'));
 const extension = node.data.result?.type === 'video' ? 'mp4' : (node.data.result?.type === 'text' ? 'txt' : 'jpg');
 const label = (node.data.label || 'ASSET').replace(/[^a-z0-9]/gi, '_').toUpperCase();
 return `${prefix}_${typeCode}_${index + 1}_${label}.${extension}`;
@@ -65,6 +67,8 @@ mediaSource: MediaSourceNode,
 imageGen: ImageGenNode,
 videoGen: VideoGenNode,
 textGen: TextGenNode,
+stt: SttNode,
+textReview: TextReviewNode,
 styleNode: StyleNode,
 };
 
@@ -198,7 +202,7 @@ setUndoStack(prev => [...prev, { nodes: getNodes(), edges: getEdges() }]);
 
 const handleResetAllResults = useCallback(() => {
 setNodes(nds => nds.map(node => {
-if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen') {
+if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt') {
 return {
 ...node,
 data: { ...node.data, result: null, statusText: '', isFinalized: false, isLoading: false }
@@ -389,6 +393,8 @@ case 'mediaSource': newNode = { id, type, position: finalPos, data: { ...commonD
 case 'imageGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Ảnh AI', model: 'Nano Banana Pro', aspectRatio: '16:9', resolution: '4k', localPrompt: '' } }; break;
 case 'videoGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Video AI', model: 'Veo 3.1 - Lite', aspectRatio: '16:9', resolution: '720p', duration: 8, videoMode: 'frame', voiceOverEnabled: false, voiceOverVoice: 'Puck — Upbeat', localPrompt: '' } }; break;
 case 'textGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Text AI', model: 'Gemini 2.5 Flash', localPrompt: '' } }; break;
+case 'stt': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Tách Audio', model: 'Gemini 2.5 Flash', localPrompt: '' } }; break;
+case 'textReview': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Duyệt Text', isFinalized: true, editedText: '' } }; break;
 case 'styleNode': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phong cách', positivePrompt: '', negativePrompt: '' } }; break;
 default: return;
 }
@@ -588,6 +594,8 @@ if (!node) return;
 const incomingEdges = currentEdges.filter(e => e.target === nodeId);
 const sourceImages: MediaAsset[] = [];
 const sourceVideos: MediaAsset[] = [];
+const sourceAudios: MediaAsset[] = [];
+const sourceTexts: string[] = [];
 let positiveStyle = '';
 let negativeStyle = '';
 
@@ -600,12 +608,15 @@ const mediaData: MediaAsset | undefined = src.data.result || src.data.media;
 if (mediaData) {
 if (mediaData.type === 'image') sourceImages.push(mediaData);
 else if (mediaData.type === 'video') sourceVideos.push(mediaData);
+else if (mediaData.type === 'audio') sourceAudios.push(mediaData);
 }
 } else if (edge.targetHandle === 'style-in') {
 if (src.type === 'styleNode') {
 if (src.data.positivePrompt) positiveStyle += (positiveStyle ? ', ' : '') + src.data.positivePrompt;
 if (src.data.negativePrompt) negativeStyle += (negativeStyle ? ', ' : '') + src.data.negativePrompt;
 }
+} else if (edge.targetHandle === 'text-in') {
+if (src.data.result?.type === 'text' && src.data.result.text) sourceTexts.push(src.data.result.text);
 }
 }
 
@@ -634,6 +645,27 @@ prompt: finalPrompt,
 negativePrompt: negativeStyle || undefined,
 referenceImages,
 model: resolveTextModelId(node.data.model),
+});
+setNodes(nds => nds.map(n => n.id === nodeId ? {
+...n,
+data: {
+...n.data, isLoading: false, statusText: 'Hoàn tất', isFinalized: true,
+lastRunHash: getNodeStateHash(node, currentEdges),
+result: { type: 'text', text }
+}
+} : n));
+return;
+}
+
+if (node.type === 'stt') {
+const sourceMedia = sourceVideos[0] || sourceAudios[0];
+if (!sourceMedia) throw new Error('Chưa có video/audio nào nối vào node này.');
+const mediaBase64 = await readAssetAsBase64(sourceMedia.path);
+const text = await textProvider.transcribeMedia({
+mediaBase64,
+mimeType: sourceMedia.mimeType,
+model: resolveTextModelId(node.data.model),
+instruction: node.data.localPrompt || undefined,
 });
 setNodes(nds => nds.map(n => n.id === nodeId ? {
 ...n,
@@ -733,7 +765,7 @@ const currentEdges = getEdges();
 const readyNodes = Array.from(remainingNodes).filter(id => {
 const node = currentNodes.find(n => n.id === id);
 if (!node) return false;
-if (node.type === 'mediaSource' || node.type === 'styleNode') {
+if (node.type === 'mediaSource' || node.type === 'styleNode' || node.type === 'textReview') {
 completedNodes.add(id);
 remainingNodes.delete(id);
 return false;
@@ -869,7 +901,7 @@ concurrency={concurrency} onChangeConcurrency={() => {}}
 onRunPipeline={() => {
 const currentNodes = getNodes();
 const currentEdges = getEdges();
-const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen') && isNodeDirty(n, currentEdges));
+const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt') && isNodeDirty(n, currentEdges));
 const ids = new Set<string>();
 dirty.forEach(n => { ids.add(n.id); getDescendants(n.id, currentNodes, currentEdges).forEach(d => ids.add(d)); });
 executeWorkflow(Array.from(ids));

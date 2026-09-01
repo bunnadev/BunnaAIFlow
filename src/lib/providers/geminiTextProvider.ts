@@ -68,4 +68,58 @@ export class GeminiTextProvider {
 
     return text;
   }
+
+  /**
+   * Gửi thẳng video/audio (inlineData base64) cho Gemini và yêu cầu trả về
+   * transcript nguyên văn — không cần tách audio hay chạy STT riêng, Gemini
+   * nhận media trực tiếp. Chỉ phù hợp cho file đủ nhỏ để nhúng base64 trong
+   * request (không qua File API), khớp với cách app đang xử lý ảnh tham chiếu.
+   */
+  async transcribeMedia(params: { mediaBase64: string; mimeType: string; model: string; instruction?: string }): Promise<string> {
+    if (!this.apiKey) {
+      throw new Error('Chưa có Gemini API key. Vào Settings để nhập.');
+    }
+
+    const instruction = params.instruction?.trim() ||
+      'Nghe file media này và trả về đúng nguyên văn lời thoại/giọng nói bằng tiếng Việt (transcript). ' +
+      'Không dịch, không tóm tắt, không thêm bình luận — chỉ trả về phần lời nói dưới dạng văn bản thuần, ' +
+      'giữ nguyên dấu câu tự nhiên theo cách người nói ngắt câu.';
+
+    const parts = [
+      { inlineData: { mimeType: params.mimeType, data: params.mediaBase64 } },
+      { text: instruction },
+    ];
+
+    const res = await fetch(`${API_BASE}/models/${params.model}:generateContent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': this.apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: { maxOutputTokens: 8192 },
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Gemini text API lỗi (${res.status}): ${errText}`);
+    }
+
+    const json = await res.json();
+    const candidate = json?.candidates?.[0];
+    const textParts = candidate?.content?.parts as Array<{ text?: string }> | undefined;
+    const text = textParts?.map((p) => p.text ?? '').join('').trim();
+
+    if (!text) {
+      throw new Error('Gemini không trả về transcript nào. Kiểm tra lại file media (định dạng/độ dài) hoặc model đã chọn.');
+    }
+
+    if (candidate?.finishReason === 'MAX_TOKENS') {
+      throw new Error('Transcript bị cắt do vượt giới hạn độ dài output — video/audio quá dài cho 1 lần gọi.');
+    }
+
+    return text;
+  }
 }

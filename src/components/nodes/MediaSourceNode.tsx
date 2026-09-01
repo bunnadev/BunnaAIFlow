@@ -24,12 +24,12 @@ const selectFromDisk = async () => {
 try {
 const picked = await open({
 multiple: false,
-filters: [{ name: 'Ảnh/Video', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4', 'webm', 'mov'] }],
+filters: [{ name: 'Ảnh/Video/Audio', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4', 'webm', 'mov', 'mp3', 'wav', 'm4a', 'aac'] }],
 });
 if (!picked || Array.isArray(picked)) return;
 
 const mimeType = mimeTypeFromExtension(picked);
-const type: 'image' | 'video' = mimeType.startsWith('video') ? 'video' : 'image';
+const type: 'image' | 'video' | 'audio' = mimeType.startsWith('video') ? 'video' : mimeType.startsWith('audio') ? 'audio' : 'image';
 const bytes = await readFile(picked);
 const asset = await saveAssetFromBytes(bytes, mimeType);
 const name = picked.split(/[/\\]/).pop() ?? 'Media';
@@ -119,6 +119,11 @@ className="relative group/img overflow-hidden rounded-xl border border-white/10 
 >
 {data.media.type === 'video' ? (
 <video src={toDisplayUrl(data.media.path)} className="w-full h-auto max-h-[200px] object-contain" muted loop autoPlay playsInline />
+) : data.media.type === 'audio' ? (
+<div className="w-full py-6 flex flex-col items-center justify-center gap-2 text-white/40">
+<span className="material-symbols-outlined text-3xl">graphic_eq</span>
+<audio src={toDisplayUrl(data.media.path)} controls className="w-full h-7" onClick={(e) => e.stopPropagation()} />
+</div>
 ) : (
 <img src={toDisplayUrl(data.media.path)} className="w-full h-auto max-h-[200px] object-contain" alt="Preview" />
 )}

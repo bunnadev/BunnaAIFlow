@@ -27,6 +27,9 @@ function extFromMime(mimeType: string): string {
   if (mimeType.includes('gif')) return 'gif';
   if (mimeType.includes('mp4')) return 'mp4';
   if (mimeType.includes('webm')) return 'webm';
+  if (mimeType.includes('mpeg') || mimeType.includes('mp3')) return 'mp3';
+  if (mimeType.includes('wav')) return 'wav';
+  if (mimeType.includes('m4a') || mimeType.includes('x-m4a')) return 'm4a';
   return 'bin';
 }
 
@@ -70,6 +73,10 @@ export function mimeTypeFromExtension(filePath: string): string {
     mp4: 'video/mp4',
     webm: 'video/webm',
     mov: 'video/quicktime',
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    m4a: 'audio/mp4',
+    aac: 'audio/aac',
   };
   return map[ext] ?? 'application/octet-stream';
 }

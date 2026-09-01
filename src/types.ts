@@ -4,7 +4,7 @@ export interface MediaAsset {
   assetId: string;
   path: string;
   mimeType: string;
-  type: 'image' | 'video';
+  type: 'image' | 'video' | 'audio';
   name?: string;
   resolution?: string;
   fileBaseName?: string;
