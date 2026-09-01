@@ -26,6 +26,28 @@ export interface MediaAsset {
   masteredNote?: string;
 }
 
+export interface Scene {
+  id: string;
+  start: number;
+  end: number;
+  duration: number;
+  /** Độ dài clip Veo được làm tròn lên (4/6/8/10s) — theo đúng quy ước của skill daoly-voice. */
+  veo: number;
+  /** Lời thoại (voice-over) của cảnh này, ghép từ các câu rơi vào khoảng [start, end]. */
+  vo: string;
+  setting: string;
+  subject: string;
+  light: string;
+  camera: string;
+}
+
+export interface SceneListResult {
+  type: 'sceneList';
+  scenes: Scene[];
+  title?: string;
+  style?: string;
+}
+
 export interface LogEntry {
   id: string;
   nodeId: string;

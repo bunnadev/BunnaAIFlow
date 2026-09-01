@@ -26,7 +26,7 @@ left: x,
 
 if (typeof window !== 'undefined') {
 const menuWidth = 224; // w-56 = 14rem = 224px
-const menuHeight = 440; // Adjusted height for more items
+const menuHeight = 520; // Adjusted height for more items
 if (x + menuWidth > window.innerWidth) menuStyle.left = window.innerWidth - menuWidth - 20;
 if (y + menuHeight > window.innerHeight) menuStyle.top = window.innerHeight - menuHeight - 20;
 }
@@ -87,6 +87,20 @@ label: 'Làm Đẹp Âm Thanh',
 icon: 'equalizer',
 color: 'text-[#06b6d4]',
 bg: 'hover:bg-[#06b6d4]/10'
+},
+{
+type: 'scenePlanner',
+label: 'Phân Tích Cảnh',
+icon: 'movie_filter',
+color: 'text-[#ec4899]',
+bg: 'hover:bg-[#ec4899]/10'
+},
+{
+type: 'sceneReview',
+label: 'Duyệt Phân Cảnh',
+icon: 'playlist_add_check',
+color: 'text-[#f43f5e]',
+bg: 'hover:bg-[#f43f5e]/10'
 },
 {
 type: 'styleNode',

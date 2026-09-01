@@ -25,6 +25,8 @@ import SttNode from './components/nodes/SttNode';
 import TextReviewNode from './components/nodes/TextReviewNode';
 import VbeeNode from './components/nodes/VbeeNode';
 import AudioMasterNode from './components/nodes/AudioMasterNode';
+import ScenePlannerNode from './components/nodes/ScenePlannerNode';
+import SceneReviewNode from './components/nodes/SceneReviewNode';
 import StyleNode from './components/nodes/StyleNode';
 import DeleteEdge from './components/nodes/DeleteEdge';
 import WorkspaceManager from './components/WorkspaceManager';
@@ -53,6 +55,7 @@ import { GeminiOmniFlashProvider } from './lib/providers/geminiOmniFlashProvider
 import { GeminiTextProvider } from './lib/providers/geminiTextProvider';
 import { VbeeProvider } from './lib/providers/vbeeProvider';
 import { DEFAULT_VBEE_VOICE_NAME, resolveVbeeVoiceCode } from './lib/vbeeVoices';
+import { buildScenesSkeleton } from './lib/sceneGrouping';
 import { resolveImageModelId, resolveVideoModelId, resolveTextModelId } from './lib/models';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { writeFile, readFile } from '@tauri-apps/plugin-fs';
@@ -61,8 +64,8 @@ import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 
 export const getNodeFileName = (node: Node, index: number, prefix: string = 'BUNNA_FLOW') => {
-const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : ((node.type === 'vbee' || node.type === 'audioMaster') ? 'AUD' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES')));
-const extension = node.data.result?.type === 'video' ? 'mp4' : (node.data.result?.type === 'text' ? 'txt' : (node.data.result?.type === 'audio' ? 'wav' : 'jpg'));
+const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : ((node.type === 'vbee' || node.type === 'audioMaster') ? 'AUD' : ((node.type === 'scenePlanner' || node.type === 'sceneReview') ? 'SCN' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES'))));
+const extension = node.data.result?.type === 'video' ? 'mp4' : (node.data.result?.type === 'text' ? 'txt' : (node.data.result?.type === 'audio' ? 'wav' : (node.data.result?.type === 'sceneList' ? 'json' : 'jpg')));
 const label = (node.data.label || 'ASSET').replace(/[^a-z0-9]/gi, '_').toUpperCase();
 return `${prefix}_${typeCode}_${index + 1}_${label}.${extension}`;
 };
@@ -76,6 +79,8 @@ stt: SttNode,
 textReview: TextReviewNode,
 vbee: VbeeNode,
 audioMaster: AudioMasterNode,
+scenePlanner: ScenePlannerNode,
+sceneReview: SceneReviewNode,
 styleNode: StyleNode,
 };
 
@@ -209,7 +214,7 @@ setUndoStack(prev => [...prev, { nodes: getNodes(), edges: getEdges() }]);
 
 const handleResetAllResults = useCallback(() => {
 setNodes(nds => nds.map(node => {
-if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee' || node.type === 'audioMaster') {
+if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee' || node.type === 'audioMaster' || node.type === 'scenePlanner') {
 return {
 ...node,
 data: { ...node.data, result: null, statusText: '', isFinalized: false, isLoading: false }
@@ -394,6 +399,7 @@ const baseParts = [node.data.model, node.data.localPrompt, node.data.aspectRatio
 if (incomingTextEdges.length > 0) baseParts.push(incomingTextHash);
 if (node.type === 'vbee') baseParts.push(node.data.voiceLabel, node.data.speed, node.data.gapSeconds);
 if (node.type === 'audioMaster') baseParts.push(node.data.targetLufs);
+if (node.type === 'scenePlanner') baseParts.push(node.data.targetSceneSeconds);
 return baseParts.join('::');
 }, [getNodes]);
 
@@ -418,6 +424,8 @@ case 'stt': newNode = { id, type, position: finalPos, data: { ...commonData, lab
 case 'textReview': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Duyệt Text', isFinalized: true, editedText: '' } }; break;
 case 'vbee': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Vbee TTS', voiceLabel: DEFAULT_VBEE_VOICE_NAME, speed: 0.95, gapSeconds: 0.35, sampleRate: 48000 } }; break;
 case 'audioMaster': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Làm Đẹp Âm Thanh', targetLufs: -14 } }; break;
+case 'scenePlanner': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phân Tích Cảnh', model: 'Gemini 3.6 Flash', targetSceneSeconds: 6.0 } }; break;
+case 'sceneReview': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Duyệt Phân Cảnh', isFinalized: true, editedScenes: [] } }; break;
 case 'styleNode': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phong cách', positivePrompt: '', negativePrompt: '' } }; break;
 default: return;
 }
@@ -575,6 +583,10 @@ const path = await saveDialog({ defaultPath: filename });
 if (!path) return;
 if (node.data.result.type === 'text') {
 await writeFile(path, new TextEncoder().encode(node.data.result.text));
+return;
+}
+if (node.data.result.type === 'sceneList') {
+await writeFile(path, new TextEncoder().encode(JSON.stringify(node.data.result, null, 2)));
 return;
 }
 const base64 = await readAssetAsBase64(node.data.result.path);
@@ -781,6 +793,42 @@ masteredNote,
 return;
 }
 
+if (node.type === 'scenePlanner') {
+const sourceVideo = sourceVideos[0];
+const sourceAudio = sourceAudios[0];
+if (!sourceVideo) throw new Error('Chưa có video gốc nào nối vào node này.');
+if (!sourceAudio) throw new Error('Chưa có audio (từ Vbee/Làm Đẹp Âm Thanh) nào nối vào node này.');
+if (!sourceAudio.timingSentences?.length) throw new Error('Audio nối vào chưa có mốc thời gian từng câu (timingSentences) — phải là audio đi thẳng hoặc gián tiếp từ node Vbee TTS.');
+
+setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, statusText: 'Đang chia phân cảnh theo lời thoại...' } } : n));
+
+const skeleton = buildScenesSkeleton(sourceAudio.timingSentences, sourceAudio.durationSeconds ?? sourceAudio.timingSentences[sourceAudio.timingSentences.length - 1].end, node.data.targetSceneSeconds ?? 6.0);
+if (skeleton.length === 0) throw new Error('Không chia được phân cảnh nào từ audio đầu vào.');
+
+setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, statusText: `Đang phân tích hình ảnh cho ${skeleton.length} cảnh...` } } : n));
+
+const videoBase64 = await readAssetAsBase64(sourceVideo.path);
+const filled = await textProvider.fillSceneDetails({
+videoBase64,
+videoMimeType: sourceVideo.mimeType,
+scenes: skeleton.map(s => ({ id: s.id, start: s.start, end: s.end, vo: s.vo })),
+style: positiveStyle || undefined,
+model: resolveTextModelId(node.data.model),
+});
+
+const scenes = skeleton.map(s => ({ ...s, ...(filled[s.id] ?? {}) }));
+
+setNodes(nds => nds.map(n => n.id === nodeId ? {
+...n,
+data: {
+...n.data, isLoading: false, statusText: 'Hoàn tất', isFinalized: true,
+lastRunHash: getNodeStateHash(node, currentEdges),
+result: { type: 'sceneList', scenes, style: positiveStyle || undefined }
+}
+} : n));
+return;
+}
+
 let genResult: { base64: string; mimeType: string };
 let resultType: 'image' | 'video';
 
@@ -868,7 +916,7 @@ const currentEdges = getEdges();
 const readyNodes = Array.from(remainingNodes).filter(id => {
 const node = currentNodes.find(n => n.id === id);
 if (!node) return false;
-if (node.type === 'mediaSource' || node.type === 'styleNode' || node.type === 'textReview') {
+if (node.type === 'mediaSource' || node.type === 'styleNode' || node.type === 'textReview' || node.type === 'sceneReview') {
 completedNodes.add(id);
 remainingNodes.delete(id);
 return false;
@@ -1008,7 +1056,7 @@ concurrency={concurrency} onChangeConcurrency={() => {}}
 onRunPipeline={() => {
 const currentNodes = getNodes();
 const currentEdges = getEdges();
-const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt' || n.type === 'vbee' || n.type === 'audioMaster') && isNodeDirty(n, currentEdges));
+const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt' || n.type === 'vbee' || n.type === 'audioMaster' || n.type === 'scenePlanner') && isNodeDirty(n, currentEdges));
 const ids = new Set<string>();
 dirty.forEach(n => { ids.add(n.id); getDescendants(n.id, currentNodes, currentEdges).forEach(d => ids.add(d)); });
 executeWorkflow(Array.from(ids));

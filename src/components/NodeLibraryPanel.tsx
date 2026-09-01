@@ -15,7 +15,9 @@ const nodeTypes = [
 { type: 'stt', label: 'Tách Audio', desc: 'Video/audio vào, transcript text ra (Gemini nghe trực tiếp).', icon: 'graphic_eq', color: 'text-[#22c55e]', bg: 'bg-[#22c55e]/10' },
 { type: 'textReview', label: 'Duyệt Text', desc: 'Sửa tay transcript trước khi đưa qua bước tiếp theo (bỏ đoạn quảng cáo…).', icon: 'edit_note', color: 'text-[#a855f7]', bg: 'bg-[#a855f7]/10' },
 { type: 'vbee', label: 'Vbee TTS', desc: 'Text vào, giọng đọc Vbee ra — đọc từng câu rồi tự ghép, kèm mốc thời gian.', icon: 'record_voice_over', color: 'text-[#eab308]', bg: 'bg-[#eab308]/10' },
-{ type: 'audioMaster', label: 'Làm Đẹp Âm Thanh', desc: 'Lọc rì, giảm tiếng xì, chuẩn hoá âm lượng bằng ffmpeg (tuỳ chọn, không có ffmpeg vẫn chạy được).', icon: 'equalizer', color: 'text-[#06b6d4]', bg: 'bg-[#06b6d4]/10' }
+{ type: 'audioMaster', label: 'Làm Đẹp Âm Thanh', desc: 'Lọc rì, giảm tiếng xì, chuẩn hoá âm lượng bằng ffmpeg (tuỳ chọn, không có ffmpeg vẫn chạy được).', icon: 'equalizer', color: 'text-[#06b6d4]', bg: 'bg-[#06b6d4]/10' },
+{ type: 'scenePlanner', label: 'Phân Tích Cảnh', desc: 'Video gốc + audio Vbee + style vào, tự chia phân cảnh theo lời thoại và điền prompt hình ảnh.', icon: 'movie_filter', color: 'text-[#ec4899]', bg: 'bg-[#ec4899]/10' },
+{ type: 'sceneReview', label: 'Duyệt Phân Cảnh', desc: 'Bỏ bớt cảnh không cần (VD cảnh quảng cáo) trước khi đưa qua bước gen ảnh.', icon: 'playlist_add_check', color: 'text-[#f43f5e]', bg: 'bg-[#f43f5e]/10' }
 ];
 
 return (

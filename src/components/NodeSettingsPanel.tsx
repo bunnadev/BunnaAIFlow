@@ -36,6 +36,8 @@ const isStt = node.type === 'stt';
 const isTextReview = node.type === 'textReview';
 const isVbee = node.type === 'vbee';
 const isAudioMaster = node.type === 'audioMaster';
+const isScenePlanner = node.type === 'scenePlanner';
+const isSceneReview = node.type === 'sceneReview';
 const isMediaSource = node.type === 'mediaSource';
 const data = node.data;
 
@@ -50,9 +52,9 @@ return (
 <div className="absolute top-0 left-0 h-full w-[288px] bg-[#0b1019] border-r border-[#F1641E]/20 z-30 flex flex-col shadow-2xl animate-slide-panel">
 <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
 <div className="flex items-center gap-2.5">
-<div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : isText ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : isStt ? 'bg-[#22c55e]/10 text-[#22c55e]' : isTextReview ? 'bg-[#a855f7]/10 text-[#a855f7]' : isVbee ? 'bg-[#eab308]/10 text-[#eab308]' : isAudioMaster ? 'bg-[#06b6d4]/10 text-[#06b6d4]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
+<div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : isText ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : isStt ? 'bg-[#22c55e]/10 text-[#22c55e]' : isTextReview ? 'bg-[#a855f7]/10 text-[#a855f7]' : isVbee ? 'bg-[#eab308]/10 text-[#eab308]' : isAudioMaster ? 'bg-[#06b6d4]/10 text-[#06b6d4]' : isScenePlanner ? 'bg-[#ec4899]/10 text-[#ec4899]' : isSceneReview ? 'bg-[#f43f5e]/10 text-[#f43f5e]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
 <span className="material-symbols-outlined text-[19px]">
-{isImage ? 'palette' : isVideo ? 'movie' : isText ? 'data_object' : isStt ? 'graphic_eq' : isTextReview ? 'edit_note' : isVbee ? 'record_voice_over' : isAudioMaster ? 'equalizer' : isMediaSource ? 'perm_media' : 'settings'}
+{isImage ? 'palette' : isVideo ? 'movie' : isText ? 'data_object' : isStt ? 'graphic_eq' : isTextReview ? 'edit_note' : isVbee ? 'record_voice_over' : isAudioMaster ? 'equalizer' : isScenePlanner ? 'movie_filter' : isSceneReview ? 'playlist_add_check' : isMediaSource ? 'perm_media' : 'settings'}
 </span>
 </div>
 <div>
@@ -159,7 +161,31 @@ Danh sách tạm thời, chọn lọc thủ công, sẽ nối vào bunna API (c�
 </>
 )}
 
-{!isMediaSource && !isText && !isStt && !isTextReview && !isVbee && !isAudioMaster && (
+{isScenePlanner && (
+<>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Cấu hình Model</SectionLabel>
+<FieldDropdown label="Mẫu AI" value={data.model} options={TEXT_MODELS} onChange={(v) => updateNode('model', v)} />
+</div>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Chia phân cảnh</SectionLabel>
+<RangeSlider label="Độ dài cảnh mong muốn" value={data.targetSceneSeconds ?? 6.0} min={3} max={10} step={0.5} formatValue={(v) => `${v}s`} onChange={(v) => updateNode('targetSceneSeconds', v)} />
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Node gom các câu liền nhau (theo mốc thời gian từ audio Vbee) thành từng cảnh dài gần mức này, không cắt giữa câu. Cần nối cả video gốc lẫn audio (media-in) và style (style-in, không bắt buộc).
+</p>
+</div>
+</>
+)}
+
+{isSceneReview && (
+<div className="flex flex-col gap-2 px-1">
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Node này không gọi AI, chỉ giữ danh sách cảnh bạn tự lọc. Bấm nút "Lấy từ input" ngay trên node để tải shotlist mới nhất, rồi bỏ những cảnh không cần (VD cảnh quảng cáo trong video gốc) bằng nút xoá từng dòng.
+</p>
+</div>
+)}
+
+{!isMediaSource && !isText && !isStt && !isTextReview && !isVbee && !isAudioMaster && !isScenePlanner && !isSceneReview && (
 <>
 <div className="flex flex-col gap-3.5">
 <SectionLabel>Cấu hình Model</SectionLabel>
