@@ -23,6 +23,7 @@ import VideoGenNode from './components/nodes/VideoGenNode';
 import TextGenNode from './components/nodes/TextGenNode';
 import SttNode from './components/nodes/SttNode';
 import TextReviewNode from './components/nodes/TextReviewNode';
+import VbeeNode from './components/nodes/VbeeNode';
 import StyleNode from './components/nodes/StyleNode';
 import DeleteEdge from './components/nodes/DeleteEdge';
 import WorkspaceManager from './components/WorkspaceManager';
@@ -44,11 +45,13 @@ import type { Workspace, LogEntry, MediaAsset } from './types';
 import { loadSettings, saveSettings, type AppSettings } from './lib/settings';
 import { loadWorkspaceState, saveWorkspaceState } from './lib/workspaceStore';
 import { exportSingleWorkspace, exportAllWorkspaces, importWorkspaces, type ImportedBundle } from './lib/exportImport';
-import { saveAssetFromBase64, readAssetAsBase64 } from './lib/assets';
+import { saveAssetFromBase64, saveAssetFromBytes, readAssetAsBase64 } from './lib/assets';
 import { GeminiImageProvider } from './lib/providers/geminiImageProvider';
 import { GeminiVideoProvider } from './lib/providers/geminiVideoProvider';
 import { GeminiOmniFlashProvider } from './lib/providers/geminiOmniFlashProvider';
 import { GeminiTextProvider } from './lib/providers/geminiTextProvider';
+import { VbeeProvider } from './lib/providers/vbeeProvider';
+import { DEFAULT_VBEE_VOICE_NAME, resolveVbeeVoiceCode } from './lib/vbeeVoices';
 import { resolveImageModelId, resolveVideoModelId, resolveTextModelId } from './lib/models';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
@@ -56,8 +59,8 @@ import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 
 export const getNodeFileName = (node: Node, index: number, prefix: string = 'BUNNA_FLOW') => {
-const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES'));
-const extension = node.data.result?.type === 'video' ? 'mp4' : (node.data.result?.type === 'text' ? 'txt' : 'jpg');
+const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : (node.type === 'vbee' ? 'AUD' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES')));
+const extension = node.data.result?.type === 'video' ? 'mp4' : (node.data.result?.type === 'text' ? 'txt' : (node.data.result?.type === 'audio' ? 'wav' : 'jpg'));
 const label = (node.data.label || 'ASSET').replace(/[^a-z0-9]/gi, '_').toUpperCase();
 return `${prefix}_${typeCode}_${index + 1}_${label}.${extension}`;
 };
@@ -69,6 +72,7 @@ videoGen: VideoGenNode,
 textGen: TextGenNode,
 stt: SttNode,
 textReview: TextReviewNode,
+vbee: VbeeNode,
 styleNode: StyleNode,
 };
 
@@ -202,7 +206,7 @@ setUndoStack(prev => [...prev, { nodes: getNodes(), edges: getEdges() }]);
 
 const handleResetAllResults = useCallback(() => {
 setNodes(nds => nds.map(node => {
-if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt') {
+if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee') {
 return {
 ...node,
 data: { ...node.data, result: null, statusText: '', isFinalized: false, isLoading: false }
@@ -373,7 +377,17 @@ return `${srcNode.data.positivePrompt || ''}|${srcNode.data.negativePrompt || ''
 return '';
 }).sort().join('|');
 
-return [node.data.model, node.data.localPrompt, node.data.aspectRatio, node.data.resolution, node.data.duration, incomingMediaIds, styleStrings].join('::');
+const incomingTextEdges = currentEdges.filter(e => e.target === node.id && e.targetHandle === 'text-in');
+const incomingTextHash = incomingTextEdges.map(e => {
+const srcNode = currentNodes.find(n => n.id === e.source);
+return srcNode?.data?.result?.type === 'text' ? (srcNode.data.result.text || '') : '';
+}).sort().join('|');
+
+return [
+node.data.model, node.data.localPrompt, node.data.aspectRatio, node.data.resolution, node.data.duration,
+node.data.voiceLabel, node.data.speed, node.data.gapSeconds,
+incomingMediaIds, styleStrings, incomingTextHash,
+].join('::');
 }, [getNodes]);
 
 const isNodeDirty = useCallback((node: Node, currentEdges: Edge[]) => {
@@ -395,6 +409,7 @@ case 'videoGen': newNode = { id, type, position: finalPos, data: { ...commonData
 case 'textGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Text AI', model: 'Gemini 2.5 Flash', localPrompt: '' } }; break;
 case 'stt': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Tách Audio', model: 'Gemini 2.5 Flash', localPrompt: '' } }; break;
 case 'textReview': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Duyệt Text', isFinalized: true, editedText: '' } }; break;
+case 'vbee': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Vbee TTS', voiceLabel: DEFAULT_VBEE_VOICE_NAME, speed: 0.95, gapSeconds: 0.35, sampleRate: 48000 } }; break;
 case 'styleNode': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phong cách', positivePrompt: '', negativePrompt: '' } }; break;
 default: return;
 }
@@ -678,6 +693,39 @@ result: { type: 'text', text }
 return;
 }
 
+if (node.type === 'vbee') {
+const scriptText = sourceTexts.join('\n\n');
+if (!scriptText.trim()) throw new Error('Chưa có text nào nối vào node này.');
+
+const vbeeProvider = new VbeeProvider(appSettingsRef.current.vbeeAppId ?? '', appSettingsRef.current.vbeeToken ?? '');
+const synthResult = await vbeeProvider.synthesizeScript({
+text: scriptText,
+voiceCode: resolveVbeeVoiceCode(node.data.voiceLabel),
+speed: node.data.speed ?? 0.95,
+sampleRate: node.data.sampleRate ?? 48000,
+gapSeconds: node.data.gapSeconds ?? 0.35,
+onProgress: ({ current, total }) => {
+setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, statusText: `Đang đọc câu ${current}/${total}...` } } : n));
+},
+});
+
+const asset = await saveAssetFromBytes(synthResult.audioBytes, 'audio/wav');
+setNodes(nds => nds.map(n => n.id === nodeId ? {
+...n,
+data: {
+...n.data, isLoading: false, statusText: 'Hoàn tất', isFinalized: true,
+lastRunHash: getNodeStateHash(node, currentEdges),
+result: {
+...asset, type: 'audio',
+durationSeconds: synthResult.durationSeconds,
+sampleRate: synthResult.sampleRate,
+timingSentences: synthResult.sentences.map(s => ({ index: s.index, text: s.text, start: s.start, end: s.end })),
+}
+}
+} : n));
+return;
+}
+
 let genResult: { base64: string; mimeType: string };
 let resultType: 'image' | 'video';
 
@@ -901,7 +949,7 @@ concurrency={concurrency} onChangeConcurrency={() => {}}
 onRunPipeline={() => {
 const currentNodes = getNodes();
 const currentEdges = getEdges();
-const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt') && isNodeDirty(n, currentEdges));
+const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt' || n.type === 'vbee') && isNodeDirty(n, currentEdges));
 const ids = new Set<string>();
 dirty.forEach(n => { ids.add(n.id); getDescendants(n.id, currentNodes, currentEdges).forEach(d => ids.add(d)); });
 executeWorkflow(Array.from(ids));

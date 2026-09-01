@@ -14,6 +14,8 @@ const SettingsPanel: React.FC<Props> = ({ settings, onSave, onClose, filenamePre
 const [geminiApiKey, setGeminiApiKey] = useState(settings.geminiApiKey ?? '');
 const [licensePublicKey, setLicensePublicKey] = useState(settings.licensePublicKey ?? '');
 const [licenseSecretKey, setLicenseSecretKey] = useState(settings.licenseSecretKey ?? '');
+const [vbeeAppId, setVbeeAppId] = useState(settings.vbeeAppId ?? '');
+const [vbeeToken, setVbeeToken] = useState(settings.vbeeToken ?? '');
 
 const handleSave = () => {
 onSave({
@@ -21,6 +23,8 @@ onSave({
 geminiApiKey: geminiApiKey.trim(),
 licensePublicKey: licensePublicKey.trim(),
 licenseSecretKey: licenseSecretKey.trim(),
+vbeeAppId: vbeeAppId.trim(),
+vbeeToken: vbeeToken.trim(),
 });
 onClose();
 };
@@ -88,6 +92,27 @@ className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 r
 />
 <p className="text-[10px] text-[#94a3b8] leading-relaxed">
 Đổi access key sẽ được xác thực lại ở lần mở app tiếp theo.
+</p>
+</div>
+
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Vbee TTS (App-Id / Token)</SectionLabel>
+<input
+type="text"
+value={vbeeAppId}
+onChange={(e) => setVbeeAppId(e.target.value)}
+placeholder="App-Id"
+className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 rounded-xl px-3 py-2.5 text-[12px] text-white outline-none transition-all font-mono"
+/>
+<input
+type="password"
+value={vbeeToken}
+onChange={(e) => setVbeeToken(e.target.value)}
+placeholder="Token"
+className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 rounded-xl px-3 py-2.5 text-[12px] text-white outline-none transition-all font-mono"
+/>
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Dùng cho node "Vbee TTS". Lấy tại tài khoản Vbee của bạn (vbee.vn) — mục tích hợp API.
 </p>
 </div>
 </div>

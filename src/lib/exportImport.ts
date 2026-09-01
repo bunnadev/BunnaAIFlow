@@ -46,7 +46,7 @@ async function nodeForExport(node: Node): Promise<Node> {
     };
   }
 
-  if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt') {
+  if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee') {
     const { result: _result, isFinalized: _f, isLoading: _l, statusText: _s, lastRunHash: _h, ...rest } = node.data;
     return {
       ...node,

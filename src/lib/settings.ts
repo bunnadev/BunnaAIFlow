@@ -6,6 +6,9 @@ export interface AppSettings {
   /** Access key license BunnaAIFlow — cặp public/secret cấp qua bunna dashboard. */
   licensePublicKey?: string;
   licenseSecretKey?: string;
+  /** BYOK cho node Vbee TTS — App-Id/Token cấp qua tài khoản Vbee của Huy. */
+  vbeeAppId?: string;
+  vbeeToken?: string;
 }
 
 const SETTINGS_FILENAME = 'settings.json';

@@ -13,7 +13,8 @@ const nodeTypes = [
 { type: 'videoGen', label: 'Video AI', desc: 'Tạo video từ ảnh.', icon: 'movie', color: 'text-[#f5a623]', bg: 'bg-[#f5a623]/10' },
 { type: 'textGen', label: 'Text AI', desc: 'Trả lời/tạo chữ, code từ prompt (kèm ảnh nếu cần).', icon: 'data_object', color: 'text-[#3b82f6]', bg: 'bg-[#3b82f6]/10' },
 { type: 'stt', label: 'Tách Audio', desc: 'Video/audio vào, transcript text ra (Gemini nghe trực tiếp).', icon: 'graphic_eq', color: 'text-[#22c55e]', bg: 'bg-[#22c55e]/10' },
-{ type: 'textReview', label: 'Duyệt Text', desc: 'Sửa tay transcript trước khi đưa qua bước tiếp theo (bỏ đoạn quảng cáo…).', icon: 'edit_note', color: 'text-[#a855f7]', bg: 'bg-[#a855f7]/10' }
+{ type: 'textReview', label: 'Duyệt Text', desc: 'Sửa tay transcript trước khi đưa qua bước tiếp theo (bỏ đoạn quảng cáo…).', icon: 'edit_note', color: 'text-[#a855f7]', bg: 'bg-[#a855f7]/10' },
+{ type: 'vbee', label: 'Vbee TTS', desc: 'Text vào, giọng đọc Vbee ra — đọc từng câu rồi tự ghép, kèm mốc thời gian.', icon: 'record_voice_over', color: 'text-[#eab308]', bg: 'bg-[#eab308]/10' }
 ];
 
 return (
