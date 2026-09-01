@@ -15,7 +15,9 @@
     {
       "identifier": "http:default",
       "allow": [
-        { "url": "https://generativelanguage.googleapis.com/*" }
+        { "url": "https://generativelanguage.googleapis.com/*" },
+        { "url": "https://api.vbee.vn/*" },
+        { "url": "https://vbee.vn/*" }
       ]
     }
   ]

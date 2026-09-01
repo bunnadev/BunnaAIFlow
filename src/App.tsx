@@ -852,7 +852,11 @@ addLog(nodeId, node.data.label || nodeId, 'success', 'Hoàn tất thành công.'
 } catch (e: any) {
 chainFailed = true;
 stopFlagRef.current = true;
-addLog(nodeId, node.data.label || nodeId, 'error', e?.message || 'Lỗi xử lý.');
+// Lỗi từ Tauri (VD bị chặn bởi capability scope của plugin http) nhiều khi
+// là string thuần chứ không phải Error có .message — trước đây rơi vào
+// 'Lỗi xử lý.' chung chung, không biết đường nào mà sửa.
+const errText = typeof e === 'string' ? e : (e?.message || JSON.stringify(e) || 'Lỗi xử lý.');
+addLog(nodeId, node.data.label || nodeId, 'error', errText);
 } finally {
 activeJobsRef.current--;
 setActiveJobsTick(t => t + 1);
