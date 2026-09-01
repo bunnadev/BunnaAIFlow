@@ -57,6 +57,7 @@ import { GeminiTextProvider } from './lib/providers/geminiTextProvider';
 import { VbeeProvider } from './lib/providers/vbeeProvider';
 import { DEFAULT_VBEE_VOICE_NAME, resolveVbeeVoiceCode } from './lib/vbeeVoices';
 import { buildScenesSkeleton } from './lib/sceneGrouping';
+import { computeFanOut } from './lib/fanOut';
 import { resolveImageModelId, resolveVideoModelId, resolveTextModelId } from './lib/models';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { writeFile, readFile } from '@tauri-apps/plugin-fs';
@@ -454,6 +455,35 @@ isLoading: false, statusText: '', result: null, isFinalized: false, isWaiting: f
 };
 setNodes((nds) => nds.concat(newNode));
 }, [getNodes, setNodes]);
+
+const handleFanOutFromSelection = useCallback(() => {
+const currentNodes = getNodes();
+const currentEdges = getEdges();
+const selectedNodes = currentNodes.filter(n => n.selected);
+if (selectedNodes.length === 0) return;
+
+const sceneSourceNode =
+currentNodes.find(n => n.type === 'sceneReview' && n.data.result?.type === 'sceneList' && n.data.result.scenes?.length > 0) ||
+currentNodes.find(n => n.type === 'scenePlanner' && n.data.result?.type === 'sceneList' && n.data.result.scenes?.length > 0);
+
+if (!sceneSourceNode) {
+setFlowStatus({ message: 'KHÔNG TÌM THẤY NODE PHÂN TÍCH CẢNH/DUYỆT PHÂN CẢNH NÀO CÓ KẾT QUẢ.', type: 'error' });
+setTimeout(() => setFlowStatus(null), 3500);
+return;
+}
+const scenes = sceneSourceNode.data.result.scenes as any[];
+
+setUndoStack(prev => [...prev, { nodes: currentNodes, edges: currentEdges }]);
+
+const { newNodes, newEdges } = computeFanOut(selectedNodes, currentEdges, scenes, Date.now());
+const selectedIds = new Set(selectedNodes.map(n => n.id));
+
+setNodes(nds => nds.map(n => selectedIds.has(n.id) ? { ...n, selected: false } : n).concat(newNodes));
+setEdges(eds => eds.concat(newEdges));
+
+setFlowStatus({ message: `ĐÃ NHÂN BẢN THÀNH ${scenes.length} BẢN THEO CẢNH TỪ "${sceneSourceNode.data.label || sceneSourceNode.id}".`, type: 'success' });
+setTimeout(() => setFlowStatus(null), 4000);
+}, [getNodes, getEdges, setNodes, setEdges]);
 
 const handleBatchConfirm = useCallback(async (imgPrompts: string[], vidPrompts: string[], settings: any, refs: MediaAsset[]) => {
 setIsBatchCombinedModalOpen(false);
@@ -1139,6 +1169,18 @@ proOptions={{ hideAttribution: true }}
 <Background variant={BackgroundVariant.Dots} gap={10} size={1} color="#333" />
 <Controls showInteractive={false} position="bottom-left" />
 <Panel position="bottom-right" className="m-4"><BatchExportPanel nodes={nodes} globalPrefix={filenamePrefix} /></Panel>
+{nodes.some(n => n.selected) && (
+<Panel position="top-center" className="m-4">
+<button
+onClick={handleFanOutFromSelection}
+className="flex items-center gap-2 px-4 py-2.5 bg-[#F1641E] hover:bg-[#F1641E]/80 text-black rounded-xl text-[10px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95"
+title="Nhân bản các node đang chọn thành nhiều bản, mỗi bản 1 phân cảnh — điểm vào của chain sẽ tự nhận prompt riêng từng cảnh"
+>
+<span className="material-symbols-outlined text-[16px]">content_copy</span>
+Nhân bản theo phân cảnh
+</button>
+</Panel>
+)}
 </ReactFlow>
 {menuState && <ContextMenu x={menuState.x} y={menuState.y} onAddManualNode={(type) => onAddManualNode(type, menuState.flowPos)} onClose={() => setMenuState(null)} />}
 {isBatchCombinedModalOpen && <BatchCombinedModal prefix={filenamePrefix} onChangePrefix={setFilenamePrefix} onConfirm={handleBatchConfirm} onCancel={() => setIsBatchCombinedModalOpen(false)} />}

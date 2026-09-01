@@ -64,6 +64,11 @@ export function groupSentencesIntoBeats(sentences: AudioTimingSentence[], totalD
   });
 }
 
+/** Ghép 4 trường mô tả hình ảnh của 1 cảnh thành 1 prompt — dùng khi nhân bản chain mẫu theo phân cảnh (fan-out), ghi đè localPrompt của node "điểm vào". */
+export function composeScenePrompt(scene: Scene): string {
+  return [scene.subject, scene.setting, scene.light, scene.camera].filter(Boolean).join('. ');
+}
+
 /** Bộ khung phân cảnh (mốc thời gian + lời thoại) — 4 trường setting/subject/light/camera để trống, node sẽ tự điền bằng phân tích đa phương thức. */
 export function buildScenesSkeleton(sentences: AudioTimingSentence[], totalDuration: number, targetSeconds = 6.0): Scene[] {
   const beats = groupSentencesIntoBeats(sentences, totalDuration, targetSeconds);
