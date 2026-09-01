@@ -10,7 +10,7 @@ onClose: () => void;
 
 const VIDEO_MODELS = ['Omni Flash', 'Veo 3.1 - Fast', 'Veo 3.1 - Lite', 'Veo 3.1 - Quality'];
 const IMAGE_MODELS = ['Nano Banana Pro', 'Nano Banana 2', 'Nano Banana 2 Lite'];
-const TEXT_MODELS = ['Gemini 2.5 Flash', 'Gemini 3 Pro'];
+const TEXT_MODELS = ['Gemini 3.6 Flash', 'Gemini 3.7 Flash', 'Gemini 3 Pro'];
 const VOICES = [
 "Zephyr — Sáng", "Puck — Vui vẻ", "Charon — Thông tin", "Kore — Cương quyết",
 "Fenrir — Phấn khích", "Leda — Trẻ trung", "Orus — Cương quyết", "Aoede — Nhẹ nhàng",

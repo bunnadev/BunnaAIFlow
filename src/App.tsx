@@ -392,8 +392,8 @@ switch (type) {
 case 'mediaSource': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Nguồn Media', media: null } }; break;
 case 'imageGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Ảnh AI', model: 'Nano Banana Pro', aspectRatio: '16:9', resolution: '4k', localPrompt: '' } }; break;
 case 'videoGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Video AI', model: 'Veo 3.1 - Lite', aspectRatio: '16:9', resolution: '720p', duration: 8, videoMode: 'frame', voiceOverEnabled: false, voiceOverVoice: 'Puck — Upbeat', localPrompt: '' } }; break;
-case 'textGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Text AI', model: 'Gemini 2.5 Flash', localPrompt: '' } }; break;
-case 'stt': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Tách Audio', model: 'Gemini 2.5 Flash', localPrompt: '' } }; break;
+case 'textGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Text AI', model: 'Gemini 3.6 Flash', localPrompt: '' } }; break;
+case 'stt': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Tách Audio', model: 'Gemini 3.6 Flash', localPrompt: '' } }; break;
 case 'textReview': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Duyệt Text', isFinalized: true, editedText: '' } }; break;
 case 'styleNode': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phong cách', positivePrompt: '', negativePrompt: '' } }; break;
 default: return;
