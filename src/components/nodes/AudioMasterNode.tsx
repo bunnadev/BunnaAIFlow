@@ -100,7 +100,7 @@ const AudioMasterNode = ({ id, data }: any) => {
         {result ? (
           <>
             <span className="material-symbols-outlined text-[#06b6d4] text-3xl">equalizer</span>
-            <audio src={toDisplayUrl(result.path)} controls className="w-full h-7" onClick={(e) => e.stopPropagation()} />
+            <audio src={toDisplayUrl(result.path)} controls className="nodrag w-full h-7" onClick={(e) => e.stopPropagation()} />
             <span className="text-[8.5px] text-white/50 font-mono">
               {result.durationSeconds?.toFixed(1) ?? '?'}s
             </span>

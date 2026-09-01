@@ -110,7 +110,7 @@ const ScenePlannerNode = ({ id, data }: any) => {
                 <span className="material-symbols-outlined text-[12px]">delete</span>
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1 max-h-[140px]">
+            <div className="nodrag nowheel flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1 max-h-[140px]">
               {scenes.map((s: any) => (
                 <div key={s.id} className="bg-white/[0.03] border border-white/5 rounded-lg px-2 py-1">
                   <div className="flex items-center justify-between">

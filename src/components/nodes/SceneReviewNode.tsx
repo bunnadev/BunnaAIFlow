@@ -110,7 +110,7 @@ const SceneReviewNode = ({ id, data }: any) => {
             <span className="text-[8px] font-black uppercase tracking-widest">Chưa có cảnh nào</span>
           </div>
         ) : (
-          <div className="flex flex-col gap-1.5 max-h-[280px] overflow-y-auto custom-scrollbar pr-0.5">
+          <div className="nodrag nowheel flex flex-col gap-1.5 max-h-[280px] overflow-y-auto custom-scrollbar pr-0.5">
             {editedScenes.map((s: any) => (
               <div key={s.id} className="bg-black/40 border border-white/5 rounded-xl px-2.5 py-2 flex items-start gap-2 group/scene">
                 <div className="flex-1 min-w-0">

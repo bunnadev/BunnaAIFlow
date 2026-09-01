@@ -97,7 +97,7 @@ const VbeeNode = ({ id, data }: any) => {
         {result ? (
           <>
             <span className="material-symbols-outlined text-[#eab308] text-3xl">graphic_eq</span>
-            <audio src={toDisplayUrl(result.path)} controls className="w-full h-7" onClick={(e) => e.stopPropagation()} />
+            <audio src={toDisplayUrl(result.path)} controls className="nodrag w-full h-7" onClick={(e) => e.stopPropagation()} />
             <span className="text-[8.5px] text-white/50 font-mono">
               {result.timingSentences?.length ?? 0} câu · {result.durationSeconds?.toFixed(1) ?? '?'}s
             </span>

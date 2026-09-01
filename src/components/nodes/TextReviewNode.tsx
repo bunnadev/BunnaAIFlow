@@ -112,7 +112,7 @@ const TextReviewNode = ({ id, data }: any) => {
           value={data.editedText ?? ''}
           onChange={(e) => setEditedText(e.target.value)}
           placeholder="Bấm “Lấy từ input” để tải transcript, rồi sửa trực tiếp ở đây (VD: bỏ đoạn quảng cáo)…"
-          className="w-full h-40 bg-black/60 border border-white/5 hover:border-white/10 rounded-xl p-2.5 text-[10px] text-white/90 outline-none transition-all custom-scrollbar leading-relaxed resize-none placeholder:text-white/20"
+          className="nodrag nowheel w-full h-40 bg-black/60 border border-white/5 hover:border-white/10 rounded-xl p-2.5 text-[10px] text-white/90 outline-none transition-all custom-scrollbar leading-relaxed resize-none placeholder:text-white/20"
         />
 
         {data.editedText && (

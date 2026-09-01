@@ -124,7 +124,7 @@ const SttNode = ({ id, data }: any) => {
       <div className="w-full h-40 bg-black/60 relative overflow-hidden group/media transition-all duration-300">
         {data.result ? (
           <>
-            <pre className="w-full h-full p-2.5 overflow-auto custom-scrollbar text-[9px] text-white/80 font-mono leading-relaxed whitespace-pre-wrap break-words">{data.result.text}</pre>
+            <pre className="nodrag nowheel w-full h-full p-2.5 overflow-auto custom-scrollbar text-[9px] text-white/80 font-mono leading-relaxed whitespace-pre-wrap break-words">{data.result.text}</pre>
             <button
               onClick={onCopy}
               className="absolute bottom-1.5 left-1.5 p-1.5 bg-black/70 hover:bg-[#22c55e] text-white rounded-lg opacity-0 group-hover/media:opacity-100 transition-all border border-white/10 flex items-center justify-center shadow-2xl"

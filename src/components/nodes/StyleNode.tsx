@@ -68,7 +68,7 @@ title="Xoá node"
 value={data.positivePrompt || ''}
 onChange={(e) => updateData('positivePrompt', e.target.value)}
 placeholder="Mô tả phong cách, nghệ thuật..."
-className="w-full h-18 bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 rounded-xl px-3 py-2 text-[10px] text-white outline-none transition-all font-medium resize-none custom-scrollbar placeholder:text-white/10"
+className="nodrag nowheel w-full h-18 bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 rounded-xl px-3 py-2 text-[10px] text-white outline-none transition-all font-medium resize-none custom-scrollbar placeholder:text-white/10"
 />
 </div>
 
@@ -78,7 +78,7 @@ className="w-full h-18 bg-[#050a10] border border-white/5 hover:border-[#F1641E]
 value={data.negativePrompt || ''}
 onChange={(e) => updateData('negativePrompt', e.target.value)}
 placeholder="Hạn chế: chất lượng thấp, lỗi..."
-className="w-full h-18 bg-[#050a10] border border-white/5 hover:border-red-400/30 rounded-xl px-3 py-2 text-[10px] text-white outline-none transition-all font-medium resize-none custom-scrollbar placeholder:text-white/10"
+className="nodrag nowheel w-full h-18 bg-[#050a10] border border-white/5 hover:border-red-400/30 rounded-xl px-3 py-2 text-[10px] text-white outline-none transition-all font-medium resize-none custom-scrollbar placeholder:text-white/10"
 />
 </div>
 </div>

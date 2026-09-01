@@ -122,7 +122,7 @@ className="relative group/img overflow-hidden rounded-xl border border-white/10 
 ) : data.media.type === 'audio' ? (
 <div className="w-full py-6 flex flex-col items-center justify-center gap-2 text-white/40">
 <span className="material-symbols-outlined text-3xl">graphic_eq</span>
-<audio src={toDisplayUrl(data.media.path)} controls className="w-full h-7" onClick={(e) => e.stopPropagation()} />
+<audio src={toDisplayUrl(data.media.path)} controls className="nodrag w-full h-7" onClick={(e) => e.stopPropagation()} />
 </div>
 ) : (
 <img src={toDisplayUrl(data.media.path)} className="w-full h-auto max-h-[200px] object-contain" alt="Preview" />
