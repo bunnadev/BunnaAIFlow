@@ -19,14 +19,13 @@ export const VIDEO_MODEL_IDS: Record<string, string> = {
 };
 
 export const TEXT_MODEL_IDS: Record<string, string> = {
+  // Gemini 2.5 Flash bị Google khai tử CHO KEY MỚI (404 "no longer available
+  // to new users") kể từ khoảng 2026-09 — nhưng key cũ (đã tạo trước đó) có
+  // thể vẫn gọi được, nên giữ lại làm lựa chọn, không ép ai cũng phải đổi.
+  'Gemini 2.5 Flash': 'gemini-2.5-flash',
   'Gemini 3.6 Flash': 'gemini-3.6-flash',
   'Gemini 3.7 Flash': 'gemini-3.7-flash',
-  'Gemini 3 Pro': 'gemini-2.5-pro',
-  // Nhãn cũ, KHÔNG còn trong danh sách chọn ở Settings — chỉ giữ lại để các
-  // node đã lưu trước 2026-09 (khi Google khai tử gemini-2.5-flash cho user
-  // mới, trả 404 gợi ý đổi sang gemini-3.6-flash) vẫn chạy được mà không bắt
-  // người dùng phải vào sửa lại model thủ công.
-  'Gemini 2.5 Flash': 'gemini-3.6-flash',
+  'Gemini 3 Pro': 'gemini-3-pro-preview', // TODO(verify): xác nhận ID chính xác khi test
 };
 
 export function resolveImageModelId(displayName: string): string {
