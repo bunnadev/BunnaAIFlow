@@ -383,11 +383,14 @@ const srcNode = currentNodes.find(n => n.id === e.source);
 return srcNode?.data?.result?.type === 'text' ? (srcNode.data.result.text || '') : '';
 }).sort().join('|');
 
-return [
-node.data.model, node.data.localPrompt, node.data.aspectRatio, node.data.resolution, node.data.duration,
-node.data.voiceLabel, node.data.speed, node.data.gapSeconds,
-incomingMediaIds, styleStrings, incomingTextHash,
-].join('::');
+const baseParts = [node.data.model, node.data.localPrompt, node.data.aspectRatio, node.data.resolution, node.data.duration, incomingMediaIds, styleStrings];
+// Chỉ thêm phần text-in/Vbee vào hash cho những node THỰC SỰ có input đó —
+// nếu thêm vô điều kiện cho mọi node, hash của các node cũ (imageGen/videoGen/
+// textGen/stt đã chạy trước khi có text-in) sẽ đổi dù input chẳng đổi gì, khiến
+// isNodeDirty() coi chúng là "dirty" và chạy lại oan uổng.
+if (incomingTextEdges.length > 0) baseParts.push(incomingTextHash);
+if (node.type === 'vbee') baseParts.push(node.data.voiceLabel, node.data.speed, node.data.gapSeconds);
+return baseParts.join('::');
 }, [getNodes]);
 
 const isNodeDirty = useCallback((node: Node, currentEdges: Edge[]) => {
