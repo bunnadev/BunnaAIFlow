@@ -26,7 +26,7 @@ left: x,
 
 if (typeof window !== 'undefined') {
 const menuWidth = 224; // w-56 = 14rem = 224px
-const menuHeight = 260; // Adjusted height for more items
+const menuHeight = 350; // Adjusted height for more items
 if (x + menuWidth > window.innerWidth) menuStyle.left = window.innerWidth - menuWidth - 20;
 if (y + menuHeight > window.innerHeight) menuStyle.top = window.innerHeight - menuHeight - 20;
 }
@@ -59,6 +59,20 @@ label: 'Text AI',
 icon: 'data_object',
 color: 'text-[#3b82f6]',
 bg: 'hover:bg-[#3b82f6]/10'
+},
+{
+type: 'stt',
+label: 'Tách Audio',
+icon: 'graphic_eq',
+color: 'text-[#22c55e]',
+bg: 'hover:bg-[#22c55e]/10'
+},
+{
+type: 'textReview',
+label: 'Duyệt Text',
+icon: 'edit_note',
+color: 'text-[#a855f7]',
+bg: 'hover:bg-[#a855f7]/10'
 },
 {
 type: 'styleNode',
