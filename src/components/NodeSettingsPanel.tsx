@@ -140,6 +140,7 @@ Danh sách tạm thời, chọn lọc thủ công, sẽ nối vào bunna API (c�
 <p className="text-[10px] text-[#94a3b8] leading-relaxed">
 <span className="text-amber-400/90 font-black">Mẹo:</span> cài{' '}
 <span className="text-white font-mono">ffmpeg</span> trên máy để node tự lọc rì tần thấp, giảm tiếng xì và chuẩn hoá âm lượng giọng đọc — không có cũng chạy được, nhưng chất lượng thô sẽ kém rõ hơn.
+{' '}macOS: <span className="text-white font-mono">brew install ffmpeg</span>. Windows: <span className="text-white font-mono">winget install ffmpeg</span>.
 </p>
 </div>
 </>
