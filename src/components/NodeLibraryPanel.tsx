@@ -10,7 +10,8 @@ const nodeTypes = [
 { type: 'mediaSource', label: 'Media Source', desc: 'Nguồn ảnh/video từ máy.', icon: 'perm_media', color: 'text-[#F1641E]', bg: 'bg-[#F1641E]/10' },
 { type: 'styleNode', label: 'Phong cách', desc: 'Style prompt cho workflow.', icon: 'auto_awesome', color: 'text-[#F1641E]', bg: 'bg-[#F1641E]/10' },
 { type: 'imageGen', label: 'Image AI', desc: 'Tạo ảnh từ Prompt.', icon: 'palette', color: 'text-[#e53935]', bg: 'bg-[#e53935]/10' },
-{ type: 'videoGen', label: 'Video AI', desc: 'Tạo video từ ảnh.', icon: 'movie', color: 'text-[#f5a623]', bg: 'bg-[#f5a623]/10' }
+{ type: 'videoGen', label: 'Video AI', desc: 'Tạo video từ ảnh.', icon: 'movie', color: 'text-[#f5a623]', bg: 'bg-[#f5a623]/10' },
+{ type: 'textGen', label: 'Text AI', desc: 'Trả lời/tạo chữ, code từ prompt (kèm ảnh nếu cần).', icon: 'data_object', color: 'text-[#3b82f6]', bg: 'bg-[#3b82f6]/10' }
 ];
 
 return (

@@ -4,17 +4,17 @@ import React, { useState, useRef, useEffect } from 'react';
 
 export const SectionLabel: React.FC<{ children: React.ReactNode; onExpand?: () => void }> = ({ children, onExpand }) => (
 <div className="flex items-center justify-between px-1 w-full">
-<span className="text-[8.5px] font-bold text-[#94a3b8] tracking-widest lowercase">
+<span className="text-[10px] font-bold text-[#94a3b8] tracking-widest normal-case">
 {children}
 </span>
 {onExpand && (
 <button
 onClick={(e) => { e.stopPropagation(); onExpand(); }}
-className="flex items-center gap-1 px-1.5 py-0.5 bg-white/5 hover:bg-white/10 rounded-lg text-[#94a3b8] hover:text-[#F1641E] transition-all group"
+className="flex items-center gap-1 px-2 py-1 bg-white/5 hover:bg-white/10 rounded-lg text-[#94a3b8] hover:text-[#F1641E] transition-all group"
 title="Mở rộng câu lệnh"
 >
-<span className="text-[7px] font-black uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity">To</span>
-<span className="material-symbols-outlined text-[12px]">expand_content</span>
+<span className="text-[8.5px] font-black uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity">To</span>
+<span className="material-symbols-outlined text-[14px]">expand_content</span>
 </button>
 )}
 </div>
@@ -47,19 +47,17 @@ useOnClickOutside(ref, () => setIsOpen(false));
 return (
 <div ref={ref} className={`relative ${className}`}>
 <button type="button" onClick={() => setIsOpen(!isOpen)}
-className={`w-full text-left border border-[#595959] hover:border-[#F1641E] transition-colors rounded-xl flex flex-col gap-0 justify-center pl-2 pr-1 select-none focus:outline-none bg-[#050a10] ${hideLabel ? 'h-[28px] py-0' : 'pb-1 pt-[3px]'}`}>
-{!hideLabel && <p className="text-[8px] font-medium text-[#94a3b8] tracking-[0.1px] lowercase">{label}</p>}
-<div className="flex items-center justify-between">
-<span className="text-[8.5px] font-medium text-white tracking-[0.1px] truncate mr-1">{value}</span>
-<span className={`material-symbols-outlined text-[12px] text-[#94a3b8] transition-transform ${isOpen ? 'rotate-180' : ''}`}>keyboard_arrow_down</span>
-</div>
+className={`relative w-full text-left border border-[#595959] hover:border-[#F1641E] transition-colors rounded-xl flex flex-col gap-0 justify-center pl-3 pr-8 select-none focus:outline-none bg-[#050a10] ${hideLabel ? 'h-[34px] py-0' : 'pb-1.5 pt-1'}`}>
+{!hideLabel && <p className="text-[9.5px] font-medium text-[#94a3b8] tracking-[0.1px] normal-case">{label}</p>}
+<span className="block text-[10px] font-medium text-white tracking-[0.1px] truncate">{value}</span>
+<span className={`material-symbols-outlined text-[14px] text-[#94a3b8] transition-transform absolute right-2.5 top-1/2 -translate-y-1/2 ${isOpen ? 'rotate-180' : ''}`}>keyboard_arrow_down</span>
 </button>
 {isOpen && (
 <div className="absolute z-[1000] top-[calc(100%+4px)] left-0 w-full bg-[#0a0e17] border border-[#595959] rounded-xl overflow-hidden shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100 origin-top">
-<div className="max-h-32 overflow-y-auto custom-scrollbar">
+<div className="max-h-40 overflow-y-auto custom-scrollbar">
 {options.map((opt) => (
 <button key={opt} type="button"
-className={`w-full text-left px-2 py-1.5 text-[8.5px] font-medium tracking-[0.1px] hover:bg-[#0b1019] transition-colors ${value === opt ? 'bg-[#0d1424] text-[#F1641E]' : 'text-[#94a3b8]'}`}
+className={`w-full text-left px-2.5 py-2 text-[10px] font-medium tracking-[0.1px] hover:bg-[#0b1019] transition-colors ${value === opt ? 'bg-[#0d1424] text-[#F1641E]' : 'text-[#94a3b8]'}`}
 onClick={() => { onChange(opt); setIsOpen(false); }}>
 {opt}
 </button>
@@ -78,7 +76,7 @@ onChange: (val: string) => void;
 <div className="flex w-full items-center border border-[#595959] rounded-xl overflow-hidden bg-[#050a10]">
 {items.map((item) => (
 <button key={item.value} type="button" onClick={() => onChange(item.value)}
-className={`flex-1 flex items-center justify-center gap-1 h-[28px] px-1.5 py-0.5 text-[8.5px] font-bold tracking-[0.1px] transition-all cursor-pointer ${
+className={`flex-1 flex items-center justify-center gap-1 h-[34px] px-2 py-1 text-[10px] font-bold tracking-[0.1px] transition-all cursor-pointer ${
 value === item.value ? 'bg-[#F1641E] text-black' : 'text-[#94a3b8] hover:text-white hover:bg-white/5'
 }`}>
 {item.icon}<span>{item.label}</span>
@@ -92,12 +90,12 @@ label: string; value: number; min: number; max: number;
 step?: number; formatValue?: (val: number) => string;
 onChange: (val: number) => void;
 }> = ({ label, value, min, max, step = 1, formatValue = (v) => String(v), onChange }) => (
-<div className="flex flex-col gap-0.5 w-full">
+<div className="flex flex-col gap-1 w-full">
 <div className="flex items-center justify-between px-1 select-none">
-<span className="text-[8px] font-bold text-[#94a3b8] tracking-widest lowercase">{label}</span>
-<span className="text-[9px] font-bold text-white tracking-[0.1px]">{formatValue(value)}</span>
+<span className="text-[9.5px] font-black text-[#94a3b8] tracking-widest normal-case">{label}</span>
+<span className="text-[11px] font-bold text-white tracking-[0.1px]">{formatValue(value)}</span>
 </div>
-<div className="px-1 w-full flex items-center h-3">
+<div className="px-1 w-full flex items-center h-3.5">
 <input
 type="range" min={min} max={max} step={step} value={value}
 onChange={(e) => onChange(Number(e.target.value))}

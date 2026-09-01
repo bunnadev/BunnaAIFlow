@@ -2,7 +2,7 @@ import React from 'react';
 import { Handle, Position, useReactFlow } from 'reactflow';
 
 const StyleNode = ({ id, data }: any) => {
-const { setNodes } = useReactFlow();
+const { setNodes, deleteElements } = useReactFlow();
 
 const updateData = (key: string, val: string) => {
 setNodes((nds) =>
@@ -20,6 +20,11 @@ window.dispatchEvent(new CustomEvent('open-node-settings', { detail: { nodeId: i
 const onDuplicate = (e: React.MouseEvent) => {
 e.stopPropagation();
 window.dispatchEvent(new CustomEvent('duplicate-node', { detail: { nodeId: id } }));
+};
+
+const onDeleteNode = (e: React.MouseEvent) => {
+e.stopPropagation();
+deleteElements({ nodes: [{ id }] });
 };
 
 return (
@@ -45,6 +50,13 @@ className="p-1 hover:bg-white/10 rounded-lg text-[#94a3b8] hover:text-white tran
 title="Cài đặt node"
 >
 <span className="material-symbols-outlined text-[14px]">tune</span>
+</button>
+<button
+onClick={onDeleteNode}
+className="p-1 hover:bg-red-500/20 rounded-lg text-[#94a3b8] hover:text-red-400 transition-all"
+title="Xoá node"
+>
+<span className="material-symbols-outlined text-[14px]">delete</span>
 </button>
 </div>
 </div>

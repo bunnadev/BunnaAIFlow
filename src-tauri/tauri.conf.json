@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "bunna-ai-flow",
+  "productName": "BUNNA AI FLOW",
   "version": "0.1.0",
   "identifier": "dev.bunna.aiflow",
   "build": {

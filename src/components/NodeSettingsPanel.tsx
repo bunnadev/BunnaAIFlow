@@ -10,6 +10,7 @@ onClose: () => void;
 
 const VIDEO_MODELS = ['Omni Flash', 'Veo 3.1 - Fast', 'Veo 3.1 - Lite', 'Veo 3.1 - Quality'];
 const IMAGE_MODELS = ['Nano Banana Pro', 'Nano Banana 2', 'Nano Banana 2 Lite'];
+const TEXT_MODELS = ['Gemini 2.5 Flash', 'Gemini 3 Pro'];
 const VOICES = [
 "Zephyr — Sáng", "Puck — Vui vẻ", "Charon — Thông tin", "Kore — Cương quyết",
 "Fenrir — Phấn khích", "Leda — Trẻ trung", "Orus — Cương quyết", "Aoede — Nhẹ nhàng",
@@ -29,6 +30,7 @@ if (!node) return null;
 
 const isImage = node.type === 'imageGen';
 const isVideo = node.type === 'videoGen';
+const isText = node.type === 'textGen';
 const isMediaSource = node.type === 'mediaSource';
 const data = node.data;
 
@@ -40,91 +42,109 @@ onUpdateData(nodeId, 'duration', 8);
 };
 
 return (
-<div className="absolute top-0 left-0 h-full w-[240px] bg-[#0b1019] border-r border-[#F1641E]/20 z-30 flex flex-col shadow-2xl animate-slide-panel">
-<div className="p-4 border-b border-white/5 flex items-center justify-between shrink-0">
-<div className="flex items-center gap-2">
-<div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
-<span className="material-symbols-outlined text-[16px]">
-{isImage ? 'palette' : isVideo ? 'movie' : isMediaSource ? 'perm_media' : 'settings'}
+<div className="absolute top-0 left-0 h-full w-[288px] bg-[#0b1019] border-r border-[#F1641E]/20 z-30 flex flex-col shadow-2xl animate-slide-panel">
+<div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
+<div className="flex items-center gap-2.5">
+<div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : isText ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
+<span className="material-symbols-outlined text-[19px]">
+{isImage ? 'palette' : isVideo ? 'movie' : isText ? 'data_object' : isMediaSource ? 'perm_media' : 'settings'}
 </span>
 </div>
 <div>
-<h3 className="text-[9.5px] font-black text-white uppercase tracking-widest leading-none">Cài đặt</h3>
-<p className="text-[7.5px] font-black text-[#94a3b8] uppercase tracking-[0.2em] mt-0.5 truncate max-w-[120px]">
+<h3 className="text-[11px] font-black text-white uppercase tracking-widest leading-none">Cài đặt</h3>
+<p className="text-[9px] font-black text-[#94a3b8] uppercase tracking-[0.2em] mt-1 truncate max-w-[144px]">
 {data.label || 'Node'}
 </p>
 </div>
 </div>
-<button onClick={onClose} className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 text-[#94a3b8] flex items-center justify-center transition-all border border-white/5">
-<span className="material-symbols-outlined text-[14px]">chevron_left</span>
+<button onClick={onClose} className="w-[34px] h-[34px] rounded-full bg-white/5 hover:bg-white/10 text-[#94a3b8] flex items-center justify-center transition-all border border-white/5">
+<span className="material-symbols-outlined text-[17px]">chevron_left</span>
 </button>
 </div>
 
-<div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-6 pb-8">
-<div className="flex flex-col gap-3">
-<SectionLabel>Danh tính</SectionLabel>
-<div className="flex flex-col gap-1.5">
-<p className="text-[8px] font-black text-white/20 uppercase tracking-widest px-1">Tên node</p>
+<div className="flex-1 overflow-y-auto custom-scrollbar p-5 flex flex-col gap-7 pb-9">
+<div className="flex flex-col gap-3.5">
+<div className="flex flex-col gap-2">
+<SectionLabel>Tên node</SectionLabel>
 <input
 type="text"
 value={data.label || ''}
 onChange={(e) => updateNode('label', e.target.value)}
-className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 rounded-xl px-2.5 py-2 text-[9.5px] text-white outline-none transition-all font-bold uppercase"
+className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 rounded-xl px-3 py-2.5 text-[11px] text-white outline-none transition-all font-bold uppercase"
 />
 </div>
 </div>
 
-{!isMediaSource && (
+{isText && (
 <>
-<div className="flex flex-col gap-3">
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Cấu hình Model</SectionLabel>
+<FieldDropdown label="Mẫu AI" value={data.model} options={TEXT_MODELS} onChange={(v) => updateNode('model', v)} />
+</div>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Câu lệnh</SectionLabel>
+<textarea
+value={data.localPrompt}
+onChange={(e) => updateNode('localPrompt', e.target.value)}
+className="w-full h-[134px] bg-[#050a10] border border-white/5 hover:border-white/10 rounded-xl p-3 text-[12px] text-white outline-none transition-all custom-scrollbar leading-relaxed"
+/>
+</div>
+</>
+)}
+
+{!isMediaSource && !isText && (
+<>
+<div className="flex flex-col gap-3.5">
 <SectionLabel>Cấu hình Model</SectionLabel>
 <FieldDropdown label="Mẫu AI" value={data.model} options={isImage ? IMAGE_MODELS : VIDEO_MODELS} onChange={(v) => updateNode('model', v)} />
 <FieldDropdown label="Độ phân giải" value={data.resolution} options={isImage ? ['1k', '2k', '4k'] : ['720p', '1k', '2k', '4k']} onChange={(v) => updateNode('resolution', v)} />
 </div>
 
-<div className="flex flex-col gap-3">
+<div className="flex flex-col gap-3.5">
 <SectionLabel>Định dạng</SectionLabel>
-<div className="flex flex-col gap-1.5">
-<p className="text-[8px] font-black text-white/20 uppercase tracking-widest px-1">Tỷ lệ</p>
-<SegmentedToggle value={data.aspectRatio} onChange={(v) => updateNode('aspectRatio', v)} items={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }]} />
+<div className="flex flex-col gap-2">
+<p className="text-[9.5px] font-black text-[#94a3b8] normal-case tracking-widest px-1">Tỷ lệ</p>
+<SegmentedToggle value={data.aspectRatio} onChange={(v) => updateNode('aspectRatio', v)} items={isImage
+? [{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }, { value: '4:3', label: '4:3' }, { value: '1:1', label: '1:1' }, { value: '3:4', label: '3:4' }]
+: [{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }]} />
 </div>
 {isVideo && (
 <>
-<div className="flex flex-col gap-1.5">
-<p className="text-[8px] font-black text-white/20 uppercase tracking-widest px-1">Chế độ</p>
+<div className="flex flex-col gap-2">
+<p className="text-[9.5px] font-black text-[#94a3b8] normal-case tracking-widest px-1">Chế độ</p>
 <SegmentedToggle value={data.videoMode} onChange={(v) => updateNode('videoMode', v)} items={[{ value: 'frame', label: 'Khung' }, { value: 'reference', label: 'Tham chiếu' }]} />
 </div>
 {data.model === 'Omni Flash' ? (
-<RangeSlider label="Thời lượng" value={data.duration} min={4} max={10} step={2} formatValue={(v) => `${v}s`} onChange={(v) => updateNode('duration', v)} />
+<RangeSlider label="Thời lượng" value={Math.min(Math.max(data.duration ?? 8, 4), 10)} min={4} max={10} step={2} formatValue={(v) => `${v}s`} onChange={(v) => updateNode('duration', v)} />
 ) : (
-<div className="flex flex-col gap-0.5 w-full opacity-60">
-<span className="text-[8px] font-bold text-[#94a3b8] uppercase px-1">8s (Cố định)</span>
-<div className="px-1 h-3 flex items-center"><div className="w-full h-1 bg-[#595959] rounded-full" /></div>
+<div className="flex flex-col gap-1 w-full opacity-60">
+<span className="text-[9.5px] font-black text-[#94a3b8] normal-case tracking-widest px-1">8s (Cố định)</span>
+<div className="px-1 h-3.5 flex items-center"><div className="w-full h-1 bg-[#595959] rounded-full" /></div>
 </div>
 )}
 </>
 )}
 </div>
 
-<div className="flex flex-col gap-3">
+<div className="flex flex-col gap-3.5">
 <SectionLabel>Câu lệnh</SectionLabel>
 <textarea
 value={data.localPrompt}
 onChange={(e) => updateNode('localPrompt', e.target.value)}
-className="w-full h-28 bg-[#050a10] border border-white/5 hover:border-white/10 rounded-xl p-2.5 text-[10px] text-white outline-none transition-all custom-scrollbar leading-relaxed"
+className="w-full h-[134px] bg-[#050a10] border border-white/5 hover:border-white/10 rounded-xl p-3 text-[12px] text-white outline-none transition-all custom-scrollbar leading-relaxed"
 />
 </div>
 
 {isVideo && (
-<div className="flex flex-col gap-3">
+<div className="flex flex-col gap-3.5">
 <SectionLabel>Thuyết minh</SectionLabel>
-<div className="p-3 bg-black/40 rounded-xl border border-white/5 flex flex-col gap-3">
+<div className="p-3.5 bg-black/40 rounded-xl border border-white/5 flex flex-col gap-3.5">
 <div className="flex items-center justify-between">
-<span className="text-[8.5px] font-black text-white/80 uppercase">Kích hoạt</span>
+<span className="text-[10px] font-black text-white/80 uppercase">Kích hoạt</span>
 <button
 onClick={() => updateNode('voiceOverEnabled', !data.voiceOverEnabled)}
-className={`w-8 h-4 rounded-full relative transition-all ${data.voiceOverEnabled ? 'bg-[#F1641E]' : 'bg-white/10'}`}
-><div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${data.voiceOverEnabled ? 'left-4.5' : 'left-0.5'}`} /></button>
+className={`w-[38px] h-[19px] rounded-full relative transition-all ${data.voiceOverEnabled ? 'bg-[#F1641E]' : 'bg-white/10'}`}
+><div className={`absolute top-0.5 w-[15px] h-[15px] rounded-full bg-white transition-all ${data.voiceOverEnabled ? 'left-[21px]' : 'left-0.5'}`} /></button>
 </div>
 {data.voiceOverEnabled && <FieldDropdown label="Giọng" value={data.voiceOverVoice} options={VOICES} onChange={(v) => updateNode('voiceOverVoice', v)} />}
 </div>
@@ -134,8 +154,8 @@ className={`w-8 h-4 rounded-full relative transition-all ${data.voiceOverEnabled
 )}
 </div>
 
-<div className="p-4 bg-black/20 border-t border-white/5 flex flex-col gap-0.5 shrink-0">
-<div className="flex justify-between items-center text-[8px] font-black text-white/20 uppercase tracking-widest">
+<div className="p-5 bg-black/20 border-t border-white/5 flex flex-col gap-1 shrink-0">
+<div className="flex justify-between items-center text-[9.5px] font-black text-white/20 uppercase tracking-widest">
 <span>ID</span>
 <span className="font-mono">{nodeId.slice(-6)}</span>
 </div>

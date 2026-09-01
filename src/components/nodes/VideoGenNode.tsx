@@ -3,7 +3,7 @@ import { Handle, Position, useReactFlow, useEdges, useNodes } from 'reactflow';
 import { toDisplayUrl } from '../../lib/assets';
 
 const VideoGenNode = ({ id, data }: any) => {
-const { setNodes, setEdges } = useReactFlow();
+const { setNodes, setEdges, deleteElements } = useReactFlow();
 const edges = useEdges();
 const nodes = useNodes();
 const [showRunOptions, setShowRunOptions] = useState(false);
@@ -84,6 +84,11 @@ e.stopPropagation();
 window.dispatchEvent(new CustomEvent('duplicate-node', { detail: { nodeId: id } }));
 };
 
+const onDeleteNode = (e: React.MouseEvent) => {
+e.stopPropagation();
+deleteElements({ nodes: [{ id }] });
+};
+
 const removeReference = (e: React.MouseEvent, edgeId: string) => {
 e.stopPropagation();
 setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
@@ -142,11 +147,20 @@ title="Cài đặt node"
 <span className="material-symbols-outlined text-[14px]">tune</span>
 </button>
 
+{(data.sequenceIndex && data.sequenceIndex !== 1) && (
 <button
 onClick={togglePause}
 className={`p-1 rounded-lg transition-all flex items-center justify-center ${data.isPaused ? 'bg-[#f5a623] text-white' : 'text-[#94a3b8] hover:text-white hover:bg-white/10'}`}
 >
 <span className="material-symbols-outlined text-[14px]">{data.isPaused ? 'pause_circle' : 'play_circle'}</span>
+</button>
+)}
+<button
+onClick={onDeleteNode}
+className="p-1 hover:bg-red-500/20 rounded-lg text-[#94a3b8] hover:text-red-400 transition-all flex items-center justify-center"
+title="Xoá node"
+>
+<span className="material-symbols-outlined text-[14px]">delete</span>
 </button>
 </div>
 </div>

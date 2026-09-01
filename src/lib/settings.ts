@@ -3,8 +3,9 @@ import { appDataDir, join } from '@tauri-apps/api/path';
 
 export interface AppSettings {
   geminiApiKey?: string;
-  /** Chỗ trống cho access key license sau này (chưa validate ở phase này). */
-  accessKey?: string;
+  /** Access key license BunnaAIFlow — cặp public/secret cấp qua bunna dashboard. */
+  licensePublicKey?: string;
+  licenseSecretKey?: string;
 }
 
 const SETTINGS_FILENAME = 'settings.json';

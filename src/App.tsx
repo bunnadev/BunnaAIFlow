@@ -20,6 +20,7 @@ import { v4 as uuidv4 } from 'uuid';
 import MediaSourceNode from './components/nodes/MediaSourceNode';
 import ImageGenNode from './components/nodes/ImageGenNode';
 import VideoGenNode from './components/nodes/VideoGenNode';
+import TextGenNode from './components/nodes/TextGenNode';
 import StyleNode from './components/nodes/StyleNode';
 import DeleteEdge from './components/nodes/DeleteEdge';
 import WorkspaceManager from './components/WorkspaceManager';
@@ -31,22 +32,30 @@ import ExecutionLogPanel from './components/ExecutionLogPanel';
 import BatchExportPanel from './components/BatchExportPanel';
 import BatchCombinedModal from './components/BatchCombinedModal';
 import SettingsPanel from './components/SettingsPanel';
+import LicenseGate from './components/LicenseGate';
+import ImportChoiceModal from './components/ImportChoiceModal';
+import ImportAllChoiceModal from './components/ImportAllChoiceModal';
+import AboutModal from './components/AboutModal';
 import { QuickPreviewModal } from './components/UI';
 
 import type { Workspace, LogEntry, MediaAsset } from './types';
 import { loadSettings, saveSettings, type AppSettings } from './lib/settings';
 import { loadWorkspaceState, saveWorkspaceState } from './lib/workspaceStore';
-import { exportWorkspaces, importWorkspaces } from './lib/exportImport';
+import { exportSingleWorkspace, exportAllWorkspaces, importWorkspaces, type ImportedBundle } from './lib/exportImport';
 import { saveAssetFromBase64, readAssetAsBase64 } from './lib/assets';
 import { GeminiImageProvider } from './lib/providers/geminiImageProvider';
 import { GeminiVideoProvider } from './lib/providers/geminiVideoProvider';
-import { resolveImageModelId, resolveVideoModelId } from './lib/models';
+import { GeminiOmniFlashProvider } from './lib/providers/geminiOmniFlashProvider';
+import { GeminiTextProvider } from './lib/providers/geminiTextProvider';
+import { resolveImageModelId, resolveVideoModelId, resolveTextModelId } from './lib/models';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
+import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 
 export const getNodeFileName = (node: Node, index: number, prefix: string = 'BUNNA_FLOW') => {
-const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : 'RES');
-const extension = node.data.result?.type === 'video' ? 'mp4' : 'jpg';
+const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : (node.type === 'textGen' ? 'TXT' : 'RES'));
+const extension = node.data.result?.type === 'video' ? 'mp4' : (node.data.result?.type === 'text' ? 'txt' : 'jpg');
 const label = (node.data.label || 'ASSET').replace(/[^a-z0-9]/gi, '_').toUpperCase();
 return `${prefix}_${typeCode}_${index + 1}_${label}.${extension}`;
 };
@@ -55,6 +64,7 @@ const NODE_TYPES = {
 mediaSource: MediaSourceNode,
 imageGen: ImageGenNode,
 videoGen: VideoGenNode,
+textGen: TextGenNode,
 styleNode: StyleNode,
 };
 
@@ -86,6 +96,7 @@ const [executionLogs, setExecutionLogs] = useState<LogEntry[]>([]);
 
 const [isBatchCombinedModalOpen, setIsBatchCombinedModalOpen] = useState(false);
 const [previewDataState, setPreviewDataState] = useState<{ open: boolean; type: 'image' | 'video'; src: string; title?: string; } | null>(null);
+const [pendingImport, setPendingImport] = useState<ImportedBundle | null>(null);
 
 const [filenamePrefix, setFilenamePrefix] = useState('BUNNA_FLOW');
 const [concurrency] = useState(2);
@@ -187,7 +198,7 @@ setUndoStack(prev => [...prev, { nodes: getNodes(), edges: getEdges() }]);
 
 const handleResetAllResults = useCallback(() => {
 setNodes(nds => nds.map(node => {
-if (node.type === 'imageGen' || node.type === 'videoGen') {
+if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen') {
 return {
 ...node,
 data: { ...node.data, result: null, statusText: '', isFinalized: false, isLoading: false }
@@ -244,13 +255,13 @@ setWorkspaces(prev => prev.map(ws => ws.id === id ? { ...ws, name } : ws));
 }, []);
 
 const handleExport = useCallback(async () => {
-const fullWorkspaces = workspaces.map(ws => ws.id === activeWorkspaceId ? {
-...ws, nodes, edges, viewport: getViewport()
-} : ws);
+const current = workspaces.find(ws => ws.id === activeWorkspaceId);
+if (!current) return;
+const liveWorkspace: Workspace = { ...current, nodes, edges, viewport: getViewport() };
 try {
-const didSave = await exportWorkspaces(fullWorkspaces, activeWorkspaceId);
+const didSave = await exportSingleWorkspace(liveWorkspace);
 if (didSave) {
-setFlowStatus({ message: 'ĐÃ XUẤT FILE .BUNNAFLOW', type: 'success' });
+setFlowStatus({ message: 'ĐÃ XUẤT WORKFLOW ĐANG MỞ', type: 'success' });
 setTimeout(() => setFlowStatus(null), 2500);
 }
 } catch (err) {
@@ -260,24 +271,86 @@ setTimeout(() => setFlowStatus(null), 2500);
 }
 }, [workspaces, activeWorkspaceId, nodes, edges, getViewport]);
 
+const handleExportAll = useCallback(async () => {
+const fullWorkspaces = workspaces.map(ws => ws.id === activeWorkspaceId ? {
+...ws, nodes, edges, viewport: getViewport()
+} : ws);
+try {
+const didSave = await exportAllWorkspaces(fullWorkspaces, activeWorkspaceId);
+if (didSave) {
+setFlowStatus({ message: `ĐÃ XUẤT TẤT CẢ ${fullWorkspaces.length} WORKFLOW`, type: 'success' });
+setTimeout(() => setFlowStatus(null), 2500);
+}
+} catch (err) {
+console.error('Export all failed:', err);
+setFlowStatus({ message: 'LỖI KHI XUẤT FILE', type: 'error' });
+setTimeout(() => setFlowStatus(null), 2500);
+}
+}, [workspaces, activeWorkspaceId, nodes, edges, getViewport]);
+
 const handleImport = useCallback(async () => {
 try {
 const result = await importWorkspaces();
 if (!result) return;
-setWorkspaces(result.workspaces);
-const first = result.workspaces.find(w => w.id === result.activeWorkspaceId) ?? result.workspaces[0];
+setPendingImport(result);
+} catch (err) {
+console.error('Import failed:', err);
+setFlowStatus({ message: 'LỖI ĐỊNH DẠNG HOẶC FILE HỎNG', type: 'error' });
+setTimeout(() => setFlowStatus(null), 3000);
+}
+}, []);
+
+const handleImportCancel = useCallback(() => setPendingImport(null), []);
+
+const handleImportReplace = useCallback(() => {
+if (!pendingImport) return;
+const imported = pendingImport.workspaces.find(w => w.id === pendingImport.activeWorkspaceId) ?? pendingImport.workspaces[0];
+const rest = pendingImport.workspaces.filter(w => w !== imported).map(w => ({ ...w, id: uuidv4() }));
+
+setWorkspaces(prev => [...prev.map(ws => ws.id === activeWorkspaceId ? { ...ws, nodes: imported.nodes, edges: imported.edges, viewport: imported.viewport } : ws), ...rest]);
+setNodes(imported.nodes || []);
+setEdges(imported.edges || []);
+if (imported.viewport) setViewport(imported.viewport);
+
+setPendingImport(null);
+setFlowStatus({ message: 'ĐÃ GHI ĐÈ WORKFLOW ĐANG MỞ', type: 'success' });
+setTimeout(() => setFlowStatus(null), 2500);
+}, [pendingImport, activeWorkspaceId, setNodes, setEdges, setViewport]);
+
+const handleImportCreateNew = useCallback(() => {
+if (!pendingImport) return;
+saveCurrentToWorkspace();
+
+const freshWorkspaces = pendingImport.workspaces.map(w => ({ ...w, id: uuidv4() }));
+const markedIndex = pendingImport.workspaces.findIndex(w => w.id === pendingImport.activeWorkspaceId);
+const first = freshWorkspaces[markedIndex >= 0 ? markedIndex : 0];
+
+setWorkspaces(prev => [...prev, ...freshWorkspaces]);
 setActiveWorkspaceId(first.id);
 setNodes(first.nodes || []);
 setEdges(first.edges || []);
 if (first.viewport) setViewport(first.viewport);
-setFlowStatus({ message: 'NHẬP FILE THÀNH CÔNG', type: 'success' });
-} catch (err) {
-console.error('Import failed:', err);
-setFlowStatus({ message: 'LỖI ĐỊNH DẠNG HOẶC FILE HỎNG', type: 'error' });
-} finally {
-setTimeout(() => setFlowStatus(null), 3000);
-}
-}, [setNodes, setEdges, setViewport]);
+
+setPendingImport(null);
+setFlowStatus({ message: 'ĐÃ TẠO WORKFLOW MỚI TỪ FILE NHẬP', type: 'success' });
+setTimeout(() => setFlowStatus(null), 2500);
+}, [pendingImport, saveCurrentToWorkspace, setNodes, setEdges, setViewport]);
+
+const handleImportAllReplace = useCallback(() => {
+if (!pendingImport || pendingImport.workspaces.length === 0) return;
+const newWorkspaces = pendingImport.workspaces;
+const first = newWorkspaces.find(w => w.id === pendingImport.activeWorkspaceId) ?? newWorkspaces[0];
+
+setWorkspaces(newWorkspaces);
+setActiveWorkspaceId(first.id);
+setNodes(first.nodes || []);
+setEdges(first.edges || []);
+if (first.viewport) setViewport(first.viewport);
+
+setPendingImport(null);
+setFlowStatus({ message: 'ĐÃ THAY THẾ TOÀN BỘ WORKFLOW', type: 'success' });
+setTimeout(() => setFlowStatus(null), 2500);
+}, [pendingImport, setNodes, setEdges, setViewport]);
 
 const getNodeStateHash = useCallback((node: Node, currentEdges: Edge[]) => {
 const currentNodes = getNodes();
@@ -314,7 +387,8 @@ let newNode: Node;
 switch (type) {
 case 'mediaSource': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Nguồn Media', media: null } }; break;
 case 'imageGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Ảnh AI', model: 'Nano Banana Pro', aspectRatio: '16:9', resolution: '4k', localPrompt: '' } }; break;
-case 'videoGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Video AI', model: 'Omni Flash', aspectRatio: '16:9', resolution: '720p', duration: 10, videoMode: 'frame', voiceOverEnabled: false, voiceOverVoice: 'Puck — Upbeat', localPrompt: '' } }; break;
+case 'videoGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Video AI', model: 'Veo 3.1 - Lite', aspectRatio: '16:9', resolution: '720p', duration: 8, videoMode: 'frame', voiceOverEnabled: false, voiceOverVoice: 'Puck — Upbeat', localPrompt: '' } }; break;
+case 'textGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Text AI', model: 'Gemini 2.5 Flash', localPrompt: '' } }; break;
 case 'styleNode': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phong cách', positivePrompt: '', negativePrompt: '' } }; break;
 default: return;
 }
@@ -470,11 +544,38 @@ const filename = getNodeFileName(node, index, filenamePrefix);
 try {
 const path = await saveDialog({ defaultPath: filename });
 if (!path) return;
+if (node.data.result.type === 'text') {
+await writeFile(path, new TextEncoder().encode(node.data.result.text));
+return;
+}
 const base64 = await readAssetAsBase64(node.data.result.path);
 const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
 await writeFile(path, bytes);
 } catch (err) {
 console.error('Download failed:', err);
+}
+}, [getNodes, filenamePrefix]);
+
+const handleVectorizeNode = useCallback(async (nodeId: string) => {
+const node = getNodes().find(n => n.id === nodeId);
+const imagePath: string | undefined = node?.data.result?.path || node?.data.media?.path;
+if (!node || !imagePath) return;
+
+setFlowStatus({ message: 'ĐANG VECTOR HOÁ...', type: 'info' });
+try {
+const svg = await invoke<string>('vectorize_image_to_svg', { path: imagePath });
+const index = getNodes().filter(n => n.type === node.type).indexOf(node);
+const filename = `${filenamePrefix}_SVG_${index + 1}_${(node.data.label || 'ASSET').replace(/[^a-z0-9]/gi, '_').toUpperCase()}.svg`;
+
+const savePath = await saveDialog({ defaultPath: filename, filters: [{ name: 'SVG', extensions: ['svg'] }] });
+if (!savePath) { setFlowStatus(null); return; }
+await writeFile(savePath, new TextEncoder().encode(svg));
+setFlowStatus({ message: 'ĐÃ VECTOR HOÁ THÀNH CÔNG', type: 'success' });
+} catch (err: any) {
+console.error('Vectorize failed:', err);
+setFlowStatus({ message: `LỖI VECTOR HOÁ: ${err?.message || err}`, type: 'error' });
+} finally {
+setTimeout(() => setFlowStatus(null), 3000);
 }
 }, [getNodes, filenamePrefix]);
 
@@ -514,6 +615,8 @@ try {
 const apiKey = appSettingsRef.current.geminiApiKey ?? '';
 const imageProvider = new GeminiImageProvider(apiKey);
 const videoProvider = new GeminiVideoProvider(apiKey);
+const omniFlashProvider = new GeminiOmniFlashProvider(apiKey);
+const textProvider = new GeminiTextProvider(apiKey);
 
 const basePrompt = node.data.localPrompt || 'A cinematic masterpiece';
 const finalPrompt = positiveStyle ? `${basePrompt}, ${positiveStyle}` : basePrompt;
@@ -524,6 +627,24 @@ base64: await readAssetAsBase64(m.path),
 mimeType: m.mimeType,
 })))
 : undefined;
+
+if (node.type === 'textGen') {
+const text = await textProvider.generateText({
+prompt: finalPrompt,
+negativePrompt: negativeStyle || undefined,
+referenceImages,
+model: resolveTextModelId(node.data.model),
+});
+setNodes(nds => nds.map(n => n.id === nodeId ? {
+...n,
+data: {
+...n.data, isLoading: false, statusText: 'Hoàn tất', isFinalized: true,
+lastRunHash: getNodeStateHash(node, currentEdges),
+result: { type: 'text', text }
+}
+} : n));
+return;
+}
 
 let genResult: { base64: string; mimeType: string };
 let resultType: 'image' | 'video';
@@ -539,7 +660,7 @@ model: resolveImageModelId(node.data.model),
 });
 } else if (node.type === 'videoGen') {
 resultType = 'video';
-const finalDuration = node.data.model === 'Omni Flash' ? node.data.duration : 8;
+const isOmniFlash = node.data.model === 'Omni Flash';
 
 let firstFrame, lastFrame;
 if (node.data.videoMode === 'frame') {
@@ -548,16 +669,22 @@ if (referenceImages?.[0]) firstFrame = referenceImages[0];
 if (referenceImages?.[1]) lastFrame = referenceImages[1];
 }
 
-genResult = await videoProvider.generateVideo({
+const videoParams = {
 prompt: finalPrompt,
 negativePrompt: negativeStyle || undefined,
 model: resolveVideoModelId(node.data.model),
 aspectRatio: node.data.aspectRatio,
-durationSeconds: finalDuration,
+resolution: node.data.resolution,
 firstFrame,
 lastFrame,
 referenceImages: node.data.videoMode === 'reference' ? referenceImages?.slice(0, 5) : undefined,
-});
+};
+
+// Omni Flash: người dùng chỉnh được 4-10s (Google Flow cho phép). Các model
+// Veo còn lại: luôn cố định 8s — API không nhận giá trị nào khác.
+genResult = isOmniFlash
+? await omniFlashProvider.generateVideo({ ...videoParams, durationSeconds: Math.min(Math.max(node.data.duration ?? 8, 4), 10) })
+: await videoProvider.generateVideo({ ...videoParams, durationSeconds: 8 });
 } else {
 return;
 }
@@ -706,21 +833,24 @@ setIsNodeLibraryOpen(false);
 };
 const hDup = (e: any) => onDuplicateNode(e.detail.nodeId);
 const hDown = (e: any) => handleDownloadNode(e.detail.nodeId);
+const hVec = (e: any) => handleVectorizeNode(e.detail.nodeId);
 
 window.addEventListener('execute-node' as any, hEx);
 window.addEventListener('open-preview' as any, hPrev);
 window.addEventListener('open-node-settings' as any, hSettings);
 window.addEventListener('duplicate-node' as any, hDup);
 window.addEventListener('download-node' as any, hDown);
+window.addEventListener('vectorize-node' as any, hVec);
 return () => {
 window.removeEventListener('execute-node' as any, hEx);
 window.removeEventListener('open-preview' as any, hPrev);
 window.removeEventListener('open-node-settings' as any, hSettings);
 window.removeEventListener('duplicate-node' as any, hDup);
 window.removeEventListener('download-node' as any, hDown);
+window.removeEventListener('vectorize-node' as any, hVec);
 };
 // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [getNodes, getEdges, isNodeDirty, onDuplicateNode, handleDownloadNode]);
+}, [getNodes, getEdges, isNodeDirty, onDuplicateNode, handleDownloadNode, handleVectorizeNode]);
 
 const handleSaveSettings = useCallback(async (next: AppSettings) => {
 setAppSettings(next);
@@ -729,9 +859,9 @@ await saveSettings(next);
 
 return (
 <div className={`w-full h-full bg-[#070b14] flex flex-col mode-${interactionMode} text-white relative p-1 overflow-hidden`}>
-<div className="absolute inset-0 pointer-events-none border border-[#F1641E]/20 z-[60] rounded-none lg:rounded-2xl" />
-<div className="absolute inset-0 pointer-events-none border-[8px] border-[#0b1019] z-[55] rounded-none lg:rounded-2xl" />
-<div className="flex-1 flex flex-col bg-[#0a0e17] rounded-none lg:rounded-xl overflow-hidden relative shadow-2xl">
+<div className="absolute inset-0 pointer-events-none border border-[#F1641E]/20 z-[60]" />
+<div className="absolute inset-0 pointer-events-none border-[8px] border-[#0b1019] z-[55]" />
+<div className="flex-1 flex flex-col bg-[#0a0e17] overflow-hidden relative shadow-2xl">
 <WorkspaceManager
 workspaces={workspaces} activeId={activeWorkspaceId}
 isGlobalPaused={false} onTogglePause={() => {}}
@@ -739,17 +869,15 @@ concurrency={concurrency} onChangeConcurrency={() => {}}
 onRunPipeline={() => {
 const currentNodes = getNodes();
 const currentEdges = getEdges();
-const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen') && isNodeDirty(n, currentEdges));
+const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen') && isNodeDirty(n, currentEdges));
 const ids = new Set<string>();
 dirty.forEach(n => { ids.add(n.id); getDescendants(n.id, currentNodes, currentEdges).forEach(d => ids.add(d)); });
 executeWorkflow(Array.from(ids));
 }}
 onStopPipeline={() => { stopFlagRef.current = true; setIsStopping(true); }} isStopping={isStopping} isRunning={runningChain}
-filenamePrefix={filenamePrefix} onChangePrefix={setFilenamePrefix}
 flowStatus={flowStatus} onClearFlowStatus={() => setFlowStatus(null)}
 onSelect={handleSelectWorkspace} onAdd={handleAddWorkspace} onDelete={handleDeleteWorkspace} onRename={handleRenameWorkspace}
 onOpenLog={() => setIsLogPanelOpen(!isLogPanelOpen)}
-onOpenSettings={() => setIsSettingsOpen(!isSettingsOpen)}
 onUndo={handleUndo}
 />
 <div className="flex-1 relative overflow-hidden flex">
@@ -773,8 +901,15 @@ className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all
 <button onClick={handleImport} title="Nhập .bunnaflow" className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#F1641E]/10 border border-[#F1641E]/20 hover:bg-[#F1641E]/20 transition-all text-[#F1641E]">
 <span className="material-symbols-outlined text-[18px]">upload</span>
 </button>
-<button onClick={handleExport} title="Xuất .bunnaflow" className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#F1641E]/10 border border-[#F1641E]/20 hover:bg-[#F1641E]/20 transition-all text-[#F1641E]">
+<button onClick={handleExport} title="Xuất workflow đang mở (.bunnaflow)" className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#F1641E]/10 border border-[#F1641E]/20 hover:bg-[#F1641E]/20 transition-all text-[#F1641E]">
 <span className="material-symbols-outlined text-[18px]">download</span>
+</button>
+<button onClick={handleExportAll} title="Xuất tất cả workflow (backup)" className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#F1641E]/10 border border-[#F1641E]/20 hover:bg-[#F1641E]/20 transition-all text-[#F1641E]">
+<span className="material-symbols-outlined text-[18px]">backup</span>
+</button>
+<div className="w-8 h-[1px] bg-white/10 my-1" />
+<button onClick={() => setIsSettingsOpen(!isSettingsOpen)} title="Cài đặt" className="w-9 h-9 rounded-lg flex items-center justify-center bg-white/[0.03] border border-white/10 text-[#94a3b8] hover:text-white hover:bg-white/10 transition-all">
+<span className="material-symbols-outlined text-[18px]">settings</span>
 </button>
 </div>
 </div>
@@ -783,7 +918,7 @@ className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all
 {activeSettingsNodeId && <NodeSettingsPanel nodeId={activeSettingsNodeId} nodes={nodes} onUpdateData={(id, key, val) => setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, [key]: val } } : n))} onClose={() => setActiveSettingsNodeId(null)} />}
 {activeStyleSettingsNodeId && <StyleSettingsModal isOpen={!!activeStyleSettingsNodeId} nodeId={activeStyleSettingsNodeId} nodes={nodes} onUpdate={(id, key, val) => setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, [key]: val } } : n))} onClose={() => setActiveStyleSettingsNodeId(null)} />}
 {isLogPanelOpen && <ExecutionLogPanel logs={executionLogs} onClear={() => setExecutionLogs([])} onClose={() => setIsLogPanelOpen(false)} />}
-{isSettingsOpen && <SettingsPanel settings={appSettings} onSave={handleSaveSettings} onClose={() => setIsSettingsOpen(false)} />}
+{isSettingsOpen && <SettingsPanel settings={appSettings} onSave={handleSaveSettings} onClose={() => setIsSettingsOpen(false)} filenamePrefix={filenamePrefix} onChangePrefix={setFilenamePrefix} />}
 <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
 onConnect={(p) => setEdges(eds => addEdge({ ...p, animated: false, style: { stroke: '#F1641E', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#F1641E' } }, eds))}
 onPaneContextMenu={(e) => { e.preventDefault(); const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY }); setMenuState({ x: e.clientX, y: e.clientY, flowPos, visible: true }); }}
@@ -799,6 +934,23 @@ proOptions={{ hideAttribution: true }}
 </ReactFlow>
 {menuState && <ContextMenu x={menuState.x} y={menuState.y} onAddManualNode={(type) => onAddManualNode(type, menuState.flowPos)} onClose={() => setMenuState(null)} />}
 {isBatchCombinedModalOpen && <BatchCombinedModal prefix={filenamePrefix} onChangePrefix={setFilenamePrefix} onConfirm={handleBatchConfirm} onCancel={() => setIsBatchCombinedModalOpen(false)} />}
+{pendingImport?.kind === 'single' && (
+<ImportChoiceModal
+currentWorkspaceName={workspaces.find(w => w.id === activeWorkspaceId)?.name || 'Workflow hiện tại'}
+onReplace={handleImportReplace}
+onCreateNew={handleImportCreateNew}
+onCancel={handleImportCancel}
+/>
+)}
+{pendingImport?.kind === 'all' && (
+<ImportAllChoiceModal
+fileWorkspaceCount={pendingImport.workspaces.length}
+currentWorkspaceCount={workspaces.length}
+onAddAll={handleImportCreateNew}
+onReplaceAll={handleImportAllReplace}
+onCancel={handleImportCancel}
+/>
+)}
 {previewDataState && <QuickPreviewModal open={previewDataState.open} type={previewDataState.type} src={previewDataState.src} title={previewDataState.title} onClose={() => setPreviewDataState(null)} />}
 </div>
 </div>
@@ -814,4 +966,22 @@ const ToolbarButton: React.FC<{ active: boolean, icon: string, label: string, on
 </button>
 );
 
-export default () => (<ReactFlowProvider><FlowApp /></ReactFlowProvider>);
+// About modal nằm ở cấp NGOÀI LicenseGate — để menu "About BUNNA AI FLOW"
+// vẫn hoạt động kể cả khi chưa nhập/xác thực access key (FlowApp chưa mount).
+const Root: React.FC = () => {
+const [isAboutOpen, setIsAboutOpen] = useState(false);
+
+useEffect(() => {
+const unlisten = listen('show-about', () => setIsAboutOpen(true));
+return () => { unlisten.then(f => f()); };
+}, []);
+
+return (
+<>
+<LicenseGate><ReactFlowProvider><FlowApp /></ReactFlowProvider></LicenseGate>
+{isAboutOpen && <AboutModal onClose={() => setIsAboutOpen(false)} />}
+</>
+);
+};
+
+export default Root;

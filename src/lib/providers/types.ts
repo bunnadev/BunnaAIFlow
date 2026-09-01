@@ -19,6 +19,7 @@ export interface VideoGenParams {
   model: string;
   aspectRatio: AspectRatio;
   durationSeconds: number;
+  resolution?: string;
   firstFrame?: ReferenceImage;
   lastFrame?: ReferenceImage;
   referenceImages?: ReferenceImage[];

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import logo from '../assets/logo.png';
 
 interface Workspace {
 id: string;
@@ -22,8 +23,6 @@ onRunPipeline: () => void;
 onStopPipeline: () => void;
 isStopping: boolean;
 isRunning: boolean;
-filenamePrefix: string;
-onChangePrefix: (val: string) => void;
 flowStatus: FlowStatus | null;
 onClearFlowStatus: () => void;
 onTogglePause: () => void;
@@ -33,14 +32,13 @@ onDelete: (id: string) => void;
 onRename: (id: string, name: string) => void;
 onOpenLog: () => void;
 onUndo?: () => void;
-onOpenSettings: () => void;
 }
 
 const WorkspaceManager: React.FC<Props> = ({
 workspaces, activeId,
 onRunPipeline, onStopPipeline, isStopping, isRunning,
-filenamePrefix, onChangePrefix, flowStatus, onClearFlowStatus,
-onSelect, onAdd, onDelete, onRename, onOpenLog, onOpenSettings
+flowStatus, onClearFlowStatus,
+onSelect, onAdd, onDelete, onRename, onOpenLog
 }) => {
 const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -67,8 +65,8 @@ setRenamingId(null);
 return (
 <div className="flex items-center gap-0 h-[48px] bg-[#0b1019] border-b border-[#F1641E]/20 z-50 px-3 shrink-0 relative">
 <div className="flex items-center gap-2 h-9 px-2.5 rounded-xl border border-[#F1641E]/40 bg-[#07101f]/90 shadow-sm mr-4 shrink-0">
-<div className="w-7 h-7 rounded-full border border-[#F1641E]/40 bg-[#F1641E]/10 flex items-center justify-center overflow-hidden">
-<span className="material-symbols-outlined text-[#F1641E] text-lg">settings_input_component</span>
+<div className="w-7 h-7 rounded-full border border-[#F1641E]/40 bg-[#F1641E]/10 flex items-center justify-center overflow-hidden shrink-0">
+<img src={logo} alt="Bunna AI Flow" className="w-full h-full object-cover" />
 </div>
 <div className="flex flex-col items-start justify-center">
 <span className="text-[10px] font-black text-white uppercase tracking-wider leading-none">BUNNA AI FLOW</span>
@@ -135,9 +133,9 @@ Mới
 <div className="flex-1" />
 
 {flowStatus && (
-<div className={`mx-3 px-3 py-1.5 rounded-lg border flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-300 ${
-flowStatus.type === 'success' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' :
-flowStatus.type === 'error' ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-[#f5a623]/10 border-[#f5a623] text-[#f5a623]'
+<div className={`fixed bottom-6 right-6 z-[200] px-3 py-1.5 rounded-lg border flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300 shadow-2xl bg-[#0b1019] ${
+flowStatus.type === 'success' ? 'border-emerald-500 text-emerald-400' :
+flowStatus.type === 'error' ? 'border-red-500 text-red-400' : 'border-[#f5a623] text-[#f5a623]'
 }`}>
 <span className="material-symbols-outlined text-[16px]">
 {flowStatus.type === 'success' ? 'check_circle' : flowStatus.type === 'error' ? 'error' : 'warning'}
@@ -148,18 +146,10 @@ flowStatus.type === 'error' ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-
 )}
 
 <div className="flex items-center gap-2 h-full border-l border-white/5 pl-3">
-<button onClick={onOpenSettings} className="flex items-center gap-1.5 px-2.5 h-7.5 rounded-xl bg-white/[0.03] border border-white/10 text-[#94a3b8] hover:text-white hover:bg-white/10 transition-all font-black text-[8px] uppercase tracking-widest">
-<span className="material-symbols-outlined text-[16px]">settings</span>
-</button>
 <button onClick={onOpenLog} className="flex items-center gap-1.5 px-2.5 h-7.5 rounded-xl bg-white/[0.03] border border-white/10 text-[#F1641E] hover:bg-[#F1641E]/10 transition-all font-black text-[8px] uppercase tracking-widest">
 <span className="material-symbols-outlined text-[16px]">assignment</span>
 LOGS
 </button>
-
-<div className="flex items-center gap-1.5 px-2 bg-[#050a10] border border-white/10 rounded-xl h-7.5 group">
-<span className="text-[8px] font-black text-[#94a3b8]/40 uppercase tracking-widest">FILE PREFIX</span>
-<input type="text" value={filenamePrefix} onChange={(e) => onChangePrefix(e.target.value)} className="bg-transparent border-none outline-none text-[9px] font-black text-white w-16 uppercase" />
-</div>
 
 {!isRunning && (
 <button onClick={onRunPipeline} className="flex items-center gap-1.5 px-3 h-7.5 rounded-xl bg-[#F1641E] text-black hover:bg-[#F1641E]/80 transition-all shadow-md font-black text-[8px] uppercase tracking-widest">

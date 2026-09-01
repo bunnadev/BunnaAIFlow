@@ -2,8 +2,12 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Handle, Position, useReactFlow, useEdges, useNodes } from 'reactflow';
 import { toDisplayUrl } from '../../lib/assets';
 
+// Tạm ẩn nút Vector hoá — kết quả chưa đủ ổn định với ảnh AI generate đa dạng,
+// cần nghiên cứu thêm cấu hình vtracer trước khi bật lại (giữ nguyên phần code).
+const VECTORIZE_ENABLED = false;
+
 const ImageGenNode = ({ id, data }: any) => {
-const { setNodes, setEdges } = useReactFlow();
+const { setNodes, setEdges, deleteElements } = useReactFlow();
 const edges = useEdges();
 const nodes = useNodes();
 const [showRunOptions, setShowRunOptions] = useState(false);
@@ -65,6 +69,10 @@ const onDownload = () => {
 window.dispatchEvent(new CustomEvent('download-node', { detail: { nodeId: id } }));
 };
 
+const onVectorize = () => {
+window.dispatchEvent(new CustomEvent('vectorize-node', { detail: { nodeId: id } }));
+};
+
 const onPreview = () => {
 if (!data.result) return;
 window.dispatchEvent(new CustomEvent('open-preview', {
@@ -84,6 +92,11 @@ window.dispatchEvent(new CustomEvent('open-node-settings', { detail: { nodeId: i
 const onDuplicate = (e: React.MouseEvent) => {
 e.stopPropagation();
 window.dispatchEvent(new CustomEvent('duplicate-node', { detail: { nodeId: id } }));
+};
+
+const onDeleteNode = (e: React.MouseEvent) => {
+e.stopPropagation();
+deleteElements({ nodes: [{ id }] });
 };
 
 const removeReference = (e: React.MouseEvent, edgeId: string) => {
@@ -139,7 +152,7 @@ title="Cài đặt node"
 <span className="material-symbols-outlined text-[14px]">tune</span>
 </button>
 
-{(!data.sequenceIndex || data.sequenceIndex !== 1) && (
+{(data.sequenceIndex && data.sequenceIndex !== 1) && (
 <button
 onClick={togglePause}
 className={`p-1 rounded-lg transition-all flex items-center justify-center ${data.isPaused ? 'bg-[#e53935] text-white' : 'text-[#94a3b8] hover:text-white hover:bg-white/10'}`}
@@ -149,6 +162,13 @@ className={`p-1 rounded-lg transition-all flex items-center justify-center ${dat
 </span>
 </button>
 )}
+<button
+onClick={onDeleteNode}
+className="p-1 hover:bg-red-500/20 rounded-lg text-[#94a3b8] hover:text-red-400 transition-all flex items-center justify-center"
+title="Xoá node"
+>
+<span className="material-symbols-outlined text-[14px]">delete</span>
+</button>
 </div>
 </div>
 
@@ -192,6 +212,15 @@ className="absolute bottom-1.5 right-1.5 p-1.5 bg-black/70 hover:bg-black text-w
 <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded text-[7px] font-black text-[#e53935] uppercase border border-white/5">
 {data.result.resolution}
 </div>
+{VECTORIZE_ENABLED && data.result.type === 'image' && (
+<button
+onClick={(e) => { e.stopPropagation(); onVectorize(); }}
+className="absolute top-1.5 right-1.5 p-1.5 bg-black/70 hover:bg-[#3b82f6] text-white rounded-lg opacity-0 group-hover/media:opacity-100 transition-all border border-white/10 flex items-center justify-center shadow-2xl"
+title="Vector hoá thành SVG"
+>
+<span className="material-symbols-outlined text-[14px]">data_object</span>
+</button>
+)}
 </>
 ) : (
 <div className="flex flex-col items-center justify-center gap-2 opacity-10">

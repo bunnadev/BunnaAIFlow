@@ -54,6 +54,13 @@ color: 'text-[#f5a623]',
 bg: 'hover:bg-[#f5a623]/10'
 },
 {
+type: 'textGen',
+label: 'Text AI',
+icon: 'data_object',
+color: 'text-[#3b82f6]',
+bg: 'hover:bg-[#3b82f6]/10'
+},
+{
 type: 'styleNode',
 label: 'Phong cách',
 icon: 'auto_awesome',

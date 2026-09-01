@@ -5,8 +5,12 @@ import { readFile } from '@tauri-apps/plugin-fs';
 import { saveAssetFromBytes, mimeTypeFromExtension, toDisplayUrl } from '../../lib/assets';
 import type { MediaAsset } from '../../types';
 
+// Tạm ẩn nút Vector hoá — kết quả chưa đủ ổn định với ảnh AI generate đa dạng,
+// cần nghiên cứu thêm cấu hình vtracer trước khi bật lại (giữ nguyên phần code).
+const VECTORIZE_ENABLED = false;
+
 const MediaSourceNode = ({ id, data }: any) => {
-const { setNodes } = useReactFlow();
+const { setNodes, deleteElements } = useReactFlow();
 
 const updateNodeMedia = (media: MediaAsset | null) => {
 setNodes((nds) =>
@@ -63,6 +67,16 @@ e.stopPropagation();
 window.dispatchEvent(new CustomEvent('duplicate-node', { detail: { nodeId: id } }));
 };
 
+const onDeleteNode = (e: React.MouseEvent) => {
+e.stopPropagation();
+deleteElements({ nodes: [{ id }] });
+};
+
+const onVectorize = (e: React.MouseEvent) => {
+e.stopPropagation();
+window.dispatchEvent(new CustomEvent('vectorize-node', { detail: { nodeId: id } }));
+};
+
 return (
 <div className="node-container !bg-[#0d1424] !border-[#F1641E]/20 !p-0 !w-[220px] !max-w-[220px] overflow-hidden group/node">
 <div className="p-2.5 border-b border-white/5 flex items-center justify-between bg-[#0b1019]/50">
@@ -87,6 +101,13 @@ title="Cài đặt node"
 >
 <span className="material-symbols-outlined text-[14px]">tune</span>
 </button>
+<button
+onClick={onDeleteNode}
+className="p-1 hover:bg-red-500/20 rounded-lg text-[#94a3b8] hover:text-red-400 transition-all"
+title="Xoá node"
+>
+<span className="material-symbols-outlined text-[14px]">delete</span>
+</button>
 </div>
 </div>
 
@@ -106,6 +127,15 @@ className="relative group/img overflow-hidden rounded-xl border border-white/10 
 <div className="w-8 h-8 rounded-full bg-black/60 border border-[#F1641E]/40 flex items-center justify-center text-[#F1641E]">
 <span className="material-symbols-outlined text-[18px]">visibility</span>
 </div>
+{VECTORIZE_ENABLED && data.media.type === 'image' && (
+<button
+onClick={onVectorize}
+className="w-8 h-8 rounded-full bg-black/60 border border-[#3b82f6]/40 flex items-center justify-center text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white transition-all"
+title="Vector hoá thành SVG"
+>
+<span className="material-symbols-outlined text-[18px]">data_object</span>
+</button>
+)}
 <button
 onClick={clearMedia}
 className="w-8 h-8 rounded-full bg-black/60 border border-red-500/40 flex items-center justify-center text-red-400 hover:bg-red-500 hover:text-white transition-all"

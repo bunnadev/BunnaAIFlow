@@ -15,7 +15,7 @@ onCancel: () => void;
 const parsePromptList = (value: string) =>
 value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 
-const VIDEO_MODELS = ['Omni Flash', 'Veo 3.1 - Fast', 'Veo 3.1 - Lite', 'Veo 3.1 - Quality'];
+const VIDEO_MODELS = ['Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality', 'Omni Flash'];
 const IMAGE_MODELS = ['Nano Banana Pro', 'Nano Banana 2', 'Nano Banana 2 Lite'];
 
 const VOICES = [
@@ -42,7 +42,7 @@ const [imageAspectRatio, setImageAspectRatio] = useState('16:9');
 const [videoModel, setVideoModel] = useState(VIDEO_MODELS[0]);
 const [videoResolution, setVideoResolution] = useState('4k');
 const [videoAspectRatio, setVideoAspectRatio] = useState('16:9');
-const [duration, setDuration] = useState(10);
+const [duration, setDuration] = useState(8);
 const [videoMode, setVideoMode] = useState('frame');
 
 const [voiceOverEnabled, setVoiceOverEnabled] = useState(false);
@@ -198,7 +198,7 @@ return (
 <SegmentedToggle value={videoMode} onChange={setVideoMode} items={[{ value: 'frame', label: 'Frame' }, { value: 'reference', label: 'Ref' }]} />
 </div>
 </div>
-<div className="flex flex-col gap-2 h-full justify-between pb-1"><RangeSlider label="Duration" value={duration} min={4} max={10} step={2} formatValue={(v) => `${v}s`} onChange={setDuration} /></div>
+<div className="flex flex-col gap-2 h-full justify-between pb-1"><RangeSlider label="Duration" value={duration} min={4} max={8} step={2} formatValue={(v) => `${v}s`} onChange={setDuration} /></div>
 </div>
 
 <div className="mt-2 p-4 bg-black/40 rounded-2xl border border-white/5 flex flex-col gap-4">
