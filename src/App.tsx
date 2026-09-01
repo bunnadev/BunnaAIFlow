@@ -33,6 +33,7 @@ import WorkspaceManager from './components/WorkspaceManager';
 import ContextMenu from './components/ContextMenu';
 import NodeSettingsPanel from './components/NodeSettingsPanel';
 import StyleSettingsModal from './components/StyleSettingsModal';
+import SceneEditPanel from './components/SceneEditPanel';
 import NodeLibraryPanel from './components/NodeLibraryPanel';
 import ExecutionLogPanel from './components/ExecutionLogPanel';
 import BatchExportPanel from './components/BatchExportPanel';
@@ -123,6 +124,7 @@ const [runningChain, setRunningChain] = useState(false);
 
 const [activeSettingsNodeId, setActiveSettingsNodeId] = useState<string | null>(null);
 const [activeStyleSettingsNodeId, setActiveStyleSettingsNodeId] = useState<string | null>(null);
+const [activeSceneEdit, setActiveSceneEdit] = useState<{ nodeId: string; sceneId: string } | null>(null);
 
 const [appSettings, setAppSettings] = useState<AppSettings>({});
 
@@ -1021,6 +1023,12 @@ setIsNodeLibraryOpen(false);
 const hDup = (e: any) => onDuplicateNode(e.detail.nodeId);
 const hDown = (e: any) => handleDownloadNode(e.detail.nodeId);
 const hVec = (e: any) => handleVectorizeNode(e.detail.nodeId);
+const hSceneEdit = (e: any) => {
+setActiveSceneEdit({ nodeId: e.detail.nodeId, sceneId: e.detail.sceneId });
+setActiveSettingsNodeId(null);
+setActiveStyleSettingsNodeId(null);
+setIsNodeLibraryOpen(false);
+};
 
 window.addEventListener('execute-node' as any, hEx);
 window.addEventListener('open-preview' as any, hPrev);
@@ -1028,6 +1036,7 @@ window.addEventListener('open-node-settings' as any, hSettings);
 window.addEventListener('duplicate-node' as any, hDup);
 window.addEventListener('download-node' as any, hDown);
 window.addEventListener('vectorize-node' as any, hVec);
+window.addEventListener('open-scene-edit' as any, hSceneEdit);
 return () => {
 window.removeEventListener('execute-node' as any, hEx);
 window.removeEventListener('open-preview' as any, hPrev);
@@ -1035,6 +1044,7 @@ window.removeEventListener('open-node-settings' as any, hSettings);
 window.removeEventListener('duplicate-node' as any, hDup);
 window.removeEventListener('download-node' as any, hDown);
 window.removeEventListener('vectorize-node' as any, hVec);
+window.removeEventListener('open-scene-edit' as any, hSceneEdit);
 };
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [getNodes, getEdges, isNodeDirty, onDuplicateNode, handleDownloadNode, handleVectorizeNode]);
@@ -1104,6 +1114,17 @@ className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all
 {isNodeLibraryOpen && <NodeLibraryPanel onAdd={(type) => onAddManualNode(type)} onClose={() => setIsNodeLibraryOpen(false)} />}
 {activeSettingsNodeId && <NodeSettingsPanel nodeId={activeSettingsNodeId} nodes={nodes} onUpdateData={(id, key, val) => setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, [key]: val } } : n))} onClose={() => setActiveSettingsNodeId(null)} />}
 {activeStyleSettingsNodeId && <StyleSettingsModal isOpen={!!activeStyleSettingsNodeId} nodeId={activeStyleSettingsNodeId} nodes={nodes} onUpdate={(id, key, val) => setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, [key]: val } } : n))} onClose={() => setActiveStyleSettingsNodeId(null)} />}
+{activeSceneEdit && <SceneEditPanel
+nodeId={activeSceneEdit.nodeId}
+sceneId={activeSceneEdit.sceneId}
+nodes={nodes}
+onUpdateScene={(nodeId, sceneId, updated) => setNodes(nds => nds.map(n => {
+if (n.id !== nodeId) return n;
+const scenes = (n.data.editedScenes ?? []).map((s: any) => s.id === sceneId ? updated : s);
+return { ...n, data: { ...n.data, editedScenes: scenes, result: { type: 'sceneList', scenes } } };
+}))}
+onClose={() => setActiveSceneEdit(null)}
+/>}
 {isLogPanelOpen && <ExecutionLogPanel logs={executionLogs} onClear={() => setExecutionLogs([])} onClose={() => setIsLogPanelOpen(false)} />}
 {isSettingsOpen && <SettingsPanel settings={appSettings} onSave={handleSaveSettings} onClose={() => setIsSettingsOpen(false)} filenamePrefix={filenamePrefix} onChangePrefix={setFilenamePrefix} />}
 <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}

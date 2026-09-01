@@ -38,6 +38,11 @@ const SceneReviewNode = ({ id, data }: any) => {
     setScenes(editedScenes.filter((s) => s.id !== sceneId));
   };
 
+  const onEditScene = (e: React.MouseEvent, sceneId: string) => {
+    e.stopPropagation();
+    window.dispatchEvent(new CustomEvent('open-scene-edit', { detail: { nodeId: id, sceneId } }));
+  };
+
   const onDownload = () => {
     window.dispatchEvent(new CustomEvent('download-node', { detail: { nodeId: id } }));
   };
@@ -125,13 +130,22 @@ const SceneReviewNode = ({ id, data }: any) => {
                     </p>
                   )}
                 </div>
-                <button
-                  onClick={(e) => onRemoveScene(e, s.id)}
-                  className="shrink-0 p-1 hover:bg-red-600 text-white/30 hover:text-white rounded-lg opacity-0 group-hover/scene:opacity-100 transition-all"
-                  title="Bỏ cảnh này"
-                >
-                  <span className="material-symbols-outlined text-[13px]">delete</span>
-                </button>
+                <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover/scene:opacity-100 transition-all">
+                  <button
+                    onClick={(e) => onEditScene(e, s.id)}
+                    className="p-1 hover:bg-[#f43f5e] text-white/30 hover:text-white rounded-lg transition-all"
+                    title="Xem/sửa cảnh này (kể cả JSON thô)"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">edit</span>
+                  </button>
+                  <button
+                    onClick={(e) => onRemoveScene(e, s.id)}
+                    className="p-1 hover:bg-red-600 text-white/30 hover:text-white rounded-lg transition-all"
+                    title="Bỏ cảnh này"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">delete</span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>

@@ -87,6 +87,8 @@ return (
 <span className="material-symbols-outlined text-white/40 text-[16px]">description</span>
 ) : node.data.result.type === 'audio' ? (
 <span className="material-symbols-outlined text-[#eab308] text-[16px]">graphic_eq</span>
+) : node.data.result.type === 'sceneList' ? (
+<span className="material-symbols-outlined text-[#ec4899] text-[16px]">movie_filter</span>
 ) : (
 <img src={toDisplayUrl(node.data.result.path)} className="w-full h-full object-cover" alt="" />
 )}
