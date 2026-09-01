@@ -81,7 +81,13 @@ const baseName = fileName.substring(0, fileName.lastIndexOf('.'));
 return (
 <div key={node.id} className={`flex items-center gap-2 p-1.5 bg-white/[0.02] rounded-xl border ${node.selected ? 'border-[#F1641E]/60 bg-[#F1641E]/10' : 'border-white/5'}`}>
 <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center overflow-hidden border border-white/10 shrink-0">
-{node.data.result.type === 'video' ? <span className="material-symbols-outlined text-[#f5a623] text-[16px]">movie</span> : <img src={toDisplayUrl(node.data.result.path)} className="w-full h-full object-cover" alt="" />}
+{node.data.result.type === 'video' ? (
+<span className="material-symbols-outlined text-[#f5a623] text-[16px]">movie</span>
+) : node.data.result.type === 'text' ? (
+<span className="material-symbols-outlined text-white/40 text-[16px]">description</span>
+) : (
+<img src={toDisplayUrl(node.data.result.path)} className="w-full h-full object-cover" alt="" />
+)}
 </div>
 <span className="text-[8.5px] text-white/90 font-black uppercase truncate tracking-widest flex-1">{baseName}</span>
 </div>
