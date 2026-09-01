@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Handle, Position, useReactFlow, useEdges, useNodes } from 'reactflow';
+import { Handle, Position, useReactFlow, useEdges, useNodes, useUpdateNodeInternals } from 'reactflow';
 import { toDisplayUrl } from '../../lib/assets';
 
 // Tạm ẩn nút Vector hoá — kết quả chưa đủ ổn định với ảnh AI generate đa dạng,
@@ -10,8 +10,16 @@ const ImageGenNode = ({ id, data }: any) => {
 const { setNodes, setEdges, deleteElements } = useReactFlow();
 const edges = useEdges();
 const nodes = useNodes();
+const updateNodeInternals = useUpdateNodeInternals();
 const [showRunOptions, setShowRunOptions] = useState(false);
 const optionsRef = useRef<HTMLDivElement>(null);
+const characterCount: number = data.characterCount || 0;
+
+// ReactFlow cần được báo lại mỗi khi số chân nối thay đổi, không thì dây nối
+// cũ sẽ vẽ sai vị trí trên canvas.
+useEffect(() => {
+updateNodeInternals(id);
+}, [characterCount, id, updateNodeInternals]);
 
 const incomingMedia = useMemo(() => {
 return edges
@@ -181,6 +189,12 @@ title="Xoá node"
 <Handle type="target" position={Position.Left} id="style-in" className="!bg-[#F1641E] !w-2 !h-2 !static !translate-x-0 !border-2 !border-[#0d1424]" />
 <span className="text-[7px] font-black text-white/30 lowercase tracking-[0.1em] -translate-y-[0.5px]">style</span>
 </div>
+{Array.from({ length: characterCount }, (_, i) => (
+<div className="flex items-center gap-1.5" key={`character-in-${i}`}>
+<Handle type="target" position={Position.Left} id={`character-in-${i}`} className="!bg-[#8b5cf6] !w-2 !h-2 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+<span className="text-[7px] font-black text-white/30 lowercase tracking-[0.1em] -translate-y-[0.5px]">nv {i + 1}</span>
+</div>
+))}
 </div>
 
 <div

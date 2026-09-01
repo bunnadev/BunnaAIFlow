@@ -26,7 +26,7 @@ left: x,
 
 if (typeof window !== 'undefined') {
 const menuWidth = 224; // w-56 = 14rem = 224px
-const menuHeight = 520; // Adjusted height for more items
+const menuHeight = 570; // Adjusted height for more items
 if (x + menuWidth > window.innerWidth) menuStyle.left = window.innerWidth - menuWidth - 20;
 if (y + menuHeight > window.innerHeight) menuStyle.top = window.innerHeight - menuHeight - 20;
 }
@@ -101,6 +101,13 @@ label: 'Duyệt Phân Cảnh',
 icon: 'playlist_add_check',
 color: 'text-[#f43f5e]',
 bg: 'hover:bg-[#f43f5e]/10'
+},
+{
+type: 'character',
+label: 'Nhân Vật',
+icon: 'face',
+color: 'text-[#8b5cf6]',
+bg: 'hover:bg-[#8b5cf6]/10'
 },
 {
 type: 'styleNode',

@@ -17,8 +17,11 @@ const [exportStatus, setExportStatus] = useState<'idle' | 'preparing' | 'done'>(
 const [isMinimized, setIsMinimized] = useState(false);
 
 const getSortedResults = () => {
+// imageSet (node Nhân Vật) là tài liệu tham chiếu trung gian, không phải
+// thành phẩm cuối — không có 1 file duy nhất để zip theo đúng khuôn của
+// panel này, nên loại khỏi danh sách xuất hàng loạt.
 return [...nodes]
-.filter(n => n.data.result && n.data.isFinalized)
+.filter(n => n.data.result && n.data.isFinalized && n.data.result.type !== 'imageSet')
 .sort((a, b) => {
 const rowDiff = a.position.y - b.position.y;
 if (Math.abs(rowDiff) < 60) return a.position.x - b.position.x;

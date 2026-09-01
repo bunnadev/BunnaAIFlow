@@ -38,6 +38,7 @@ const isVbee = node.type === 'vbee';
 const isAudioMaster = node.type === 'audioMaster';
 const isScenePlanner = node.type === 'scenePlanner';
 const isSceneReview = node.type === 'sceneReview';
+const isCharacter = node.type === 'character';
 const isMediaSource = node.type === 'mediaSource';
 const data = node.data;
 
@@ -52,9 +53,9 @@ return (
 <div className="absolute top-0 left-0 h-full w-[288px] bg-[#0b1019] border-r border-[#F1641E]/20 z-30 flex flex-col shadow-2xl animate-slide-panel">
 <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
 <div className="flex items-center gap-2.5">
-<div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : isText ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : isStt ? 'bg-[#22c55e]/10 text-[#22c55e]' : isTextReview ? 'bg-[#a855f7]/10 text-[#a855f7]' : isVbee ? 'bg-[#eab308]/10 text-[#eab308]' : isAudioMaster ? 'bg-[#06b6d4]/10 text-[#06b6d4]' : isScenePlanner ? 'bg-[#ec4899]/10 text-[#ec4899]' : isSceneReview ? 'bg-[#f43f5e]/10 text-[#f43f5e]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
+<div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : isText ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : isStt ? 'bg-[#22c55e]/10 text-[#22c55e]' : isTextReview ? 'bg-[#a855f7]/10 text-[#a855f7]' : isVbee ? 'bg-[#eab308]/10 text-[#eab308]' : isAudioMaster ? 'bg-[#06b6d4]/10 text-[#06b6d4]' : isScenePlanner ? 'bg-[#ec4899]/10 text-[#ec4899]' : isSceneReview ? 'bg-[#f43f5e]/10 text-[#f43f5e]' : isCharacter ? 'bg-[#8b5cf6]/10 text-[#8b5cf6]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
 <span className="material-symbols-outlined text-[19px]">
-{isImage ? 'palette' : isVideo ? 'movie' : isText ? 'data_object' : isStt ? 'graphic_eq' : isTextReview ? 'edit_note' : isVbee ? 'record_voice_over' : isAudioMaster ? 'equalizer' : isScenePlanner ? 'movie_filter' : isSceneReview ? 'playlist_add_check' : isMediaSource ? 'perm_media' : 'settings'}
+{isImage ? 'palette' : isVideo ? 'movie' : isText ? 'data_object' : isStt ? 'graphic_eq' : isTextReview ? 'edit_note' : isVbee ? 'record_voice_over' : isAudioMaster ? 'equalizer' : isScenePlanner ? 'movie_filter' : isSceneReview ? 'playlist_add_check' : isCharacter ? 'face' : isMediaSource ? 'perm_media' : 'settings'}
 </span>
 </div>
 <div>
@@ -185,7 +186,34 @@ Node này không gọi AI, chỉ giữ danh sách cảnh bạn tự lọc. Bấm
 </div>
 )}
 
-{!isMediaSource && !isText && !isStt && !isTextReview && !isVbee && !isAudioMaster && !isScenePlanner && !isSceneReview && (
+{isCharacter && (
+<>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Danh tính</SectionLabel>
+<input
+type="text"
+value={data.characterName || ''}
+onChange={(e) => updateNode('characterName', e.target.value)}
+placeholder="VD: Cha, Mẹ, Con trai..."
+className="w-full bg-[#050a10] border border-white/5 hover:border-[#8b5cf6]/30 rounded-xl px-3 py-2.5 text-[11px] text-white outline-none transition-all font-bold"
+/>
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Dùng để ghi chú trong prompt gửi Gemini khi ảnh này được nối làm 1 trong nhiều nhân vật của 1 cảnh — giúp phân biệt đúng ai với ai.
+</p>
+</div>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Cấu hình Model</SectionLabel>
+<FieldDropdown label="Mẫu AI" value={data.model} options={IMAGE_MODELS} onChange={(v) => updateNode('model', v)} />
+</div>
+<div className="flex flex-col gap-2 px-1">
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Nối 1 ảnh trực diện hoàn chỉnh vào chân bên trái, node sẽ tự tạo thêm 3 góc (nghiêng, 3/4, phía sau) — prompt góc nhìn cố định sẵn, không chỉnh được, chỉ giữ nguyên khuôn mặt/tóc/trang phục từ ảnh gốc.
+</p>
+</div>
+</>
+)}
+
+{!isMediaSource && !isText && !isStt && !isTextReview && !isVbee && !isAudioMaster && !isScenePlanner && !isSceneReview && !isCharacter && (
 <>
 <div className="flex flex-col gap-3.5">
 <SectionLabel>Cấu hình Model</SectionLabel>
@@ -217,6 +245,14 @@ Node này không gọi AI, chỉ giữ danh sách cảnh bạn tự lọc. Bấm
 )}
 </>
 )}
+</div>
+
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Nhân vật nhất quán</SectionLabel>
+<RangeSlider label="Số nhân vật" value={data.characterCount ?? 0} min={0} max={5} step={1} formatValue={(v) => v === 0 ? 'Không dùng' : `${v}`} onChange={(v) => updateNode('characterCount', v)} />
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Mỗi nhân vật sẽ có 1 chân nối riêng (nv 1, nv 2...) bên trái node — nối thẳng node Nhân Vật vào từng chân. {isVideo && 'Bỏ trống (0) nếu chạy chế độ Khung từ ảnh đã gen sẵn — lúc đó ảnh khung đã là nhân vật nhất quán rồi.'}
+</p>
 </div>
 
 <div className="flex flex-col gap-3.5">

@@ -17,7 +17,8 @@ const nodeTypes = [
 { type: 'vbee', label: 'Vbee TTS', desc: 'Text vào, giọng đọc Vbee ra — đọc từng câu rồi tự ghép, kèm mốc thời gian.', icon: 'record_voice_over', color: 'text-[#eab308]', bg: 'bg-[#eab308]/10' },
 { type: 'audioMaster', label: 'Làm Đẹp Âm Thanh', desc: 'Lọc rì, giảm tiếng xì, chuẩn hoá âm lượng bằng ffmpeg (tuỳ chọn, không có ffmpeg vẫn chạy được).', icon: 'equalizer', color: 'text-[#06b6d4]', bg: 'bg-[#06b6d4]/10' },
 { type: 'scenePlanner', label: 'Phân Tích Cảnh', desc: 'Video gốc + audio Vbee + style vào, tự chia phân cảnh theo lời thoại và điền prompt hình ảnh.', icon: 'movie_filter', color: 'text-[#ec4899]', bg: 'bg-[#ec4899]/10' },
-{ type: 'sceneReview', label: 'Duyệt Phân Cảnh', desc: 'Bỏ bớt cảnh không cần (VD cảnh quảng cáo) trước khi đưa qua bước gen ảnh.', icon: 'playlist_add_check', color: 'text-[#f43f5e]', bg: 'bg-[#f43f5e]/10' }
+{ type: 'sceneReview', label: 'Duyệt Phân Cảnh', desc: 'Bỏ bớt cảnh không cần (VD cảnh quảng cáo) trước khi đưa qua bước gen ảnh.', icon: 'playlist_add_check', color: 'text-[#f43f5e]', bg: 'bg-[#f43f5e]/10' },
+{ type: 'character', label: 'Nhân Vật', desc: 'Nối 1 ảnh trực diện, tự tạo thêm 3 góc nhìn — nối vào chân "nv" của Image/Video AI để giữ nhân vật nhất quán.', icon: 'face', color: 'text-[#8b5cf6]', bg: 'bg-[#8b5cf6]/10' }
 ];
 
 return (

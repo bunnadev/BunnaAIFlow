@@ -4,6 +4,7 @@ Controls,
 Edge,
 addEdge,
 Node,
+Connection,
 ReactFlowProvider,
 useNodesState,
 useEdgesState,
@@ -15,6 +16,7 @@ Background,
 BackgroundVariant
 } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
+import JSZip from 'jszip';
 
 // Custom Nodes & Components
 import MediaSourceNode from './components/nodes/MediaSourceNode';
@@ -27,6 +29,7 @@ import VbeeNode from './components/nodes/VbeeNode';
 import AudioMasterNode from './components/nodes/AudioMasterNode';
 import ScenePlannerNode from './components/nodes/ScenePlannerNode';
 import SceneReviewNode from './components/nodes/SceneReviewNode';
+import CharacterNode from './components/nodes/CharacterNode';
 import StyleNode from './components/nodes/StyleNode';
 import DeleteEdge from './components/nodes/DeleteEdge';
 import WorkspaceManager from './components/WorkspaceManager';
@@ -58,6 +61,8 @@ import { VbeeProvider } from './lib/providers/vbeeProvider';
 import { DEFAULT_VBEE_VOICE_NAME, resolveVbeeVoiceCode } from './lib/vbeeVoices';
 import { buildScenesSkeleton } from './lib/sceneGrouping';
 import { computeFanOut } from './lib/fanOut';
+import { CHARACTER_ANGLES } from './lib/characterAngles';
+import { computeBulkConnectEdges } from './lib/bulkConnect';
 import { resolveImageModelId, resolveVideoModelId, resolveTextModelId } from './lib/models';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { writeFile, readFile } from '@tauri-apps/plugin-fs';
@@ -66,7 +71,7 @@ import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 
 export const getNodeFileName = (node: Node, index: number, prefix: string = 'BUNNA_FLOW') => {
-const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : ((node.type === 'vbee' || node.type === 'audioMaster') ? 'AUD' : ((node.type === 'scenePlanner' || node.type === 'sceneReview') ? 'SCN' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES'))));
+const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : ((node.type === 'vbee' || node.type === 'audioMaster') ? 'AUD' : ((node.type === 'scenePlanner' || node.type === 'sceneReview') ? 'SCN' : (node.type === 'character' ? 'CHR' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES')))));
 const extension = node.data.result?.type === 'video' ? 'mp4' : (node.data.result?.type === 'text' ? 'txt' : (node.data.result?.type === 'audio' ? 'wav' : (node.data.result?.type === 'sceneList' ? 'json' : 'jpg')));
 const label = (node.data.label || 'ASSET').replace(/[^a-z0-9]/gi, '_').toUpperCase();
 return `${prefix}_${typeCode}_${index + 1}_${label}.${extension}`;
@@ -83,12 +88,14 @@ vbee: VbeeNode,
 audioMaster: AudioMasterNode,
 scenePlanner: ScenePlannerNode,
 sceneReview: SceneReviewNode,
+character: CharacterNode,
 styleNode: StyleNode,
 };
 
 const EDGE_TYPES = {
 default: DeleteEdge,
 };
+
 
 type InteractionMode = 'select' | 'hand' | 'connect';
 type ExecutionMode = 'single' | 'sequence';
@@ -217,7 +224,7 @@ setUndoStack(prev => [...prev, { nodes: getNodes(), edges: getEdges() }]);
 
 const handleResetAllResults = useCallback(() => {
 setNodes(nds => nds.map(node => {
-if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee' || node.type === 'audioMaster' || node.type === 'scenePlanner') {
+if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee' || node.type === 'audioMaster' || node.type === 'scenePlanner' || node.type === 'character') {
 return {
 ...node,
 data: { ...node.data, result: null, statusText: '', isFinalized: false, isLoading: false }
@@ -394,15 +401,30 @@ const srcNode = currentNodes.find(n => n.id === e.source);
 return srcNode?.data?.result?.type === 'text' ? (srcNode.data.result.text || '') : '';
 }).sort().join('|');
 
+const incomingCharacterEdges = currentEdges.filter(e => e.target === node.id && e.targetHandle?.startsWith('character-in-'));
+const incomingCharacterHash = incomingCharacterEdges.map(e => {
+const srcNode = currentNodes.find(n => n.id === e.source);
+const r = srcNode?.data?.result;
+return `${e.targetHandle}:${r?.type === 'imageSet' ? r.images.map((i: any) => i.assetId).join(',') : (r?.assetId || '')}`;
+}).sort().join('|');
+
 const baseParts = [node.data.model, node.data.localPrompt, node.data.aspectRatio, node.data.resolution, node.data.duration, incomingMediaIds, styleStrings];
-// Chỉ thêm phần text-in/Vbee vào hash cho những node THỰC SỰ có input đó —
-// nếu thêm vô điều kiện cho mọi node, hash của các node cũ (imageGen/videoGen/
-// textGen/stt đã chạy trước khi có text-in) sẽ đổi dù input chẳng đổi gì, khiến
-// isNodeDirty() coi chúng là "dirty" và chạy lại oan uổng.
+// Chỉ thêm phần text-in/Vbee/nhân vật vào hash cho những node THỰC SỰ có
+// input đó — nếu thêm vô điều kiện cho mọi node, hash của các node cũ
+// (imageGen/videoGen/textGen/stt đã chạy trước khi có các trường này) sẽ đổi
+// dù input chẳng đổi gì, khiến isNodeDirty() coi chúng là "dirty" và chạy
+// lại oan uổng (đã từng vấp lỗi này thật với text-in, không lặp lại).
 if (incomingTextEdges.length > 0) baseParts.push(incomingTextHash);
 if (node.type === 'vbee') baseParts.push(node.data.voiceLabel, node.data.speed, node.data.gapSeconds);
 if (node.type === 'audioMaster') baseParts.push(node.data.targetLufs);
 if (node.type === 'scenePlanner') baseParts.push(node.data.targetSceneSeconds);
+if (node.type === 'character') baseParts.push(node.data.characterName);
+// characterCount mặc định 0 cho MỌI node imageGen/videoGen kể cả những node
+// không dùng tính năng này — chỉ thêm vào hash khi thực sự bật (>0), để
+// không đổi hash của những node đã chạy trước khi tính năng này tồn tại.
+if ((node.type === 'imageGen' || node.type === 'videoGen') && (node.data.characterCount ?? 0) > 0) {
+baseParts.push(node.data.characterCount, incomingCharacterHash);
+}
 return baseParts.join('::');
 }, [getNodes]);
 
@@ -429,6 +451,7 @@ case 'vbee': newNode = { id, type, position: finalPos, data: { ...commonData, la
 case 'audioMaster': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Làm Đẹp Âm Thanh', targetLufs: -14 } }; break;
 case 'scenePlanner': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phân Tích Cảnh', model: 'Gemini 3.6 Flash', targetSceneSeconds: 6.0 } }; break;
 case 'sceneReview': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Duyệt Phân Cảnh', isFinalized: true, editedScenes: [] } }; break;
+case 'character': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Nhân Vật', characterName: '', model: 'Nano Banana Pro', aspectRatio: '3:4' } }; break;
 case 'styleNode': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phong cách', positivePrompt: '', negativePrompt: '' } }; break;
 default: return;
 }
@@ -455,6 +478,22 @@ isLoading: false, statusText: '', result: null, isFinalized: false, isWaiting: f
 };
 setNodes((nds) => nds.concat(newNode));
 }, [getNodes, setNodes]);
+
+const handleConnect = useCallback((p: Connection) => {
+if (!p.source || !p.target) return;
+const primaryEdge = { ...p, animated: false, style: { stroke: '#F1641E', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#F1641E' } };
+
+const currentNodes = getNodes();
+const currentEdges = getEdges();
+const bulkEdges = computeBulkConnectEdges(currentNodes, p, currentEdges, `edge_bulk_${Date.now()}`);
+
+setEdges(eds => addEdge(primaryEdge, eds).concat(bulkEdges));
+
+if (bulkEdges.length > 0) {
+setFlowStatus({ message: `ĐÃ NỐI THÊM TỚI ${bulkEdges.length} NODE ĐANG CHỌN.`, type: 'success' });
+setTimeout(() => setFlowStatus(null), 2500);
+}
+}, [getNodes, getEdges, setEdges]);
 
 const handleFanOutFromSelection = useCallback(() => {
 const currentNodes = getNodes();
@@ -611,6 +650,20 @@ const index = getNodes().filter(n => n.type === node.type).indexOf(node);
 const filename = getNodeFileName(node, index, filenamePrefix);
 
 try {
+if (node.data.result.type === 'imageSet') {
+const zip = new JSZip();
+for (let i = 0; i < node.data.result.images.length; i++) {
+const img = node.data.result.images[i];
+const base64 = await readAssetAsBase64(img.path);
+zip.file(`${filename.replace(/\.[^.]+$/, '')}_${i + 1}.${img.mimeType?.includes('png') ? 'png' : 'jpg'}`, base64, { base64: true });
+}
+const content = await zip.generateAsync({ type: 'uint8array' });
+const path = await saveDialog({ defaultPath: filename.replace(/\.[^.]+$/, '.zip'), filters: [{ name: 'ZIP', extensions: ['zip'] }] });
+if (!path) return;
+await writeFile(path, content);
+return;
+}
+
 const path = await saveDialog({ defaultPath: filename });
 if (!path) return;
 if (node.data.result.type === 'text') {
@@ -663,6 +716,7 @@ const sourceImages: MediaAsset[] = [];
 const sourceVideos: MediaAsset[] = [];
 const sourceAudios: MediaAsset[] = [];
 const sourceTexts: string[] = [];
+const characterGroups: { name?: string; images: MediaAsset[] }[] = [];
 let positiveStyle = '';
 let negativeStyle = '';
 
@@ -671,11 +725,12 @@ const src = currentNodes.find(n => n.id === edge.source);
 if (!src) continue;
 
 if (edge.targetHandle === 'media-in') {
-const mediaData: MediaAsset | undefined = src.data.result || src.data.media;
+const mediaData: any = src.data.result || src.data.media;
 if (mediaData) {
 if (mediaData.type === 'image') sourceImages.push(mediaData);
 else if (mediaData.type === 'video') sourceVideos.push(mediaData);
 else if (mediaData.type === 'audio') sourceAudios.push(mediaData);
+else if (mediaData.type === 'imageSet') sourceImages.push(...mediaData.images);
 }
 } else if (edge.targetHandle === 'style-in') {
 if (src.type === 'styleNode') {
@@ -684,6 +739,13 @@ if (src.data.negativePrompt) negativeStyle += (negativeStyle ? ', ' : '') + src.
 }
 } else if (edge.targetHandle === 'text-in') {
 if (src.data.result?.type === 'text' && src.data.result.text) sourceTexts.push(src.data.result.text);
+} else if (edge.targetHandle?.startsWith('character-in-')) {
+const mediaData: any = src.data.result || src.data.media;
+if (mediaData?.type === 'imageSet') {
+characterGroups.push({ name: mediaData.characterName, images: mediaData.images });
+} else if (mediaData?.type === 'image') {
+characterGroups.push({ name: undefined, images: [mediaData] });
+}
 }
 }
 
@@ -697,10 +759,30 @@ const omniFlashProvider = new GeminiOmniFlashProvider(apiKey);
 const textProvider = new GeminiTextProvider(apiKey);
 
 const basePrompt = node.data.localPrompt || 'A cinematic masterpiece';
-const finalPrompt = positiveStyle ? `${basePrompt}, ${positiveStyle}` : basePrompt;
 
-const referenceImages = sourceImages.length
-? await Promise.all(sourceImages.slice(0, 10).map(async (m) => ({
+// Nhân vật nhất quán: ảnh từng nhân vật (đã gộp qua các chân character-in-N)
+// nối thêm vào cuối danh sách ảnh tham chiếu chung, kèm 1 đoạn ghi chú trong
+// prompt để Gemini biết đâu là ảnh của ai — bản thân API không tự phân biệt
+// được chỉ vì ảnh tới từ chân khác nhau, phải nói rõ bằng chữ.
+let characterNote = '';
+if (characterGroups.length > 0) {
+let cursor = sourceImages.length;
+const parts: string[] = [];
+characterGroups.forEach((g, i) => {
+const from = cursor + 1;
+const to = cursor + g.images.length;
+const label = g.name ? `Nhân vật ${i + 1} (${g.name})` : `Nhân vật ${i + 1}`;
+parts.push(`${label} = ảnh tham chiếu ${from}${to > from ? `-${to}` : ''}`);
+cursor = to;
+});
+characterNote = `\n\nGhi chú tham chiếu nhân vật (giữ đúng ngoại hình từng người theo đúng ảnh tương ứng): ${parts.join('; ')}.`;
+}
+
+const finalPrompt = (positiveStyle ? `${basePrompt}, ${positiveStyle}` : basePrompt) + characterNote;
+
+const allReferenceAssets = [...sourceImages, ...characterGroups.flatMap(g => g.images)];
+const referenceImages = allReferenceAssets.length
+? await Promise.all(allReferenceAssets.slice(0, 16).map(async (m) => ({
 base64: await readAssetAsBase64(m.path),
 mimeType: m.mimeType,
 })))
@@ -856,6 +938,36 @@ data: {
 ...n.data, isLoading: false, statusText: 'Hoàn tất', isFinalized: true,
 lastRunHash: getNodeStateHash(node, currentEdges),
 result: { type: 'sceneList', scenes, style: positiveStyle || undefined }
+}
+} : n));
+return;
+}
+
+if (node.type === 'character') {
+const frontal = sourceImages[0];
+if (!frontal) throw new Error('Chưa có ảnh trực diện nào nối vào node này.');
+const frontalBase64 = await readAssetAsBase64(frontal.path);
+const images: MediaAsset[] = [frontal];
+
+for (let i = 0; i < CHARACTER_ANGLES.length; i++) {
+const angle = CHARACTER_ANGLES[i];
+setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, statusText: `Đang tạo góc ${angle.label} (${i + 1}/${CHARACTER_ANGLES.length})...` } } : n));
+const angleResult = await imageProvider.generateImage({
+prompt: angle.prompt,
+referenceImages: [{ base64: frontalBase64, mimeType: frontal.mimeType }],
+aspectRatio: (node.data.aspectRatio || '3:4') as any,
+model: resolveImageModelId(node.data.model),
+});
+const asset = await saveAssetFromBase64(angleResult.base64, angleResult.mimeType);
+images.push({ ...asset, type: 'image' });
+}
+
+setNodes(nds => nds.map(n => n.id === nodeId ? {
+...n,
+data: {
+...n.data, isLoading: false, statusText: 'Hoàn tất', isFinalized: true,
+lastRunHash: getNodeStateHash(node, currentEdges),
+result: { type: 'imageSet', images, characterName: node.data.characterName || undefined },
 }
 } : n));
 return;
@@ -1096,7 +1208,7 @@ concurrency={concurrency} onChangeConcurrency={() => {}}
 onRunPipeline={() => {
 const currentNodes = getNodes();
 const currentEdges = getEdges();
-const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt' || n.type === 'vbee' || n.type === 'audioMaster' || n.type === 'scenePlanner') && isNodeDirty(n, currentEdges));
+const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt' || n.type === 'vbee' || n.type === 'audioMaster' || n.type === 'scenePlanner' || n.type === 'character') && isNodeDirty(n, currentEdges));
 const ids = new Set<string>();
 dirty.forEach(n => { ids.add(n.id); getDescendants(n.id, currentNodes, currentEdges).forEach(d => ids.add(d)); });
 executeWorkflow(Array.from(ids));
@@ -1142,7 +1254,17 @@ className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all
 </div>
 <div className="flex-1 relative bg-[#1C1C1C] flex">
 {isNodeLibraryOpen && <NodeLibraryPanel onAdd={(type) => onAddManualNode(type)} onClose={() => setIsNodeLibraryOpen(false)} />}
-{activeSettingsNodeId && <NodeSettingsPanel nodeId={activeSettingsNodeId} nodes={nodes} onUpdateData={(id, key, val) => setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, [key]: val } } : n))} onClose={() => setActiveSettingsNodeId(null)} />}
+{activeSettingsNodeId && <NodeSettingsPanel nodeId={activeSettingsNodeId} nodes={nodes} onUpdateData={(id, key, val) => {
+setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, [key]: val } } : n));
+if (key === 'characterCount') {
+// Giảm số nhân vật thì xoá luôn dây đang nối vào các chân bị mất, không để treo lơ lửng.
+setEdges(eds => eds.filter(e => {
+if (e.target !== id || !e.targetHandle?.startsWith('character-in-')) return true;
+const idx = parseInt(e.targetHandle.replace('character-in-', ''), 10);
+return idx < val;
+}));
+}
+}} onClose={() => setActiveSettingsNodeId(null)} />}
 {activeStyleSettingsNodeId && <StyleSettingsModal isOpen={!!activeStyleSettingsNodeId} nodeId={activeStyleSettingsNodeId} nodes={nodes} onUpdate={(id, key, val) => setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, [key]: val } } : n))} onClose={() => setActiveStyleSettingsNodeId(null)} />}
 {activeSceneEdit && <SceneEditPanel
 nodeId={activeSceneEdit.nodeId}
@@ -1158,7 +1280,7 @@ onClose={() => setActiveSceneEdit(null)}
 {isLogPanelOpen && <ExecutionLogPanel logs={executionLogs} onClear={() => setExecutionLogs([])} onClose={() => setIsLogPanelOpen(false)} />}
 {isSettingsOpen && <SettingsPanel settings={appSettings} onSave={handleSaveSettings} onClose={() => setIsSettingsOpen(false)} filenamePrefix={filenamePrefix} onChangePrefix={setFilenamePrefix} />}
 <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
-onConnect={(p) => setEdges(eds => addEdge({ ...p, animated: false, style: { stroke: '#F1641E', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#F1641E' } }, eds))}
+onConnect={handleConnect}
 onPaneContextMenu={(e) => { e.preventDefault(); const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY }); setMenuState({ x: e.clientX, y: e.clientY, flowPos, visible: true }); }}
 onPaneClick={() => { setMenuState(null); setIsNodeLibraryOpen(false); setActiveSettingsNodeId(null); setActiveStyleSettingsNodeId(null); }}
 onNodesDelete={onNodesDelete} onEdgesDelete={onEdgesDelete}

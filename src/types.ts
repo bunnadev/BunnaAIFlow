@@ -48,6 +48,17 @@ export interface SceneListResult {
   style?: string;
 }
 
+/**
+ * Kết quả của node Nhân Vật — gói nhiều ảnh (nhiều góc) của CÙNG 1 nhân vật,
+ * nối vào 1 chân "character-in-N" của Image AI/Video AI là nhận đủ cả gói,
+ * không cần nối riêng từng ảnh.
+ */
+export interface ImageSetResult {
+  type: 'imageSet';
+  images: MediaAsset[];
+  characterName?: string;
+}
+
 export interface LogEntry {
   id: string;
   nodeId: string;
