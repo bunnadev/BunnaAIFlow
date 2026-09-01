@@ -26,7 +26,7 @@ left: x,
 
 if (typeof window !== 'undefined') {
 const menuWidth = 224; // w-56 = 14rem = 224px
-const menuHeight = 400; // Adjusted height for more items
+const menuHeight = 440; // Adjusted height for more items
 if (x + menuWidth > window.innerWidth) menuStyle.left = window.innerWidth - menuWidth - 20;
 if (y + menuHeight > window.innerHeight) menuStyle.top = window.innerHeight - menuHeight - 20;
 }
@@ -80,6 +80,13 @@ label: 'Vbee TTS',
 icon: 'record_voice_over',
 color: 'text-[#eab308]',
 bg: 'hover:bg-[#eab308]/10'
+},
+{
+type: 'audioMaster',
+label: 'Làm Đẹp Âm Thanh',
+icon: 'equalizer',
+color: 'text-[#06b6d4]',
+bg: 'hover:bg-[#06b6d4]/10'
 },
 {
 type: 'styleNode',

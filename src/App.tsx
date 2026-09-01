@@ -24,6 +24,7 @@ import TextGenNode from './components/nodes/TextGenNode';
 import SttNode from './components/nodes/SttNode';
 import TextReviewNode from './components/nodes/TextReviewNode';
 import VbeeNode from './components/nodes/VbeeNode';
+import AudioMasterNode from './components/nodes/AudioMasterNode';
 import StyleNode from './components/nodes/StyleNode';
 import DeleteEdge from './components/nodes/DeleteEdge';
 import WorkspaceManager from './components/WorkspaceManager';
@@ -60,7 +61,7 @@ import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 
 export const getNodeFileName = (node: Node, index: number, prefix: string = 'BUNNA_FLOW') => {
-const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : (node.type === 'vbee' ? 'AUD' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES')));
+const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : ((node.type === 'vbee' || node.type === 'audioMaster') ? 'AUD' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES')));
 const extension = node.data.result?.type === 'video' ? 'mp4' : (node.data.result?.type === 'text' ? 'txt' : (node.data.result?.type === 'audio' ? 'wav' : 'jpg'));
 const label = (node.data.label || 'ASSET').replace(/[^a-z0-9]/gi, '_').toUpperCase();
 return `${prefix}_${typeCode}_${index + 1}_${label}.${extension}`;
@@ -74,6 +75,7 @@ textGen: TextGenNode,
 stt: SttNode,
 textReview: TextReviewNode,
 vbee: VbeeNode,
+audioMaster: AudioMasterNode,
 styleNode: StyleNode,
 };
 
@@ -207,7 +209,7 @@ setUndoStack(prev => [...prev, { nodes: getNodes(), edges: getEdges() }]);
 
 const handleResetAllResults = useCallback(() => {
 setNodes(nds => nds.map(node => {
-if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee') {
+if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee' || node.type === 'audioMaster') {
 return {
 ...node,
 data: { ...node.data, result: null, statusText: '', isFinalized: false, isLoading: false }
@@ -391,6 +393,7 @@ const baseParts = [node.data.model, node.data.localPrompt, node.data.aspectRatio
 // isNodeDirty() coi chúng là "dirty" và chạy lại oan uổng.
 if (incomingTextEdges.length > 0) baseParts.push(incomingTextHash);
 if (node.type === 'vbee') baseParts.push(node.data.voiceLabel, node.data.speed, node.data.gapSeconds);
+if (node.type === 'audioMaster') baseParts.push(node.data.targetLufs);
 return baseParts.join('::');
 }, [getNodes]);
 
@@ -414,6 +417,7 @@ case 'textGen': newNode = { id, type, position: finalPos, data: { ...commonData,
 case 'stt': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Tách Audio', model: 'Gemini 2.5 Flash', localPrompt: '' } }; break;
 case 'textReview': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Duyệt Text', isFinalized: true, editedText: '' } }; break;
 case 'vbee': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Vbee TTS', voiceLabel: DEFAULT_VBEE_VOICE_NAME, speed: 0.95, gapSeconds: 0.35, sampleRate: 48000 } }; break;
+case 'audioMaster': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Làm Đẹp Âm Thanh', targetLufs: -14 } }; break;
 case 'styleNode': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phong cách', positivePrompt: '', negativePrompt: '' } }; break;
 default: return;
 }
@@ -713,31 +717,48 @@ setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, status
 },
 });
 
+const asset = await saveAssetFromBytes(synthResult.audioBytes, 'audio/wav');
+setNodes(nds => nds.map(n => n.id === nodeId ? {
+...n,
+data: {
+...n.data, isLoading: false, statusText: 'Hoàn tất', isFinalized: true,
+lastRunHash: getNodeStateHash(node, currentEdges),
+result: {
+...asset, type: 'audio',
+durationSeconds: synthResult.durationSeconds,
+sampleRate: synthResult.sampleRate,
+timingSentences: synthResult.sentences.map(s => ({ index: s.index, text: s.text, start: s.start, end: s.end })),
+}
+}
+} : n));
+return;
+}
+
+if (node.type === 'audioMaster') {
+const sourceAudio = sourceAudios[0];
+if (!sourceAudio) throw new Error('Chưa có audio nào nối vào node này.');
+
 setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, statusText: 'Đang chuẩn hoá âm lượng...' } } : n));
 
-// Bước làm đẹp (lọc rì, giảm tiếng xì, chuẩn hoá âm lượng) qua ffmpeg —
-// LUÔN LÀ TUỲ CHỌN: ffmpeg không đóng gói kèm app, máy khách sau này có
-// thể không có. Có thì dùng bản đã chuẩn hoá; không thì lặng lẽ dùng bản
-// thô kèm ghi chú, không chặn mất công/credit Vbee đã tốn.
-let finalBytes = synthResult.audioBytes;
-let masteredNote: string | undefined;
 const tempDir = await appDataDir();
-const tempInputPath = await join(tempDir, `_vbee_tmp_${Date.now()}.wav`);
-const tempOutputPath = tempInputPath.replace(/\.wav$/, '.mastered.wav');
+const tempOutputPath = await join(tempDir, `_master_tmp_${Date.now()}.wav`);
+let finalBytes: Uint8Array;
+let masteredNote: string | undefined;
+const targetLufs = node.data.targetLufs ?? -14.0;
 try {
-await writeFile(tempInputPath, synthResult.audioBytes);
 const masterResult = await invoke<{ mastered: boolean; note?: string }>('master_audio', {
-inputPath: tempInputPath, outputPath: tempOutputPath, targetLufs: -14.0, sampleRate: synthResult.sampleRate,
+inputPath: sourceAudio.path, outputPath: tempOutputPath, targetLufs, sampleRate: sourceAudio.sampleRate ?? 44100,
 });
 if (masterResult.mastered) {
 finalBytes = await readFile(tempOutputPath);
 } else {
+finalBytes = await readFile(sourceAudio.path);
 masteredNote = masterResult.note ?? 'Chưa cài ffmpeg trên máy — đang dùng bản thô, chưa chuẩn hoá âm lượng.';
 }
 } catch (e: any) {
+finalBytes = await readFile(sourceAudio.path);
 masteredNote = `Không chạy được bước làm đẹp giọng đọc (${e?.message || e}) — đang dùng bản thô.`;
 } finally {
-await deleteAsset(tempInputPath).catch(() => {});
 await deleteAsset(tempOutputPath).catch(() => {});
 }
 
@@ -749,9 +770,9 @@ data: {
 lastRunHash: getNodeStateHash(node, currentEdges),
 result: {
 ...asset, type: 'audio',
-durationSeconds: synthResult.durationSeconds,
-sampleRate: synthResult.sampleRate,
-timingSentences: synthResult.sentences.map(s => ({ index: s.index, text: s.text, start: s.start, end: s.end })),
+durationSeconds: sourceAudio.durationSeconds,
+sampleRate: sourceAudio.sampleRate,
+timingSentences: sourceAudio.timingSentences,
 mastered: !masteredNote,
 masteredNote,
 }
@@ -987,7 +1008,7 @@ concurrency={concurrency} onChangeConcurrency={() => {}}
 onRunPipeline={() => {
 const currentNodes = getNodes();
 const currentEdges = getEdges();
-const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt' || n.type === 'vbee') && isNodeDirty(n, currentEdges));
+const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt' || n.type === 'vbee' || n.type === 'audioMaster') && isNodeDirty(n, currentEdges));
 const ids = new Set<string>();
 dirty.forEach(n => { ids.add(n.id); getDescendants(n.id, currentNodes, currentEdges).forEach(d => ids.add(d)); });
 executeWorkflow(Array.from(ids));

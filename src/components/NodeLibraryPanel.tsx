@@ -14,7 +14,8 @@ const nodeTypes = [
 { type: 'textGen', label: 'Text AI', desc: 'Trả lời/tạo chữ, code từ prompt (kèm ảnh nếu cần).', icon: 'data_object', color: 'text-[#3b82f6]', bg: 'bg-[#3b82f6]/10' },
 { type: 'stt', label: 'Tách Audio', desc: 'Video/audio vào, transcript text ra (Gemini nghe trực tiếp).', icon: 'graphic_eq', color: 'text-[#22c55e]', bg: 'bg-[#22c55e]/10' },
 { type: 'textReview', label: 'Duyệt Text', desc: 'Sửa tay transcript trước khi đưa qua bước tiếp theo (bỏ đoạn quảng cáo…).', icon: 'edit_note', color: 'text-[#a855f7]', bg: 'bg-[#a855f7]/10' },
-{ type: 'vbee', label: 'Vbee TTS', desc: 'Text vào, giọng đọc Vbee ra — đọc từng câu rồi tự ghép, kèm mốc thời gian.', icon: 'record_voice_over', color: 'text-[#eab308]', bg: 'bg-[#eab308]/10' }
+{ type: 'vbee', label: 'Vbee TTS', desc: 'Text vào, giọng đọc Vbee ra — đọc từng câu rồi tự ghép, kèm mốc thời gian.', icon: 'record_voice_over', color: 'text-[#eab308]', bg: 'bg-[#eab308]/10' },
+{ type: 'audioMaster', label: 'Làm Đẹp Âm Thanh', desc: 'Lọc rì, giảm tiếng xì, chuẩn hoá âm lượng bằng ffmpeg (tuỳ chọn, không có ffmpeg vẫn chạy được).', icon: 'equalizer', color: 'text-[#06b6d4]', bg: 'bg-[#06b6d4]/10' }
 ];
 
 return (
