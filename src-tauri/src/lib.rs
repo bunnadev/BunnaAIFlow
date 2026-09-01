@@ -1,3 +1,4 @@
+mod audio_master;
 mod license;
 mod vectorize;
 
@@ -17,7 +18,8 @@ pub fn run() {
             license::validate_license,
             license::encrypt_aiflow_file,
             license::decrypt_aiflow_file,
-            vectorize::vectorize_image_to_svg
+            vectorize::vectorize_image_to_svg,
+            audio_master::master_audio
         ])
         .setup(|app| {
             let handle = app.handle();

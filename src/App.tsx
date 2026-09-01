@@ -45,7 +45,7 @@ import type { Workspace, LogEntry, MediaAsset } from './types';
 import { loadSettings, saveSettings, type AppSettings } from './lib/settings';
 import { loadWorkspaceState, saveWorkspaceState } from './lib/workspaceStore';
 import { exportSingleWorkspace, exportAllWorkspaces, importWorkspaces, type ImportedBundle } from './lib/exportImport';
-import { saveAssetFromBase64, saveAssetFromBytes, readAssetAsBase64 } from './lib/assets';
+import { saveAssetFromBase64, saveAssetFromBytes, readAssetAsBase64, deleteAsset } from './lib/assets';
 import { GeminiImageProvider } from './lib/providers/geminiImageProvider';
 import { GeminiVideoProvider } from './lib/providers/geminiVideoProvider';
 import { GeminiOmniFlashProvider } from './lib/providers/geminiOmniFlashProvider';
@@ -54,7 +54,8 @@ import { VbeeProvider } from './lib/providers/vbeeProvider';
 import { DEFAULT_VBEE_VOICE_NAME, resolveVbeeVoiceCode } from './lib/vbeeVoices';
 import { resolveImageModelId, resolveVideoModelId, resolveTextModelId } from './lib/models';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { writeFile } from '@tauri-apps/plugin-fs';
+import { writeFile, readFile } from '@tauri-apps/plugin-fs';
+import { appDataDir, join } from '@tauri-apps/api/path';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 
@@ -712,7 +713,35 @@ setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, status
 },
 });
 
-const asset = await saveAssetFromBytes(synthResult.audioBytes, 'audio/wav');
+setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, statusText: 'Đang chuẩn hoá âm lượng...' } } : n));
+
+// Bước làm đẹp (lọc rì, giảm tiếng xì, chuẩn hoá âm lượng) qua ffmpeg —
+// LUÔN LÀ TUỲ CHỌN: ffmpeg không đóng gói kèm app, máy khách sau này có
+// thể không có. Có thì dùng bản đã chuẩn hoá; không thì lặng lẽ dùng bản
+// thô kèm ghi chú, không chặn mất công/credit Vbee đã tốn.
+let finalBytes = synthResult.audioBytes;
+let masteredNote: string | undefined;
+const tempDir = await appDataDir();
+const tempInputPath = await join(tempDir, `_vbee_tmp_${Date.now()}.wav`);
+const tempOutputPath = tempInputPath.replace(/\.wav$/, '.mastered.wav');
+try {
+await writeFile(tempInputPath, synthResult.audioBytes);
+const masterResult = await invoke<{ mastered: boolean; note?: string }>('master_audio', {
+inputPath: tempInputPath, outputPath: tempOutputPath, targetLufs: -14.0, sampleRate: synthResult.sampleRate,
+});
+if (masterResult.mastered) {
+finalBytes = await readFile(tempOutputPath);
+} else {
+masteredNote = masterResult.note ?? 'Chưa cài ffmpeg trên máy — đang dùng bản thô, chưa chuẩn hoá âm lượng.';
+}
+} catch (e: any) {
+masteredNote = `Không chạy được bước làm đẹp giọng đọc (${e?.message || e}) — đang dùng bản thô.`;
+} finally {
+await deleteAsset(tempInputPath).catch(() => {});
+await deleteAsset(tempOutputPath).catch(() => {});
+}
+
+const asset = await saveAssetFromBytes(finalBytes, 'audio/wav');
 setNodes(nds => nds.map(n => n.id === nodeId ? {
 ...n,
 data: {
@@ -723,6 +752,8 @@ result: {
 durationSeconds: synthResult.durationSeconds,
 sampleRate: synthResult.sampleRate,
 timingSentences: synthResult.sentences.map(s => ({ index: s.index, text: s.text, start: s.start, end: s.end })),
+mastered: !masteredNote,
+masteredNote,
 }
 }
 } : n));

@@ -136,6 +136,12 @@ Danh sách tạm thời, chọn lọc thủ công, sẽ nối vào bunna API (c�
 <RangeSlider label="Tốc độ đọc" value={data.speed ?? 0.95} min={0.25} max={1.9} step={0.05} formatValue={(v) => `${v.toFixed(2)}x`} onChange={(v) => updateNode('speed', v)} />
 <RangeSlider label="Khoảng nghỉ giữa câu" value={data.gapSeconds ?? 0.35} min={0} max={1.5} step={0.05} formatValue={(v) => `${v.toFixed(2)}s`} onChange={(v) => updateNode('gapSeconds', v)} />
 </div>
+<div className="flex flex-col gap-2 px-1">
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+<span className="text-amber-400/90 font-black">Mẹo:</span> cài{' '}
+<span className="text-white font-mono">ffmpeg</span> trên máy để node tự lọc rì tần thấp, giảm tiếng xì và chuẩn hoá âm lượng giọng đọc — không có cũng chạy được, nhưng chất lượng thô sẽ kém rõ hơn.
+</p>
+</div>
 </>
 )}
 

@@ -99,8 +99,19 @@ const VbeeNode = ({ id, data }: any) => {
             <span className="material-symbols-outlined text-[#eab308] text-3xl">graphic_eq</span>
             <audio src={toDisplayUrl(result.path)} controls className="w-full h-7" onClick={(e) => e.stopPropagation()} />
             <span className="text-[8.5px] text-white/50 font-mono">
-              {result.sentences?.length ?? 0} câu · {result.durationSeconds?.toFixed(1) ?? '?'}s
+              {result.timingSentences?.length ?? 0} câu · {result.durationSeconds?.toFixed(1) ?? '?'}s
             </span>
+            {result.mastered ? (
+              <span className="flex items-center gap-1 text-[7.5px] text-emerald-400/80 font-black uppercase tracking-widest">
+                <span className="material-symbols-outlined text-[11px]">check_circle</span>
+                Đã chuẩn hoá âm lượng
+              </span>
+            ) : result.masteredNote ? (
+              <span className="flex items-center gap-1 text-[7.5px] text-amber-400/80 text-center leading-tight px-1" title={result.masteredNote}>
+                <span className="material-symbols-outlined text-[11px] shrink-0">info</span>
+                Bản thô — cài ffmpeg để chuẩn hoá âm lượng
+              </span>
+            ) : null}
             <div className="absolute bottom-1.5 right-1.5 flex gap-1">
               <button
                 onClick={(e) => { e.stopPropagation(); onDownload(); }}

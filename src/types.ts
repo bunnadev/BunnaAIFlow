@@ -21,6 +21,9 @@ export interface MediaAsset {
   timingSentences?: AudioTimingSentence[];
   durationSeconds?: number;
   sampleRate?: number;
+  /** true nếu đã qua bước làm đẹp bằng ffmpeg (lọc rì, chuẩn hoá âm lượng); false + masteredNote nếu bỏ qua (không có ffmpeg). */
+  mastered?: boolean;
+  masteredNote?: string;
 }
 
 export interface LogEntry {
