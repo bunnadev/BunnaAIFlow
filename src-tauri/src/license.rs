@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 type HmacSha256 = Hmac<Sha256>;
 
 // Đổi sang URL production khi phát hành chính thức.
-const LICENSE_API_BASE: &str = "https://dev_api.bunna.dev";
+const LICENSE_API_BASE: &str = "https://dev_api_mac.bunna.dev";
 
 #[derive(Serialize)]
 pub struct LicenseResult {
