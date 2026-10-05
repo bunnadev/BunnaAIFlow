@@ -45,7 +45,7 @@ ${partCatalogShort()}
 
 Dây nối (QUAN TRỌNG — danh sách này dùng để vẽ ảnh và để lắp mạch thật):
 - Liệt kê TỪNG SỢI DÂY riêng, mỗi dây có đúng 2 đầu: "từ X tới Y". Không gom nhiều chân vào 1 "điểm nối".
-- Nguồn vào/ra: dùng đầu dây tự do "INPUT +", "INPUT −", "OUTPUT +", "OUTPUT −"; hoặc cọc đấu nguồn / jack audio / loa nếu hợp với mạch.
+- Nguồn VÀO: mặc định dùng 1 cọc đấu nguồn 2 chân (loại vẽ terminal2, ký hiệu PWR, chân + và −) — người dùng kẹp dây cá sấu từ máy cấp nguồn vào đây. Đầu RA (nếu mạch có, VD mạch nguồn) dùng đầu dây tự do "OUTPUT +", "OUTPUT −" hoặc cọc đấu thứ 2; jack audio / loa nếu hợp với mạch.
 - Mỗi chân linh kiện tối đa 2 đầu dây. Nếu có từ 4 dây về mass trở lên thì dùng "Thanh mass" (thanh đồng chung chạy ngang đáy mạch) làm đầu dây cho các dây mass, KHÔNG dồn nhiều dây vào 1 chân linh kiện. Chân điện trở/diode/tụ có thể hàn thẳng vào chân linh kiện khác — ghi là 1 dây "hàn trực tiếp".
 - Ghi đúng tên chân theo datasheet (VD 2N3055 vỏ TO-3: chân B, E và vỏ = C; TO-220: chân 1, 2, 3 từ trái sang khi nhìn mặt chữ; chiết áp: chân 1, chân 2 = giữa (con trượt), chân 3; tụ hoá: chân +, chân −).
 - Mỗi dây 1 màu, quy ước: đỏ = dương nguồn, đen hoặc xanh dương = mass/âm, dây tín hiệu dùng màu khác nhau (vàng, xanh lá, cam, xanh ngọc…).
@@ -138,6 +138,8 @@ The illustration is a precise wiring diagram that people will copy to build the 
 - Every wire keeps exactly the same route and connects exactly the same two pins. Do not add, remove, merge, shorten or reroute any wire. Do not add any wire, jumper or component that is not in the image.
 - Every wire keeps EXACTLY its color from the illustration. Never recolor a wire: black stays black, red stays red, blue stays blue, and so on. In particular every wire that ends on the copper ground bar keeps its color (do not turn ground wires red or purple). Count the wires of each color in the illustration — the photo must have the same count of each color.
 - Every component keeps the same number of pins/legs/solder lugs; unconnected pins stay unconnected.
+- Thin bare metal legs that connect two components directly stay thin bare metal legs — never turn them into insulated colored wires.
+- Do NOT add anything that is not in the illustration: no copper bar / bus bar, no extra terminal, battery, clip, cable or wire. If the illustration has a copper ground bar keep it exactly, otherwise there must be none. Free stripped wire ends stay free wire ends.
 - All text stays exactly as it is: the white titles, the green labels and the markings printed on components — same words, same spelling, same position. Do not add any other text.
 
 Only change the look: real wood grain, real PVC-insulated wires with soft contact shadows, shiny solder joints, realistic metal, plastic, ceramic and copper textures, soft natural studio light from the top-left. Everything in sharp focus, no blur, no hands, no extra objects.`;
