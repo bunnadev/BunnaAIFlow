@@ -340,7 +340,7 @@ Chỉ dẫn gửi kèm Gemini để lên kịch bản shot — sửa thoải má
 <div className="flex flex-col gap-2">
 <p className="text-[9.5px] font-black text-[#94a3b8] normal-case tracking-widest px-1">Tỷ lệ</p>
 <SegmentedToggle value={data.aspectRatio} onChange={(v) => updateNode('aspectRatio', v)} items={isImage
-? [{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }, { value: '4:3', label: '4:3' }, { value: '1:1', label: '1:1' }, { value: '3:4', label: '3:4' }]
+? [{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }, { value: '4:3', label: '4:3' }, { value: '1:1', label: '1:1' }, { value: '3:4', label: '3:4' }, { value: '4:5', label: '4:5' }]
 : [{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }]} />
 </div>
 {isVideo && (

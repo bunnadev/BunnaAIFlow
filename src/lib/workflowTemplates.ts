@@ -77,6 +77,17 @@ Yêu cầu:
 
 Chỉ trả về caption, không giải thích thêm.`;
 
+const CIRCUIT_PHOTO_PROMPT = `Turn this illustration into a realistic photograph of the EXACT same DIY circuit, actually built and photographed from directly above on a dark wooden workbench.
+
+The illustration is a precise wiring diagram that people will copy to build the real circuit — treat it as ground truth and change NOTHING about the circuit itself:
+- Every component stays at exactly the same position, size and rotation.
+- Every wire keeps exactly the same route and connects exactly the same two pins. Do not add, remove, merge, shorten or reroute any wire. Do not add any wire, jumper or component that is not in the image.
+- Every wire keeps EXACTLY its color from the illustration. Never recolor a wire: black stays black, red stays red, blue stays blue, and so on. In particular every wire that ends on the copper ground bar keeps its color (do not turn ground wires red or purple). Count the wires of each color in the illustration — the photo must have the same count of each color.
+- Every component keeps the same number of pins/legs/solder lugs; unconnected pins stay unconnected.
+- All text stays exactly as it is: the white titles, the green labels and the markings printed on components — same words, same spelling, same position. Do not add any other text.
+
+Only change the look: real wood grain, real PVC-insulated wires with soft contact shadows, shiny solder joints, realistic metal, plastic, ceramic and copper textures, soft natural studio light from the top-left. Everything in sharp focus, no blur, no hands, no extra objects.`;
+
 const EXAMPLE_IDEA = 'Mạch hạ áp DC chỉnh được từ 0V đến khoảng 48V, dùng transistor 2N3055 và chiết áp 5K, nguồn vào tối đa 50V DC. Có diode bảo vệ ngược cực.';
 
 function edge(source: string, sourceHandle: string, target: string, targetHandle: string): Edge {
@@ -96,6 +107,7 @@ function buildDiyCircuitTemplate() {
     engineer: `textGen_${t}_engineer`,
     review: `textReview_${t}_review`,
     draw: `circuitDraw_${t}_draw`,
+    photo: `imageGen_${t}_photo`,
     caption: `textGen_${t}_caption`,
   };
 
@@ -108,6 +120,11 @@ function buildDiyCircuitTemplate() {
       data: { ...common, label: '3. Duyệt mạch', isFinalized: true, editedText: '' } },
     { id: ids.draw, type: 'circuitDraw', position: { x: 1020, y: -120 },
       data: { ...common, label: '4. Vẽ mạch', model: 'Gemini 3.6 Flash', localPrompt: '' } },
+    // Ảnh giống thật: Nano Banana tô lại từ sơ đồ code vẽ. Đôi khi vẫn đổi màu/thêm
+    // dây (đã thử, kể cả AI tự soi cũng báo sai) — sơ đồ ở node 4 mới là bản chuẩn,
+    // nên đăng kèm cả 2 ảnh và tự so trước khi đăng.
+    { id: ids.photo, type: 'imageGen', position: { x: 1380, y: -120 },
+      data: { ...common, label: '5. Ảnh giống thật', model: 'Nano Banana Pro', aspectRatio: '4:5', resolution: '2k', localPrompt: CIRCUIT_PHOTO_PROMPT } },
     { id: ids.caption, type: 'textGen', position: { x: 1020, y: 420 },
       data: { ...common, label: 'Caption bài đăng', model: 'Gemini 3.6 Flash', localPrompt: CIRCUIT_CAPTION_PROMPT } },
   ];
@@ -116,6 +133,7 @@ function buildDiyCircuitTemplate() {
     edge(ids.idea, 'text-out', ids.engineer, 'text-in'),
     edge(ids.engineer, 'text-out', ids.review, 'text-in'),
     edge(ids.review, 'text-out', ids.draw, 'text-in'),
+    edge(ids.draw, 'media-out', ids.photo, 'media-in'),
     edge(ids.review, 'text-out', ids.caption, 'text-in'),
   ];
 
@@ -126,7 +144,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'diy-circuit',
     label: 'Mạch DIY',
-    desc: 'Ý tưởng mạch → kỹ sư kiểm tra & sửa → duyệt → app tự vẽ ảnh mạch (dây luôn đúng chân) + caption.',
+    desc: 'Ý tưởng mạch → kỹ sư kiểm tra & sửa → duyệt → app tự vẽ ảnh mạch (dây luôn đúng chân) → bản giống thật (Nano Banana) + caption.',
     icon: 'electrical_services',
     build: buildDiyCircuitTemplate,
   },
