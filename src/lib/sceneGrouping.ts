@@ -1,3 +1,4 @@
+import type { Node, Edge } from 'reactflow';
 import type { AudioTimingSentence, Scene } from '../types';
 
 const MAX_BEAT_SECONDS = 10.0;
@@ -64,13 +65,52 @@ export function groupSentencesIntoBeats(sentences: AudioTimingSentence[], totalD
   });
 }
 
-/** Ghép 4 trường mô tả hình ảnh của 1 cảnh thành 1 prompt — dùng khi nhân bản chain mẫu theo phân cảnh (fan-out), ghi đè localPrompt của node "điểm vào". */
+/**
+ * Ghép mô tả hình ảnh của 1 cảnh thành 1 prompt — dùng khi nhân bản chain mẫu
+ * theo phân cảnh (fan-out), ghi đè localPrompt của node "điểm vào". Scene từ
+ * node Đạo Diễn đã có sẵn `prompt` hoàn chỉnh — dùng thẳng, không ghép lại từ
+ * 4 trường subject/setting/light/camera (scene đó không có các trường này).
+ */
 export function composeScenePrompt(scene: Scene): string {
+  if (scene.prompt) return scene.prompt;
   return [scene.subject, scene.setting, scene.light, scene.camera].filter(Boolean).join('. ');
 }
 
-/** Bộ khung phân cảnh (mốc thời gian + lời thoại) — 4 trường setting/subject/light/camera để trống, node sẽ tự điền bằng phân tích đa phương thức. */
-export function buildScenesSkeleton(sentences: AudioTimingSentence[], totalDuration: number, targetSeconds = 6.0): Scene[] {
+/**
+ * Cảnh mà 1 cổng nguồn cụ thể (source node + sourceHandle) đại diện — dùng
+ * khi đang xử lý 1 kết nối `scene-in` cụ thể (VD lúc vừa kéo dây, hoặc lúc
+ * resolve prompt lúc chạy). Nguồn có thể là:
+ * - `sceneReview`: đọc thẳng từ `editedScenes`, khớp id lấy từ sourceHandle
+ *   (`scene-out-<id>`).
+ * - `scenePass` (node "Chuyển Tiếp Cảnh" — chỉ relay, không giữ dữ liệu riêng):
+ *   đệ quy tìm cảnh đang chảy vào chính input của nó.
+ */
+export function resolveSceneFromSource(nodes: Node[], edges: Edge[], sourceNodeId: string, sourceHandleId?: string | null): Scene | undefined {
+  const src = nodes.find((n) => n.id === sourceNodeId);
+  if (!src) return undefined;
+  if (src.type === 'scenePass') {
+    return resolveConnectedScene(nodes, edges, src.id);
+  }
+  const sceneId = sourceHandleId?.replace('scene-out-', '');
+  return ((src.data as any)?.editedScenes as Scene[] | undefined)?.find((s) => s.id === sceneId);
+}
+
+/** Cảnh đang nối vào chân `scene-in` của 1 node cụ thể (nếu có). */
+export function resolveConnectedScene(nodes: Node[], edges: Edge[], targetNodeId: string): Scene | undefined {
+  const edge = edges.find((e) => e.target === targetNodeId && e.targetHandle === 'scene-in');
+  if (!edge) return undefined;
+  return resolveSceneFromSource(nodes, edges, edge.source, edge.sourceHandle);
+}
+
+/**
+ * Bộ khung phân cảnh (mốc thời gian + lời thoại) — 4 trường setting/subject/
+ * light/camera để trống, node sẽ tự điền bằng phân tích đa phương thức.
+ * Cố ý KHÔNG annotate kiểu trả về là `Scene[]` — các trường start/end/vo ở
+ * đây luôn có giá trị cụ thể (không optional như `Scene` dùng chung cho cả
+ * scene bên node Đạo Diễn), để TS giữ nguyên kiểu cụ thể cho lệnh gọi
+ * `fillSceneDetails` ngay sau đó.
+ */
+export function buildScenesSkeleton(sentences: AudioTimingSentence[], totalDuration: number, targetSeconds = 6.0) {
   const beats = groupSentencesIntoBeats(sentences, totalDuration, targetSeconds);
   return beats.map((b, i) => ({
     id: `S${String(i + 1).padStart(2, '0')}`,

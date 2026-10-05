@@ -16,7 +16,7 @@ window.dispatchEvent(new CustomEvent('duplicate-node', { detail: { nodeId: id } 
 return (
 <div className="node-container !bg-[#0d1424] !border-[#F1641E]/20 !w-[260px] !p-0 overflow-hidden group/node">
 <div className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center -translate-x-2 pointer-events-none">
-<Handle type="target" position={Position.Left} id="media-in" className="!bg-[#F1641E] !w-2 !h-2 !static !translate-x-0" />
+<Handle type="target" position={Position.Left} id="media-in" className="!bg-[#F1641E] !w-4 !h-4 !static !translate-x-0" />
 </div>
 
 <div className="p-2.5 border-b border-white/5 flex items-center justify-between bg-[#0b1019]/50">

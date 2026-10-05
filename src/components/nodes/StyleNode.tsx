@@ -84,7 +84,7 @@ className="nodrag nowheel w-full h-18 bg-[#050a10] border border-white/5 hover:b
 </div>
 
 <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center translate-x-2 pointer-events-none">
-<Handle type="source" position={Position.Right} id="style-out" className="!bg-[#F1641E] !w-2 !h-2 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+<Handle type="source" position={Position.Right} id="style-out" className="!bg-[#F1641E] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />
 </div>
 </div>
 );

@@ -9,13 +9,20 @@ interface Props {
   onClose: () => void;
 }
 
-const FIELD_LABELS: Record<string, string> = {
+const DAO_LY_FIELD_LABELS: Record<string, string> = {
   vo: 'Lời thoại (voice-over)',
   setting: 'Bối cảnh',
   subject: 'Nhân vật / chủ thể',
   light: 'Ánh sáng',
   camera: 'Góc máy',
 };
+
+const DIRECTOR_FIELD_LABELS: Record<string, string> = {
+  description: 'Mô tả shot',
+  prompt: 'Prompt',
+};
+
+const FIELD_HEIGHT: Record<string, string> = { prompt: 'h-28' };
 
 const SceneEditPanel: React.FC<Props> = ({ nodeId, sceneId, nodes, onUpdateScene, onClose }) => {
   const node = nodes.find((n) => n.id === nodeId);
@@ -31,6 +38,9 @@ const SceneEditPanel: React.FC<Props> = ({ nodeId, sceneId, nodes, onUpdateScene
   }, [scene?.id, JSON.stringify(scene)]);
 
   if (!nodeId || !sceneId || !scene) return null;
+
+  const isDirectorScene = scene.description !== undefined || scene.prompt !== undefined;
+  const fieldLabels = isDirectorScene ? DIRECTOR_FIELD_LABELS : DAO_LY_FIELD_LABELS;
 
   const updateField = (key: string, val: any) => {
     onUpdateScene(nodeId, sceneId, { ...scene, [key]: val });
@@ -65,43 +75,45 @@ const SceneEditPanel: React.FC<Props> = ({ nodeId, sceneId, nodes, onUpdateScene
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-6 pb-8">
-        <div className="flex flex-col gap-3">
-          <SectionLabel>Thời gian</SectionLabel>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-[7.5px] text-white/40 uppercase font-black px-0.5">Bắt đầu (s)</label>
-              <input
-                type="number" step="0.1" value={scene.start}
-                onChange={(e) => updateField('start', parseFloat(e.target.value) || 0)}
-                className="w-full bg-[#050a10] border border-white/5 hover:border-[#f43f5e]/30 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none font-mono"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[7.5px] text-white/40 uppercase font-black px-0.5">Kết thúc (s)</label>
-              <input
-                type="number" step="0.1" value={scene.end}
-                onChange={(e) => updateField('end', parseFloat(e.target.value) || 0)}
-                className="w-full bg-[#050a10] border border-white/5 hover:border-[#f43f5e]/30 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none font-mono"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[7.5px] text-white/40 uppercase font-black px-0.5">Clip (s)</label>
-              <input
-                type="number" step="1" value={scene.veo}
-                onChange={(e) => updateField('veo', parseInt(e.target.value) || 4)}
-                className="w-full bg-[#050a10] border border-white/5 hover:border-[#f43f5e]/30 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none font-mono"
-              />
+        {!isDirectorScene && (
+          <div className="flex flex-col gap-3">
+            <SectionLabel>Thời gian</SectionLabel>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[7.5px] text-white/40 uppercase font-black px-0.5">Bắt đầu (s)</label>
+                <input
+                  type="number" step="0.1" value={scene.start}
+                  onChange={(e) => updateField('start', parseFloat(e.target.value) || 0)}
+                  className="w-full bg-[#050a10] border border-white/5 hover:border-[#f43f5e]/30 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none font-mono"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[7.5px] text-white/40 uppercase font-black px-0.5">Kết thúc (s)</label>
+                <input
+                  type="number" step="0.1" value={scene.end}
+                  onChange={(e) => updateField('end', parseFloat(e.target.value) || 0)}
+                  className="w-full bg-[#050a10] border border-white/5 hover:border-[#f43f5e]/30 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none font-mono"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[7.5px] text-white/40 uppercase font-black px-0.5">Clip (s)</label>
+                <input
+                  type="number" step="1" value={scene.veo}
+                  onChange={(e) => updateField('veo', parseInt(e.target.value) || 4)}
+                  className="w-full bg-[#050a10] border border-white/5 hover:border-[#f43f5e]/30 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none font-mono"
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {Object.entries(FIELD_LABELS).map(([key, label]) => (
+        {Object.entries(fieldLabels).map(([key, label]) => (
           <div className="flex flex-col gap-3" key={key}>
             <SectionLabel>{label}</SectionLabel>
             <textarea
               value={scene[key] ?? ''}
               onChange={(e) => updateField(key, e.target.value)}
-              className="w-full h-16 bg-[#050a10] border border-white/5 hover:border-[#f43f5e]/30 rounded-xl p-2.5 text-[10px] text-white/90 outline-none transition-all leading-relaxed custom-scrollbar resize-none"
+              className={`w-full ${FIELD_HEIGHT[key] ?? 'h-16'} bg-[#050a10] border border-white/5 hover:border-[#f43f5e]/30 rounded-xl p-2.5 text-[10px] text-white/90 outline-none transition-all leading-relaxed custom-scrollbar resize-none`}
             />
           </div>
         ))}

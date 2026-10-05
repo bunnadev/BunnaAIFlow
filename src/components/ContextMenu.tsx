@@ -26,7 +26,7 @@ left: x,
 
 if (typeof window !== 'undefined') {
 const menuWidth = 224; // w-56 = 14rem = 224px
-const menuHeight = 570; // Adjusted height for more items
+const menuHeight = 400; // Header + tối đa 5 dòng (scroll) + divider + nút đóng
 if (x + menuWidth > window.innerWidth) menuStyle.left = window.innerWidth - menuWidth - 20;
 if (y + menuHeight > window.innerHeight) menuStyle.top = window.innerHeight - menuHeight - 20;
 }
@@ -110,6 +110,27 @@ color: 'text-[#8b5cf6]',
 bg: 'hover:bg-[#8b5cf6]/10'
 },
 {
+type: 'director',
+label: 'Đạo Diễn',
+icon: 'theater_comedy',
+color: 'text-[#14b8a6]',
+bg: 'hover:bg-[#14b8a6]/10'
+},
+{
+type: 'scenePass',
+label: 'Chuyển Tiếp Cảnh',
+icon: 'cable',
+color: 'text-[#f43f5e]',
+bg: 'hover:bg-[#f43f5e]/10'
+},
+{
+type: 'mediaGroup',
+label: 'Gộp Media',
+icon: 'collections',
+color: 'text-[#0ea5e9]',
+bg: 'hover:bg-[#0ea5e9]/10'
+},
+{
 type: 'styleNode',
 label: 'Phong cách',
 icon: 'auto_awesome',
@@ -128,7 +149,7 @@ style={menuStyle}
 <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">Add Node</span>
 </div>
 
-<div className="flex flex-col">
+<div className="flex flex-col max-h-[280px] overflow-y-auto custom-scrollbar">
 {items.map((item) => (
 <button
 key={item.type}

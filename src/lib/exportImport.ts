@@ -1,5 +1,5 @@
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { readFile, writeFile } from '@tauri-apps/plugin-fs';
+import { readFile, writeFile, exists } from '@tauri-apps/plugin-fs';
 import type { Node } from 'reactflow';
 import type { Workspace } from '../types';
 import { encryptJson, decryptJson } from './crypto';
@@ -7,15 +7,50 @@ import { saveAssetFromBase64, readAssetAsBase64 } from './assets';
 
 /**
  * Chính sách export/import đã chốt:
- * - mediaSource: nhúng base64 ảnh nguồn thẳng vào file (để test workflow ngay).
- * - imageGen/videoGen: CHỈ export config (prompt, model, tỉ lệ...), không nhúng
- *   kết quả đã generate. Sau import, node coi như "dirty", chạy Start sẽ tự tạo lại.
- * - Video (nguồn hay kết quả): không bao giờ nhúng.
+ * - Ảnh (mediaSource ảnh, kết quả Image AI, từng ảnh trong bundle Nhân Vật):
+ *   nhúng base64 VÀ giữ path/assetId gốc. Import cùng máy (clone/replace) thì
+ *   dùng thẳng path có sẵn, không tạo file trùng; import máy khác (path không
+ *   còn) thì giải mã base64 để dựng lại file.
+ * - Video/audio (mediaSource video/audio, kết quả Video AI, Vbee, Làm Đẹp Âm
+ *   Thanh): KHÔNG nhúng base64 (nặng) — chỉ giữ path. Import cùng máy thì dùng
+ *   lại nếu path còn tồn tại; máy khác thì coi như mất, node quay về "chưa chạy".
+ * - Text/JSON (Text AI, STT, Phân Tích Cảnh): giữ nguyên kết quả khi export —
+ *   dữ liệu nhỏ, nằm thẳng trong JSON, không cần path/base64 gì cả.
  * - File .bunnaflow là JSON đã mã hoá (xem lib/crypto.ts), không phải .json thuần.
  * - File mang field `kind`: 'single' (nút Export, chỉ tab đang mở) hay 'all'
  *   (nút Export All, backup toàn bộ tab) — quyết định modal hỏi lúc import.
  *   File cũ chưa có `kind` được suy ra tạm theo số lượng workspace trong file.
  */
+
+const IMAGE_RESULT_NODE_TYPES = new Set(['imageGen']);
+const HEAVY_MEDIA_RESULT_NODE_TYPES = new Set(['videoGen', 'vbee', 'audioMaster']);
+const LIGHT_RESULT_NODE_TYPES = new Set(['textGen', 'stt', 'scenePlanner', 'director']); // giữ nguyên result, không cần path/base64
+
+/** Nhúng base64 vào 1 asset ảnh (giữ nguyên path/assetId gốc bên cạnh). */
+async function embedImage(asset: any): Promise<any> {
+  if (!asset?.path) return asset;
+  const embeddedBase64 = await readAssetAsBase64(asset.path);
+  return { ...asset, embeddedBase64 };
+}
+
+/**
+ * Dựng lại 1 asset ảnh lúc import: ưu tiên dùng path gốc nếu file còn tồn tại
+ * trên máy này (không tạo file trùng); nếu không thì giải mã base64 thành file
+ * mới. Trả null nếu không còn cách nào phục hồi.
+ */
+async function resolveImage(asset: any): Promise<any | null> {
+  if (!asset) return null;
+  if (asset.path && (await exists(asset.path))) {
+    const { embeddedBase64: _b64, ...rest } = asset;
+    return rest;
+  }
+  if (asset.embeddedBase64) {
+    const saved = await saveAssetFromBase64(asset.embeddedBase64, asset.mimeType || 'image/png');
+    const { embeddedBase64: _b64, path: _p, assetId: _id, ...rest } = asset;
+    return { ...rest, ...saved };
+  }
+  return null;
+}
 
 export type ExportKind = 'single' | 'all';
 
@@ -30,28 +65,40 @@ function sanitizeFileName(name: string): string {
 }
 
 async function nodeForExport(node: Node): Promise<Node> {
-  if (node.type === 'mediaSource' && node.data?.media?.path && node.data.media.type === 'image') {
-    const embeddedBase64 = await readAssetAsBase64(node.data.media.path);
+  if (node.type === 'mediaSource' && node.data?.media?.path) {
+    if (node.data.media.type !== 'image') return node; // video/audio: giữ path, không nhúng (nặng)
     return {
       ...node,
-      data: {
-        ...node.data,
-        media: {
-          mimeType: node.data.media.mimeType,
-          type: node.data.media.type,
-          name: node.data.media.name,
-          embeddedBase64,
-        },
-      },
+      data: { ...node.data, media: await embedImage(node.data.media) },
     };
   }
 
-  if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee' || node.type === 'audioMaster' || node.type === 'scenePlanner' || node.type === 'character') {
-    const { result: _result, isFinalized: _f, isLoading: _l, statusText: _s, lastRunHash: _h, ...rest } = node.data;
+  // imageSet (bó nhiều ảnh) — dùng chung cho Nhân Vật lẫn Gộp Media, nhận
+  // diện theo SHAPE kết quả chứ không theo node.type, để node mới nào sau
+  // này cũng tự động được xử lý đúng mà không cần nhớ thêm vào đây.
+  if (node.data?.result?.type === 'imageSet') {
+    const images = await Promise.all((node.data.result.images ?? []).map(embedImage));
     return {
       ...node,
-      data: { ...rest, result: null, isFinalized: false, isLoading: false, statusText: '' },
+      data: { ...node.data, result: { ...node.data.result, images }, isLoading: false, statusText: '' },
     };
+  }
+
+  if (IMAGE_RESULT_NODE_TYPES.has(node.type ?? '') && node.data?.result?.path) {
+    return {
+      ...node,
+      data: { ...node.data, result: await embedImage(node.data.result), isLoading: false, statusText: '' },
+    };
+  }
+
+  if (HEAVY_MEDIA_RESULT_NODE_TYPES.has(node.type ?? '')) {
+    // Video/audio: giữ path như đang có trong data, không nhúng base64.
+    return { ...node, data: { ...node.data, isLoading: false, statusText: '' } };
+  }
+
+  if (LIGHT_RESULT_NODE_TYPES.has(node.type ?? '')) {
+    // Text/JSON: nằm thẳng trong data, không có file — giữ nguyên, chỉ dọn cờ trạng thái tạm.
+    return { ...node, data: { ...node.data, isLoading: false, statusText: '' } };
   }
 
   return node;
@@ -87,25 +134,53 @@ export async function exportAllWorkspaces(workspaces: Workspace[], activeWorkspa
 }
 
 async function nodeForImport(node: Node): Promise<Node> {
-  if (node.type === 'mediaSource' && node.data?.media?.embeddedBase64) {
-    const asset = await saveAssetFromBase64(
-      node.data.media.embeddedBase64,
-      node.data.media.mimeType || 'image/png',
-    );
+  if (node.type === 'mediaSource' && node.data?.media) {
+    const media = node.data.media;
+    if (media.type === 'image') {
+      const resolved = await resolveImage(media);
+      return {
+        ...node,
+        data: { ...node.data, media: resolved ? { ...resolved, type: 'image', name: media.name } : null },
+      };
+    }
+    // video/audio: chỉ dùng lại được nếu path còn tồn tại trên máy này.
+    const stillValid = media.path ? await exists(media.path) : false;
+    return { ...node, data: { ...node.data, media: stillValid ? media : null } };
+  }
+
+  if (node.data?.result?.type === 'imageSet') {
+    const resolvedImages = await Promise.all((node.data.result.images ?? []).map(resolveImage));
+    const ok = resolvedImages.length > 0 && resolvedImages.every((img: any) => img !== null);
     return {
       ...node,
       data: {
         ...node.data,
-        media: {
-          assetId: asset.assetId,
-          path: asset.path,
-          mimeType: asset.mimeType,
-          type: 'image',
-          name: node.data.media.name,
-        },
+        result: ok ? { ...node.data.result, images: resolvedImages } : null,
+        isFinalized: ok,
       },
     };
   }
+
+  if (IMAGE_RESULT_NODE_TYPES.has(node.type ?? '') && node.data?.result?.path) {
+    const resolved = await resolveImage(node.data.result);
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        result: resolved ? { ...node.data.result, ...resolved } : null,
+        isFinalized: !!resolved,
+      },
+    };
+  }
+
+  if (HEAVY_MEDIA_RESULT_NODE_TYPES.has(node.type ?? '') && node.data?.result?.path) {
+    const stillValid = await exists(node.data.result.path);
+    return {
+      ...node,
+      data: { ...node.data, result: stillValid ? node.data.result : null, isFinalized: stillValid },
+    };
+  }
+
   return node;
 }
 

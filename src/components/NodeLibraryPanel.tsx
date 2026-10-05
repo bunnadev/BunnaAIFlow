@@ -18,7 +18,10 @@ const nodeTypes = [
 { type: 'audioMaster', label: 'Làm Đẹp Âm Thanh', desc: 'Lọc rì, giảm tiếng xì, chuẩn hoá âm lượng bằng ffmpeg (tuỳ chọn, không có ffmpeg vẫn chạy được).', icon: 'equalizer', color: 'text-[#06b6d4]', bg: 'bg-[#06b6d4]/10' },
 { type: 'scenePlanner', label: 'Phân Tích Cảnh', desc: 'Video gốc + audio Vbee + style vào, tự chia phân cảnh theo lời thoại và điền prompt hình ảnh.', icon: 'movie_filter', color: 'text-[#ec4899]', bg: 'bg-[#ec4899]/10' },
 { type: 'sceneReview', label: 'Duyệt Phân Cảnh', desc: 'Bỏ bớt cảnh không cần (VD cảnh quảng cáo) trước khi đưa qua bước gen ảnh.', icon: 'playlist_add_check', color: 'text-[#f43f5e]', bg: 'bg-[#f43f5e]/10' },
-{ type: 'character', label: 'Nhân Vật', desc: 'Nối 1 ảnh trực diện, tự tạo thêm 3 góc nhìn — nối vào chân "nv" của Image/Video AI để giữ nhân vật nhất quán.', icon: 'face', color: 'text-[#8b5cf6]', bg: 'bg-[#8b5cf6]/10' }
+{ type: 'character', label: 'Nhân Vật', desc: 'Nối 1 ảnh trực diện, tự tạo thêm 3 góc nhìn — nối vào chân "nv" của Image/Video AI để giữ nhân vật nhất quán.', icon: 'face', color: 'text-[#8b5cf6]', bg: 'bg-[#8b5cf6]/10' },
+{ type: 'director', label: 'Đạo Diễn', desc: 'Ảnh (người mẫu + sản phẩm) + ý tưởng vào, tự lên kịch bản shot kèm prompt — dùng cho video affiliate.', icon: 'theater_comedy', color: 'text-[#14b8a6]', bg: 'bg-[#14b8a6]/10' },
+{ type: 'scenePass', label: 'Chuyển Tiếp Cảnh', desc: 'Relay 1 cảnh từ Duyệt Phân Cảnh tới nhiều node — nối 1 lần, nhân bản cụm không cần nối lại từng node.', icon: 'cable', color: 'text-[#f43f5e]', bg: 'bg-[#f43f5e]/10' },
+{ type: 'mediaGroup', label: 'Gộp Media', desc: 'Gom nhiều ảnh nối vào thành 1 bó — nối 1 dây duy nhất sang Image AI/Video AI thay vì kéo lại từng ảnh.', icon: 'collections', color: 'text-[#0ea5e9]', bg: 'bg-[#0ea5e9]/10' }
 ];
 
 return (

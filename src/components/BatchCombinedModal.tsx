@@ -18,19 +18,6 @@ value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 const VIDEO_MODELS = ['Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality', 'Omni Flash'];
 const IMAGE_MODELS = ['Nano Banana Pro', 'Nano Banana 2', 'Nano Banana 2 Lite'];
 
-const VOICES = [
-"Zephyr — Bright", "Puck — Upbeat", "Charon — Info", "Kore — Firm",
-"Fenrir — Excited", "Leda — Youthful", "Orus — Firm", "Aoede — Gentle",
-"Callirrhoe — Friendly", "Autonoe — Bright", "Enceladus — Soft",
-"Iapetus — Clear", "Umbriel — Friendly", "Algieba — Smooth",
-"Despina — Smooth", "Erinome — Clear", "Algenib — Raspy",
-"Rasalgethi — Info", "Laomedeia — Upbeat", "Achernar — Soft",
-"Alnilam — Firm", "Schedar — Even", "Gacrux — Mature",
-"Pulcherrima — Direct", "Achird — Friendly", "Zubenelgenubi — Natural",
-"Vindemiatrix — Gentle", "Sadachbia — Vivid", "Sadaltager — Insight",
-"Sulafat — Warm"
-];
-
 const BatchCombinedModal: React.FC<Props> = ({ prefix, onChangePrefix, onConfirm, onCancel }) => {
 const [imgText, setImgText] = useState('');
 const [vidText, setVidText] = useState('');
@@ -44,9 +31,6 @@ const [videoResolution, setVideoResolution] = useState('4k');
 const [videoAspectRatio, setVideoAspectRatio] = useState('16:9');
 const [duration, setDuration] = useState(8);
 const [videoMode, setVideoMode] = useState('frame');
-
-const [voiceOverEnabled, setVoiceOverEnabled] = useState(false);
-const [voiceOverVoice, setVoiceOverVoice] = useState(VOICES[1]);
 
 const [references, setReferences] = useState<MediaAsset[]>([]);
 const [previewMedia, setPreviewMedia] = useState<MediaAsset | null>(null);
@@ -108,7 +92,6 @@ if (imgLines.length > 0) {
 onConfirm(imgLines, vidLines, {
 imageModel, imageResolution, imageAspectRatio,
 videoModel, videoResolution, videoAspectRatio, duration, videoMode,
-voiceOverEnabled, voiceOverVoice
 }, references);
 }
 };
@@ -199,14 +182,6 @@ return (
 </div>
 </div>
 <div className="flex flex-col gap-2 h-full justify-between pb-1"><RangeSlider label="Duration" value={duration} min={4} max={8} step={2} formatValue={(v) => `${v}s`} onChange={setDuration} /></div>
-</div>
-
-<div className="mt-2 p-4 bg-black/40 rounded-2xl border border-white/5 flex flex-col gap-4">
-<div className="flex items-center justify-between">
-<div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-xl flex items-center justify-center ${voiceOverEnabled ? 'bg-[#F1641E]/10 text-[#F1641E]' : 'bg-white/5 text-white/20'}`}><span className="material-symbols-outlined text-[20px]">record_voice_over</span></div><span className="text-[10px] font-black text-white/80 uppercase tracking-widest">Voiceover</span></div>
-<button onClick={() => setVoiceOverEnabled(!voiceOverEnabled)} className={`w-12 h-6 rounded-full relative ${voiceOverEnabled ? 'bg-[#F1641E]' : 'bg-white/10'}`}><div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${voiceOverEnabled ? 'left-7' : 'left-1'}`} /></button>
-</div>
-{voiceOverEnabled && <div className="animate-in fade-in slide-in-from-top-1"><FieldDropdown label="Voice Model" value={voiceOverVoice} options={VOICES} onChange={setVoiceOverVoice} className="w-full" /></div>}
 </div>
 </div>
 </div>

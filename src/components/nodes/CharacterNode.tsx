@@ -57,6 +57,11 @@ const CharacterNode = ({ id, data }: any) => {
     if (incomingMedia) setEdges((eds) => eds.filter((edge) => edge.id !== incomingMedia.edgeId));
   };
 
+  const onDebugPreview = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.dispatchEvent(new CustomEvent('debug-node-request', { detail: { nodeId: id } }));
+  };
+
   const result = data.result;
   const images = result?.images as any[] | undefined;
 
@@ -74,6 +79,11 @@ const CharacterNode = ({ id, data }: any) => {
           <button onClick={onDuplicate} className="p-1 hover:bg-white/10 rounded-lg text-[#94a3b8] hover:text-[#8b5cf6] transition-all flex items-center justify-center" title="Nhân bản node">
             <span className="material-symbols-outlined text-[14px]">content_copy</span>
           </button>
+          {import.meta.env.DEV && (
+            <button onClick={onDebugPreview} className="p-1 hover:bg-white/10 rounded-lg text-[#94a3b8] hover:text-amber-400 transition-all flex items-center justify-center" title="Xem trước prompt/request sẽ gửi (chỉ dev)">
+              <span className="material-symbols-outlined text-[14px]">bug_report</span>
+            </button>
+          )}
           <button onClick={onOpenSettings} className="p-1 hover:bg-white/10 rounded-lg text-[#94a3b8] hover:text-white transition-all flex items-center justify-center" title="Cài đặt node">
             <span className="material-symbols-outlined text-[14px]">tune</span>
           </button>
@@ -85,7 +95,7 @@ const CharacterNode = ({ id, data }: any) => {
 
       <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col gap-4 -translate-x-2 pointer-events-none z-50">
         <div className="flex items-center gap-1.5">
-          <Handle type="target" position={Position.Left} id="media-in" className="!bg-[#8b5cf6] !w-2 !h-2 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+          <Handle type="target" position={Position.Left} id="media-in" className="!bg-[#8b5cf6] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />
           <span className="text-[7px] font-black text-white/30 lowercase tracking-[0.1em] -translate-y-[0.5px]">trực diện</span>
         </div>
       </div>
@@ -163,7 +173,7 @@ const CharacterNode = ({ id, data }: any) => {
       </div>
 
       <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center translate-x-2 pointer-events-none z-50">
-        <Handle type="source" position={Position.Right} id="media-out" className="!bg-[#8b5cf6] !w-2 !h-2 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+        <Handle type="source" position={Position.Right} id="media-out" className="!bg-[#8b5cf6] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />
       </div>
     </div>
   );

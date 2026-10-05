@@ -26,19 +26,30 @@ export interface MediaAsset {
   masteredNote?: string;
 }
 
+/**
+ * 1 "cảnh"/shot dùng chung cho cả 2 pipeline: video đạo lý (scenePlanner, dựa
+ * trên mốc thời gian lời thoại — dùng start/end/veo/vo/setting/subject/light/
+ * camera) và video affiliate sản phẩm (director, dựa trên ý tưởng — chỉ dùng
+ * description/prompt). sceneReview/SceneEditPanel/fan-out dùng chung type này,
+ * tự nhận diện scene thuộc pipeline nào qua sự có mặt của description/prompt.
+ */
 export interface Scene {
   id: string;
-  start: number;
-  end: number;
-  duration: number;
+  start?: number;
+  end?: number;
+  duration?: number;
   /** Độ dài clip Veo được làm tròn lên (4/6/8/10s) — theo đúng quy ước của skill daoly-voice. */
-  veo: number;
+  veo?: number;
   /** Lời thoại (voice-over) của cảnh này, ghép từ các câu rơi vào khoảng [start, end]. */
-  vo: string;
-  setting: string;
-  subject: string;
-  light: string;
-  camera: string;
+  vo?: string;
+  setting?: string;
+  subject?: string;
+  light?: string;
+  camera?: string;
+  /** Mô tả ngắn gọn shot (node Đạo Diễn) — VD "Shot 1 (Hook): ...". */
+  description?: string;
+  /** Prompt hoàn chỉnh cho shot (node Đạo Diễn) — dùng thẳng, không ghép từ subject/setting/light/camera. */
+  prompt?: string;
 }
 
 export interface SceneListResult {

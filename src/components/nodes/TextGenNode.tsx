@@ -8,23 +8,35 @@ const TextGenNode = ({ id, data }: any) => {
   const nodes = useNodes();
   const [copied, setCopied] = useState(false);
 
+  // 1 dây có thể mang cả 1 bó ảnh (imageSet — từ Nhân Vật hoặc Gộp Media),
+  // phải tách phẳng thành từng ảnh riêng để đánh số đúng — khớp với thứ tự
+  // thật sự gửi lên API (xem buildNodeRequestContext trong App.tsx).
   const incomingMedia = useMemo(() => {
     return edges
       .filter(e => e.target === id && e.targetHandle === 'media-in')
-      .map(edge => {
+      .flatMap(edge => {
         const srcNode = nodes.find(n => n.id === edge.source);
-        if (!srcNode) return null;
+        if (!srcNode) return [];
         const srcData = srcNode.data as any;
         const mediaData = srcData.result || srcData.media;
-        return {
+        if (mediaData?.type === 'imageSet') {
+          return (mediaData.images ?? []).map((img: any) => ({
+            id: `${srcNode.id}_${img.assetId}`,
+            edgeId: edge.id,
+            path: img.path,
+            type: img.type || 'image',
+            label: srcData.label,
+          }));
+        }
+        if (!mediaData) return [];
+        return [{
           id: srcNode.id,
           edgeId: edge.id,
-          path: mediaData?.path,
-          type: mediaData?.type || 'image',
-          label: srcData.label
-        };
-      })
-      .filter(item => item !== null);
+          path: mediaData.path,
+          type: mediaData.type || 'image',
+          label: srcData.label,
+        }];
+      });
   }, [edges, nodes, id]);
 
   const clearResult = (e: React.MouseEvent) => {
@@ -74,6 +86,11 @@ const TextGenNode = ({ id, data }: any) => {
     deleteElements({ nodes: [{ id }] });
   };
 
+  const onDebugPreview = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.dispatchEvent(new CustomEvent('debug-node-request', { detail: { nodeId: id } }));
+  };
+
   const removeReference = (e: React.MouseEvent, edgeId: string) => {
     e.stopPropagation();
     setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
@@ -97,6 +114,15 @@ const TextGenNode = ({ id, data }: any) => {
           >
             <span className="material-symbols-outlined text-[14px]">content_copy</span>
           </button>
+          {import.meta.env.DEV && (
+            <button
+              onClick={onDebugPreview}
+              className="p-1 hover:bg-white/10 rounded-lg text-[#94a3b8] hover:text-amber-400 transition-all flex items-center justify-center"
+              title="Xem trước prompt/request sẽ gửi (chỉ dev)"
+            >
+              <span className="material-symbols-outlined text-[14px]">bug_report</span>
+            </button>
+          )}
           <button
             onClick={onOpenSettings}
             className="p-1 hover:bg-white/10 rounded-lg text-[#94a3b8] hover:text-white transition-all flex items-center justify-center"
@@ -116,8 +142,12 @@ const TextGenNode = ({ id, data }: any) => {
 
       <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col gap-4 -translate-x-2 pointer-events-none z-50">
         <div className="flex items-center gap-1.5">
-          <Handle type="target" position={Position.Left} id="media-in" className="!bg-[#3b82f6] !w-2 !h-2 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+          <Handle type="target" position={Position.Left} id="media-in" className="!bg-[#3b82f6] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />
           <span className="text-[7px] font-black text-white/30 lowercase tracking-[0.1em] -translate-y-[0.5px]">image</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Handle type="target" position={Position.Left} id="scene-in" className="!bg-[#f43f5e] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+          <span className="text-[7px] font-black text-white/30 lowercase tracking-[0.1em] -translate-y-[0.5px]">cảnh</span>
         </div>
       </div>
 
@@ -183,17 +213,23 @@ const TextGenNode = ({ id, data }: any) => {
 
       <div className="p-2.5 flex flex-col gap-2.5">
         {incomingMedia.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {incomingMedia.slice(0, 10).map((item: any, idx: number) => (
-              <div key={item.id} className="relative w-6 h-6 rounded-lg overflow-hidden border border-white/10 bg-black group/thumb" title={item.label}>
+          <div className="flex flex-wrap gap-1.5">
+            {incomingMedia.slice(0, 16).map((item: any, idx: number) => (
+              <div
+                key={item.id}
+                className="relative w-9 h-9 rounded-lg overflow-hidden border border-white/10 bg-black group/thumb"
+                title={item.label}
+                onMouseEnter={() => item.edgeId && window.dispatchEvent(new CustomEvent('hover-edge', { detail: { edgeId: item.edgeId, hovered: true } }))}
+                onMouseLeave={() => item.edgeId && window.dispatchEvent(new CustomEvent('hover-edge', { detail: { edgeId: item.edgeId, hovered: false } }))}
+              >
                 {item.path && (item.type === 'video' ? <video src={toDisplayUrl(item.path)} className="w-full h-full object-cover" muted /> : <img src={toDisplayUrl(item.path)} className="w-full h-full object-cover" alt="" />)}
-                <div className="absolute bottom-0 right-0 bg-[#3b82f6] text-black text-[6px] font-black px-1 rounded-tl-sm">{idx + 1}</div>
+                <div className="absolute bottom-0 right-0 bg-[#3b82f6] text-black text-[8px] font-black px-1 rounded-tl-sm">{idx + 1}</div>
                 <button
                   onClick={(e) => removeReference(e, item.edgeId)}
                   className="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
                   title="Xoá tham chiếu"
                 >
-                  <span className="material-symbols-outlined text-[12px] text-white">close</span>
+                  <span className="material-symbols-outlined text-[14px] text-white">close</span>
                 </button>
               </div>
             ))}

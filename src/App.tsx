@@ -30,6 +30,9 @@ import AudioMasterNode from './components/nodes/AudioMasterNode';
 import ScenePlannerNode from './components/nodes/ScenePlannerNode';
 import SceneReviewNode from './components/nodes/SceneReviewNode';
 import CharacterNode from './components/nodes/CharacterNode';
+import DirectorNode from './components/nodes/DirectorNode';
+import MediaGroupNode from './components/nodes/MediaGroupNode';
+import ScenePassNode from './components/nodes/ScenePassNode';
 import StyleNode from './components/nodes/StyleNode';
 import DeleteEdge from './components/nodes/DeleteEdge';
 import WorkspaceManager from './components/WorkspaceManager';
@@ -52,26 +55,43 @@ import type { Workspace, LogEntry, MediaAsset } from './types';
 import { loadSettings, saveSettings, type AppSettings } from './lib/settings';
 import { loadWorkspaceState, saveWorkspaceState } from './lib/workspaceStore';
 import { exportSingleWorkspace, exportAllWorkspaces, importWorkspaces, type ImportedBundle } from './lib/exportImport';
-import { saveAssetFromBase64, saveAssetFromBytes, readAssetAsBase64, deleteAsset } from './lib/assets';
-import { GeminiImageProvider } from './lib/providers/geminiImageProvider';
-import { GeminiVideoProvider } from './lib/providers/geminiVideoProvider';
-import { GeminiOmniFlashProvider } from './lib/providers/geminiOmniFlashProvider';
-import { GeminiTextProvider } from './lib/providers/geminiTextProvider';
+import { saveAssetFromBase64, saveAssetFromBytes, readAssetAsBase64, deleteAsset, mimeTypeFromExtension } from './lib/assets';
+import { GeminiImageProvider, buildImageRequestPayload } from './lib/providers/geminiImageProvider';
+import { GeminiVideoProvider, buildVideoRequestPayload } from './lib/providers/geminiVideoProvider';
+import { GeminiOmniFlashProvider, buildOmniFlashRequestPayload } from './lib/providers/geminiOmniFlashProvider';
+import { GeminiTextProvider, buildSceneDetailsInstruction } from './lib/providers/geminiTextProvider';
 import { VbeeProvider } from './lib/providers/vbeeProvider';
 import { DEFAULT_VBEE_VOICE_NAME, resolveVbeeVoiceCode } from './lib/vbeeVoices';
-import { buildScenesSkeleton } from './lib/sceneGrouping';
-import { computeFanOut } from './lib/fanOut';
+import { buildScenesSkeleton, composeScenePrompt, resolveSceneFromSource, resolveConnectedScene } from './lib/sceneGrouping';
+import { computeGroupClone } from './lib/fanOut';
 import { CHARACTER_ANGLES } from './lib/characterAngles';
+import { DEFAULT_DIRECTOR_SYSTEM_PROMPT } from './lib/directorPrompt';
 import { computeBulkConnectEdges } from './lib/bulkConnect';
+import { HoveredEdgeContext } from './lib/edgeHoverContext';
 import { resolveImageModelId, resolveVideoModelId, resolveTextModelId } from './lib/models';
-import { save as saveDialog } from '@tauri-apps/plugin-dialog';
+import { save as saveDialog, open as openDialog } from '@tauri-apps/plugin-dialog';
 import { writeFile, readFile } from '@tauri-apps/plugin-fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 
+/**
+ * Cấp lại ID mới (thật sự ngẫu nhiên) cho MỌI dây nối của 1 workspace. Cần
+ * thiết vì trước đây dây nối mới được tạo qua ReactFlow's `addEdge()` không
+ * truyền id — ReactFlow tự đặt id theo công thức nguồn+đích (KHÔNG ngẫu
+ * nhiên), nên nối lại đúng cặp nguồn/đích đã từng nối trước đó (rất phổ biến
+ * khi dựng lại 1 chain) ra trùng y hệt id cũ, gây lẫn lộn cho tính năng
+ * sáng/mờ dây lúc hover. Bản thân việc tạo dây mới đã được sửa (luôn dùng
+ * uuidv4), nhưng KHÔNG tự sửa lại dây cũ đã lưu trong các workspace có từ
+ * trước — nên cần chạy 1 lần lúc nạp dữ liệu (mở app, chuyển tab, import) để
+ * "chữa lành" toàn bộ workflow cũ mà người dùng không phải tự làm gì.
+ */
+function withFreshEdgeIds(ws: Workspace): Workspace {
+  return { ...ws, edges: (ws.edges ?? []).map((e) => ({ ...e, id: uuidv4() })) };
+}
+
 export const getNodeFileName = (node: Node, index: number, prefix: string = 'BUNNA_FLOW') => {
-const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : ((node.type === 'vbee' || node.type === 'audioMaster') ? 'AUD' : ((node.type === 'scenePlanner' || node.type === 'sceneReview') ? 'SCN' : (node.type === 'character' ? 'CHR' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES')))));
+const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : ((node.type === 'vbee' || node.type === 'audioMaster') ? 'AUD' : ((node.type === 'scenePlanner' || node.type === 'sceneReview' || node.type === 'director') ? 'SCN' : (node.type === 'character' ? 'CHR' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES')))));
 const extension = node.data.result?.type === 'video' ? 'mp4' : (node.data.result?.type === 'text' ? 'txt' : (node.data.result?.type === 'audio' ? 'wav' : (node.data.result?.type === 'sceneList' ? 'json' : 'jpg')));
 const label = (node.data.label || 'ASSET').replace(/[^a-z0-9]/gi, '_').toUpperCase();
 return `${prefix}_${typeCode}_${index + 1}_${label}.${extension}`;
@@ -89,6 +109,9 @@ audioMaster: AudioMasterNode,
 scenePlanner: ScenePlannerNode,
 sceneReview: SceneReviewNode,
 character: CharacterNode,
+director: DirectorNode,
+mediaGroup: MediaGroupNode,
+scenePass: ScenePassNode,
 styleNode: StyleNode,
 };
 
@@ -138,6 +161,20 @@ const [appSettings, setAppSettings] = useState<AppSettings>({});
 
 const [nodes, setNodes, onNodesChange] = useNodesState([]);
 const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+const [pendingSceneConnection, setPendingSceneConnection] = useState<{ connection: Connection; existingPrompt: string; targetLabel: string; sceneLabel: string } | null>(null);
+const [debugPreview, setDebugPreview] = useState<{ label: string; fields: { label: string; value: string }[] } | null>(null);
+
+// Xoá đúng dây đang được hover (VD bấm nút xoá trên icon tham chiếu trong
+// lúc chuột vẫn còn ở trên nó) khiến phần tử DOM biến mất ngay lập tức —
+// trình duyệt không kịp bắn sự kiện mouseleave, nên hover-edge{hovered:false}
+// không bao giờ tới, các dây khác bị mờ mãi mãi. Dọn theo cách khác: hễ dây
+// đang hover không còn tồn tại trong edges nữa thì tự tắt hover.
+useEffect(() => {
+if (hoveredEdgeId && !edges.some(e => e.id === hoveredEdgeId)) {
+setHoveredEdgeId(null);
+}
+}, [edges, hoveredEdgeId]);
 
 const [undoStack, setUndoStack] = useState<UndoState[]>([]);
 const { screenToFlowPosition, getNodes, getEdges, setViewport, getViewport } = useReactFlow();
@@ -155,8 +192,9 @@ setAppSettings(settings);
 
 const stored = await loadWorkspaceState();
 if (stored && stored.workspaces.length > 0) {
-setWorkspaces(stored.workspaces);
-const active = stored.workspaces.find(w => w.id === stored.activeWorkspaceId) ?? stored.workspaces[0];
+const freshWorkspaces = stored.workspaces.map(withFreshEdgeIds);
+setWorkspaces(freshWorkspaces);
+const active = freshWorkspaces.find(w => w.id === stored.activeWorkspaceId) ?? freshWorkspaces[0];
 setActiveWorkspaceId(active.id);
 setNodes(active.nodes || []);
 setEdges(active.edges || []);
@@ -224,7 +262,7 @@ setUndoStack(prev => [...prev, { nodes: getNodes(), edges: getEdges() }]);
 
 const handleResetAllResults = useCallback(() => {
 setNodes(nds => nds.map(node => {
-if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee' || node.type === 'audioMaster' || node.type === 'scenePlanner' || node.type === 'character') {
+if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee' || node.type === 'audioMaster' || node.type === 'scenePlanner' || node.type === 'character' || node.type === 'director' || node.type === 'mediaGroup') {
 return {
 ...node,
 data: { ...node.data, result: null, statusText: '', isFinalized: false, isLoading: false }
@@ -318,7 +356,7 @@ const handleImport = useCallback(async () => {
 try {
 const result = await importWorkspaces();
 if (!result) return;
-setPendingImport(result);
+setPendingImport({ ...result, workspaces: result.workspaces.map(withFreshEdgeIds) });
 } catch (err) {
 console.error('Import failed:', err);
 setFlowStatus({ message: 'LỖI ĐỊNH DẠNG HOẶC FILE HỎNG', type: 'error' });
@@ -383,7 +421,13 @@ const currentNodes = getNodes();
 const incomingMediaEdges = currentEdges.filter(e => e.target === node.id && e.targetHandle === 'media-in');
 const incomingMediaIds = incomingMediaEdges.map(e => {
 const srcNode = currentNodes.find(n => n.id === e.source);
-return srcNode?.data?.result?.assetId || srcNode?.data?.media?.assetId || '';
+const mediaData: any = srcNode?.data?.result || srcNode?.data?.media;
+// imageSet (bó nhiều ảnh — Nhân Vật/Gộp Media) không có assetId ở cấp
+// ngoài cùng, phải nối hết assetId từng ảnh bên trong lại — không thì đổi
+// ảnh bên trong bó (VD Nhân Vật/Gộp Media nguồn chạy lại) sẽ không làm
+// node này "dirty", âm thầm dùng bó cũ mà không biết.
+if (mediaData?.type === 'imageSet') return (mediaData.images ?? []).map((i: any) => i.assetId).join(',');
+return mediaData?.assetId || '';
 }).sort().join('|');
 
 const incomingStyleEdges = currentEdges.filter(e => e.target === node.id && e.targetHandle === 'style-in');
@@ -408,7 +452,15 @@ const r = srcNode?.data?.result;
 return `${e.targetHandle}:${r?.type === 'imageSet' ? r.images.map((i: any) => i.assetId).join(',') : (r?.assetId || '')}`;
 }).sort().join('|');
 
+// Nối scene-in thì prompt của node này sống theo đúng nội dung cảnh đang nối
+// — đưa cả nội dung cảnh (không chỉ việc có dây hay không) vào hash, để sửa
+// cảnh trong Duyệt Phân Cảnh xong là node tự nhận biết "dirty", chạy lại lấy
+// bản mới nhất mà không cần nối lại dây.
+const incomingSceneEdge = currentEdges.find(e => e.target === node.id && e.targetHandle === 'scene-in');
+const incomingSceneHash = incomingSceneEdge ? JSON.stringify(resolveConnectedScene(currentNodes, currentEdges, node.id) ?? '') : '';
+
 const baseParts = [node.data.model, node.data.localPrompt, node.data.aspectRatio, node.data.resolution, node.data.duration, incomingMediaIds, styleStrings];
+if (incomingSceneEdge) baseParts.push(incomingSceneHash);
 // Chỉ thêm phần text-in/Vbee/nhân vật vào hash cho những node THỰC SỰ có
 // input đó — nếu thêm vô điều kiện cho mọi node, hash của các node cũ
 // (imageGen/videoGen/textGen/stt đã chạy trước khi có các trường này) sẽ đổi
@@ -418,6 +470,7 @@ if (incomingTextEdges.length > 0) baseParts.push(incomingTextHash);
 if (node.type === 'vbee') baseParts.push(node.data.voiceLabel, node.data.speed, node.data.gapSeconds);
 if (node.type === 'audioMaster') baseParts.push(node.data.targetLufs);
 if (node.type === 'scenePlanner') baseParts.push(node.data.targetSceneSeconds);
+if (node.type === 'director') baseParts.push(node.data.systemPrompt);
 if (node.type === 'character') baseParts.push(node.data.characterName);
 // characterCount mặc định 0 cho MỌI node imageGen/videoGen kể cả những node
 // không dùng tính năng này — chỉ thêm vào hash khi thực sự bật (>0), để
@@ -443,7 +496,7 @@ let newNode: Node;
 switch (type) {
 case 'mediaSource': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Nguồn Media', media: null } }; break;
 case 'imageGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Ảnh AI', model: 'Nano Banana Pro', aspectRatio: '16:9', resolution: '4k', localPrompt: '' } }; break;
-case 'videoGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Video AI', model: 'Veo 3.1 - Lite', aspectRatio: '16:9', resolution: '720p', duration: 8, videoMode: 'frame', voiceOverEnabled: false, voiceOverVoice: 'Puck — Upbeat', localPrompt: '' } }; break;
+case 'videoGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Video AI', model: 'Veo 3.1 - Lite', aspectRatio: '16:9', resolution: '720p', duration: 8, videoMode: 'frame', localPrompt: '' } }; break;
 case 'textGen': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Text AI', model: 'Gemini 2.5 Flash', localPrompt: '' } }; break;
 case 'stt': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Tách Audio', model: 'Gemini 2.5 Flash', localPrompt: '' } }; break;
 case 'textReview': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Duyệt Text', isFinalized: true, editedText: '' } }; break;
@@ -452,6 +505,9 @@ case 'audioMaster': newNode = { id, type, position: finalPos, data: { ...commonD
 case 'scenePlanner': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phân Tích Cảnh', model: 'Gemini 3.6 Flash', targetSceneSeconds: 6.0 } }; break;
 case 'sceneReview': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Duyệt Phân Cảnh', isFinalized: true, editedScenes: [] } }; break;
 case 'character': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Nhân Vật', characterName: '', model: 'Nano Banana Pro', aspectRatio: '3:4' } }; break;
+case 'director': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Đạo Diễn', model: 'Gemini 3.6 Flash', localPrompt: '', systemPrompt: DEFAULT_DIRECTOR_SYSTEM_PROMPT } }; break;
+case 'scenePass': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Chuyển Tiếp Cảnh' } }; break;
+case 'mediaGroup': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Gộp Media' } }; break;
 case 'styleNode': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phong cách', positivePrompt: '', negativePrompt: '' } }; break;
 default: return;
 }
@@ -479,9 +535,18 @@ isLoading: false, statusText: '', result: null, isFinalized: false, isWaiting: f
 setNodes((nds) => nds.concat(newNode));
 }, [getNodes, setNodes]);
 
-const handleConnect = useCallback((p: Connection) => {
-if (!p.source || !p.target) return;
-const primaryEdge = { ...p, animated: false, style: { stroke: '#F1641E', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#F1641E' } };
+const addConnectionEdge = useCallback((p: Connection, skipBulkConnect?: boolean) => {
+// ID riêng, không để ReactFlow tự đặt (mặc định nó ghép id theo kiểu
+// nguồn+đích, KHÔNG ngẫu nhiên — nối lại đúng cặp nguồn/đích vừa xoá trước
+// đó sẽ ra trùng y hệt ID cũ). Đây chính là nguyên nhân bug "dây mới tự
+// sáng theo trạng thái hover cũ": hoveredEdgeId bị kẹt trỏ vào 1 ID đã xoá,
+// dây mới tình cờ trùng ID đó nên bị tính nhầm là "đang hover".
+const primaryEdge = { ...p, id: uuidv4(), animated: false, style: { stroke: '#F1641E', strokeWidth: 3 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#F1641E' } };
+
+if (skipBulkConnect) {
+setEdges(eds => addEdge(primaryEdge, eds));
+return;
+}
 
 const currentNodes = getNodes();
 const currentEdges = getEdges();
@@ -495,32 +560,47 @@ setTimeout(() => setFlowStatus(null), 2500);
 }
 }, [getNodes, getEdges, setEdges]);
 
-const handleFanOutFromSelection = useCallback(() => {
+const handleConnect = useCallback((p: Connection) => {
+if (!p.source || !p.target) return;
+
+// Nối vào chân scene-in (lấy prompt trực tiếp từ 1 cảnh của Duyệt Phân
+// Cảnh) sẽ THAY HẲN localPrompt hiện có của node đích lúc chạy — nếu đang
+// có sẵn prompt tay, hỏi lại trước khi nối để tránh ghi đè nhầm. Không bulk-
+// connect cho loại chân này: mỗi node thường cần 1 cảnh RIÊNG, tự nối tay
+// từng cái, không nên tự động nối 1 cảnh vào hàng loạt node đang chọn.
+if (p.targetHandle === 'scene-in') {
+const currentNodes = getNodes();
+const currentEdges = getEdges();
+const targetNode = currentNodes.find(n => n.id === p.target);
+const existingPrompt = (targetNode?.data?.localPrompt || '').trim();
+const scene = p.source ? resolveSceneFromSource(currentNodes, currentEdges, p.source, p.sourceHandle) : undefined;
+
+if (existingPrompt) {
+setPendingSceneConnection({ connection: p, existingPrompt, targetLabel: targetNode?.data?.label || 'Node', sceneLabel: scene?.id || '' });
+} else {
+addConnectionEdge(p, true);
+}
+return;
+}
+
+addConnectionEdge(p);
+}, [getNodes, getEdges, addConnectionEdge]);
+
+const handleCloneSelection = useCallback(() => {
 const currentNodes = getNodes();
 const currentEdges = getEdges();
 const selectedNodes = currentNodes.filter(n => n.selected);
 if (selectedNodes.length === 0) return;
 
-const sceneSourceNode =
-currentNodes.find(n => n.type === 'sceneReview' && n.data.result?.type === 'sceneList' && n.data.result.scenes?.length > 0) ||
-currentNodes.find(n => n.type === 'scenePlanner' && n.data.result?.type === 'sceneList' && n.data.result.scenes?.length > 0);
-
-if (!sceneSourceNode) {
-setFlowStatus({ message: 'KHÔNG TÌM THẤY NODE PHÂN TÍCH CẢNH/DUYỆT PHÂN CẢNH NÀO CÓ KẾT QUẢ.', type: 'error' });
-setTimeout(() => setFlowStatus(null), 3500);
-return;
-}
-const scenes = sceneSourceNode.data.result.scenes as any[];
-
 setUndoStack(prev => [...prev, { nodes: currentNodes, edges: currentEdges }]);
 
-const { newNodes, newEdges } = computeFanOut(selectedNodes, currentEdges, scenes, Date.now());
+const { newNodes, newEdges } = computeGroupClone(selectedNodes, currentEdges, Date.now());
 const selectedIds = new Set(selectedNodes.map(n => n.id));
 
 setNodes(nds => nds.map(n => selectedIds.has(n.id) ? { ...n, selected: false } : n).concat(newNodes));
 setEdges(eds => eds.concat(newEdges));
 
-setFlowStatus({ message: `ĐÃ NHÂN BẢN THÀNH ${scenes.length} BẢN THEO CẢNH TỪ "${sceneSourceNode.data.label || sceneSourceNode.id}".`, type: 'success' });
+setFlowStatus({ message: `ĐÃ NHÂN BẢN ${selectedNodes.length} NODE — KÉO DÂY CẢNH RIÊNG VÀO BẢN MỚI NẾU CẦN.`, type: 'success' });
 setTimeout(() => setFlowStatus(null), 4000);
 }, [getNodes, getEdges, setNodes, setEdges]);
 
@@ -589,7 +669,6 @@ position: { x: genStartX + 320, y: rowY },
 data: {
 label: `Video ${i + 1}`, model: settings.videoModel, aspectRatio: settings.videoAspectRatio,
 resolution: settings.videoResolution, duration: settings.duration, videoMode: settings.videoMode,
-voiceOverEnabled: settings.voiceOverEnabled, voiceOverVoice: settings.voiceOverVoice,
 localPrompt: vidPrompts[i],
 isLoading: false, statusText: '', result: null, isFinalized: false, isBatch: true, isPaused: false
 }
@@ -682,6 +761,50 @@ console.error('Download failed:', err);
 }
 }, [getNodes, filenamePrefix]);
 
+// Cho phép nạp thủ công 1 file ảnh/video từ máy làm "kết quả" của node Image
+// AI/Video AI — trường hợp thật Huy gặp: kết quả app ra không ưng, tự gen lại
+// bằng tay qua Google Flow (VEO web) rồi muốn đưa kết quả đó vào lại app để
+// node phía sau (media-in/scene-in...) dùng làm tham chiếu như thể node này
+// tự tạo ra. Lưu vào asset dir của app (giống ảnh/video tự gen) rồi gán thẳng
+// vào node.data.result — mọi chỗ đọc result (thumbnail, tải xuống, làm nguồn
+// cho node khác) không cần biết nó tới từ đâu. Đồng thời set lastRunHash
+// giống 1 lần chạy thật vừa xong, không thì lần chạy pipeline kế tiếp sẽ coi
+// node "dirty" (chưa chạy) và tự động generate đè lên kết quả vừa nạp tay.
+const handleUploadNodeResult = useCallback(async (nodeId: string) => {
+const node = getNodes().find(n => n.id === nodeId);
+if (!node) return;
+const isVideo = node.type === 'videoGen';
+
+const filePath = await openDialog({
+multiple: false,
+filters: [isVideo
+? { name: 'Video', extensions: ['mp4', 'webm', 'mov'] }
+: { name: 'Ảnh', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
+});
+if (!filePath || typeof filePath !== 'string') return;
+
+try {
+const bytes = await readFile(filePath);
+const mimeType = mimeTypeFromExtension(filePath);
+const asset = await saveAssetFromBytes(bytes, mimeType);
+const currentEdges = getEdges();
+setNodes(nds => nds.map(n => n.id === nodeId ? {
+...n,
+data: {
+...n.data, isLoading: false, statusText: 'Hoàn tất', isFinalized: true,
+lastRunHash: getNodeStateHash(n, currentEdges),
+result: { ...asset, type: isVideo ? 'video' : 'image', resolution: n.data.resolution }
+}
+} : n));
+setFlowStatus({ message: 'ĐÃ NẠP KẾT QUẢ THỦ CÔNG CHO NODE', type: 'success' });
+setTimeout(() => setFlowStatus(null), 2500);
+} catch (err) {
+console.error('Upload result failed:', err);
+setFlowStatus({ message: 'LỖI NẠP FILE — KIỂM TRA ĐỊNH DẠNG', type: 'error' });
+setTimeout(() => setFlowStatus(null), 3000);
+}
+}, [getNodes, getEdges, getNodeStateHash]);
+
 const handleVectorizeNode = useCallback(async (nodeId: string) => {
 const node = getNodes().find(n => n.id === nodeId);
 const imagePath: string | undefined = node?.data.result?.path || node?.data.media?.path;
@@ -705,11 +828,31 @@ setTimeout(() => setFlowStatus(null), 3000);
 }
 }, [getNodes, filenamePrefix]);
 
-const runNodeLogic = async (nodeId: string, nodesSnapshot?: Node[], edgesSnapshot?: Edge[]) => {
+/**
+ * Chuẩn bị prompt/ảnh tham chiếu cho 1 node — phần setup DÙNG CHUNG giữa
+ * chạy thật (runNodeLogic) và xem trước request (nút debug, chỉ hiện lúc
+ * dev). Cố ý tách riêng để 2 chỗ này KHÔNG BAO GIỜ lệch nhau — nếu tự viết
+ * lại logic riêng cho preview thì preview có thể "nói dối" (hiện 1 đằng,
+ * gửi 1 nẻo), tệ hơn cả không có preview.
+ */
+interface NodeRequestContext {
+node: Node;
+finalPrompt: string;
+positiveStyle: string;
+negativeStyle: string;
+referenceImages: { base64: string; mimeType: string }[] | undefined;
+sourceImages: MediaAsset[];
+sourceVideos: MediaAsset[];
+sourceAudios: MediaAsset[];
+sourceTexts: string[];
+scenePromptOverride: string | undefined;
+}
+
+const buildNodeRequestContext = async (nodeId: string, nodesSnapshot?: Node[], edgesSnapshot?: Edge[]): Promise<NodeRequestContext | null> => {
 const currentNodes = nodesSnapshot || getNodes();
 const currentEdges = edgesSnapshot || getEdges();
 const node = currentNodes.find(n => n.id === nodeId);
-if (!node) return;
+if (!node) return null;
 
 const incomingEdges = currentEdges.filter(e => e.target === nodeId);
 const sourceImages: MediaAsset[] = [];
@@ -719,12 +862,19 @@ const sourceTexts: string[] = [];
 const characterGroups: { name?: string; images: MediaAsset[] }[] = [];
 let positiveStyle = '';
 let negativeStyle = '';
+// Nối 1 cảnh cụ thể (từ chân "cảnh N" của Duyệt Phân Cảnh) vào chân scene-in
+// sẽ THAY HẲN localPrompt của node này lúc chạy — sống theo cảnh, sửa cảnh
+// xong chạy lại là node tự lấy bản mới nhất, không cần nối lại dây.
+let scenePromptOverride: string | undefined;
 
 for (const edge of incomingEdges) {
 const src = currentNodes.find(n => n.id === edge.source);
 if (!src) continue;
 
-if (edge.targetHandle === 'media-in') {
+if (edge.targetHandle === 'scene-in') {
+const scene = resolveSceneFromSource(currentNodes, currentEdges, edge.source, edge.sourceHandle);
+if (scene) scenePromptOverride = composeScenePrompt(scene);
+} else if (edge.targetHandle === 'media-in') {
 const mediaData: any = src.data.result || src.data.media;
 if (mediaData) {
 if (mediaData.type === 'image') sourceImages.push(mediaData);
@@ -749,26 +899,28 @@ characterGroups.push({ name: undefined, images: [mediaData] });
 }
 }
 
-setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, isLoading: true, statusText: 'Đang xử lý...', isFinalized: false } } : n));
+// promptOverrideEnabled: cho phép 1 node CỤ THỂ bỏ qua prompt sống-theo-cảnh
+// (VD kết quả xấu ở 1 cảnh, cần tự viết lại riêng node này) mà không phải
+// ngắt hẳn dây nối "cảnh" — xem ghi chú ở NodeSettingsPanel.tsx.
+const basePrompt = (scenePromptOverride && !node.data.promptOverrideEnabled) ? scenePromptOverride : (node.data.localPrompt || 'A cinematic masterpiece');
 
-try {
-const apiKey = appSettingsRef.current.geminiApiKey ?? '';
-const imageProvider = new GeminiImageProvider(apiKey);
-const videoProvider = new GeminiVideoProvider(apiKey);
-const omniFlashProvider = new GeminiOmniFlashProvider(apiKey);
-const textProvider = new GeminiTextProvider(apiKey);
-
-const basePrompt = node.data.localPrompt || 'A cinematic masterpiece';
+// Mode "Khung" của Video AI dùng đúng 2 ảnh sourceImages làm firstFrame/lastFrame
+// theo thứ tự cố định — ảnh nhân vật (character-in-N) không có chỗ trong mô hình
+// đó (không phải "ảnh tham chiếu chung" mà là khung hình đầu/cuối cụ thể), nên
+// bỏ qua hẳn characterGroups ở mode này. Nếu không, ảnh nhân vật sẽ vô tình lọt
+// vào làm firstFrame/lastFrame khi sourceImages có ít hơn 2 ảnh.
+const isVideoFrameMode = node.type === 'videoGen' && node.data.videoMode === 'frame';
+const effectiveCharacterGroups = isVideoFrameMode ? [] : characterGroups;
 
 // Nhân vật nhất quán: ảnh từng nhân vật (đã gộp qua các chân character-in-N)
 // nối thêm vào cuối danh sách ảnh tham chiếu chung, kèm 1 đoạn ghi chú trong
 // prompt để Gemini biết đâu là ảnh của ai — bản thân API không tự phân biệt
 // được chỉ vì ảnh tới từ chân khác nhau, phải nói rõ bằng chữ.
 let characterNote = '';
-if (characterGroups.length > 0) {
+if (effectiveCharacterGroups.length > 0) {
 let cursor = sourceImages.length;
 const parts: string[] = [];
-characterGroups.forEach((g, i) => {
+effectiveCharacterGroups.forEach((g, i) => {
 const from = cursor + 1;
 const to = cursor + g.images.length;
 const label = g.name ? `Nhân vật ${i + 1} (${g.name})` : `Nhân vật ${i + 1}`;
@@ -780,13 +932,35 @@ characterNote = `\n\nGhi chú tham chiếu nhân vật (giữ đúng ngoại hì
 
 const finalPrompt = (positiveStyle ? `${basePrompt}, ${positiveStyle}` : basePrompt) + characterNote;
 
-const allReferenceAssets = [...sourceImages, ...characterGroups.flatMap(g => g.images)];
+const allReferenceAssets = [...sourceImages, ...effectiveCharacterGroups.flatMap(g => g.images)];
 const referenceImages = allReferenceAssets.length
 ? await Promise.all(allReferenceAssets.slice(0, 16).map(async (m) => ({
 base64: await readAssetAsBase64(m.path),
 mimeType: m.mimeType,
 })))
 : undefined;
+
+return { node, finalPrompt, positiveStyle, negativeStyle, referenceImages, sourceImages, sourceVideos, sourceAudios, sourceTexts, scenePromptOverride };
+};
+
+const runNodeLogic = async (nodeId: string, nodesSnapshot?: Node[], edgesSnapshot?: Edge[]) => {
+const currentNodes = nodesSnapshot || getNodes();
+const currentEdges = edgesSnapshot || getEdges();
+const node = currentNodes.find(n => n.id === nodeId);
+if (!node) return;
+
+setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, isLoading: true, statusText: 'Đang xử lý...', isFinalized: false } } : n));
+
+try {
+const ctx = await buildNodeRequestContext(nodeId, nodesSnapshot, edgesSnapshot);
+if (!ctx) throw new Error('Không tìm thấy node.');
+const { finalPrompt, negativeStyle, referenceImages, sourceImages, sourceVideos, sourceAudios, sourceTexts, positiveStyle } = ctx;
+
+const apiKey = appSettingsRef.current.geminiApiKey ?? '';
+const imageProvider = new GeminiImageProvider(apiKey);
+const videoProvider = new GeminiVideoProvider(apiKey);
+const omniFlashProvider = new GeminiOmniFlashProvider(apiKey);
+const textProvider = new GeminiTextProvider(apiKey);
 
 if (node.type === 'textGen') {
 const text = await textProvider.generateText({
@@ -943,6 +1117,49 @@ result: { type: 'sceneList', scenes, style: positiveStyle || undefined }
 return;
 }
 
+if (node.type === 'mediaGroup') {
+if (!sourceImages.length) throw new Error('Chưa có ảnh nào nối vào node này.');
+// Không gọi API — chỉ gộp lại thành 1 bó (imageSet). sourceImages đã được
+// buildNodeRequestContext tự tách phẳng nếu 1 trong các dây nối vào đây lại
+// là 1 bó khác (imageSet lồng nhau), nên không cần tự xử lý thêm ở đây.
+setNodes(nds => nds.map(n => n.id === nodeId ? {
+...n,
+data: {
+...n.data, isLoading: false, statusText: 'Hoàn tất', isFinalized: true,
+lastRunHash: getNodeStateHash(node, currentEdges),
+result: { type: 'imageSet', images: sourceImages }
+}
+} : n));
+return;
+}
+
+if (node.type === 'director') {
+if (!sourceImages.length) throw new Error('Chưa có ảnh nào (người mẫu/sản phẩm) nối vào node này.');
+
+setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, statusText: 'Đang lên ý tưởng & viết prompt cho từng shot...' } } : n));
+
+const systemPrompt = (node.data.systemPrompt || '').trim() || DEFAULT_DIRECTOR_SYSTEM_PROMPT;
+const shots = await textProvider.planShots({
+systemPrompt,
+notes: node.data.localPrompt || '',
+referenceImages,
+model: resolveTextModelId(node.data.model),
+});
+if (!shots.length) throw new Error('Gemini không trả về shot nào — thử lại hoặc bổ sung ý tưởng/ghi chú.');
+
+const scenes = shots.map((s, i) => ({ id: `S${String(i + 1).padStart(2, '0')}`, description: s.description, prompt: s.prompt }));
+
+setNodes(nds => nds.map(n => n.id === nodeId ? {
+...n,
+data: {
+...n.data, isLoading: false, statusText: 'Hoàn tất', isFinalized: true,
+lastRunHash: getNodeStateHash(node, currentEdges),
+result: { type: 'sceneList', scenes, style: positiveStyle || undefined }
+}
+} : n));
+return;
+}
+
 if (node.type === 'character') {
 const frontal = sourceImages[0];
 if (!frontal) throw new Error('Chưa có ảnh trực diện nào nối vào node này.');
@@ -1032,6 +1249,163 @@ throw err;
 }
 };
 
+// Ảnh base64 trong request payload xem trước dài hàng trăm nghìn ký tự,
+// không đọc được và làm chậm modal — thay bằng placeholder ghi rõ độ dài.
+// CHỈ redact đúng những field thực sự chứa base64 (theo TÊN field, không
+// theo độ dài chuỗi) — nếu redact theo độ dài sẽ vô tình nuốt luôn prompt
+// dài (VD prompt phân cảnh ghép nhiều đoạn dễ vượt vài trăm ký tự), làm
+// mất đúng thứ Huy cần soi. Giữ nguyên mọi field khác (aspectRatio,
+// referenceType, model, prompt...) để soi đúng cấu trúc request thật.
+const BASE64_PAYLOAD_KEYS = new Set(['bytesBase64Encoded', 'data']);
+const redactBase64ForPreview = (value: unknown, key?: string): unknown => {
+if (typeof value === 'string') {
+if (key && BASE64_PAYLOAD_KEYS.has(key) && value.length > 100) {
+return `<base64, ${value.length.toLocaleString('vi-VN')} ký tự — ẩn bớt để dễ đọc>`;
+}
+return value;
+}
+if (Array.isArray(value)) return value.map((v) => redactBase64ForPreview(v));
+if (value && typeof value === 'object') {
+return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactBase64ForPreview(v, k)]));
+}
+return value;
+};
+
+const requestPayloadFields = (url: string, body: unknown): { label: string; value: string }[] => [
+{ label: 'API URL', value: url },
+{ label: 'Request Payload (JSON)', value: JSON.stringify(redactBase64ForPreview(body), null, 2) },
+];
+
+/**
+ * Nội dung hiện ra ở popup debug (nút chỉ có lúc dev) — mỗi loại node gửi
+ * request khác nhau nên cần map riêng, KHÔNG dùng chung 1 field "prompt" cho
+ * tất cả: VD node Đạo Diễn thật ra gửi systemPrompt + notes riêng biệt cho
+ * Gemini, không đi qua finalPrompt/basePrompt như Image/Video/Text AI.
+ */
+const buildDebugFields = (node: Node, ctx: NodeRequestContext): { label: string; value: string }[] => {
+const common = [{ label: 'Model', value: node.data.model || '(chưa chọn)' }];
+const refCount = ctx.referenceImages?.length ?? 0;
+
+if (node.type === 'mediaGroup') {
+return [
+{ label: 'Số ảnh sẽ gộp', value: String(ctx.sourceImages.length) },
+{ label: 'Danh sách', value: ctx.sourceImages.length ? ctx.sourceImages.map((m, i) => `${i + 1}. ${m.path}`).join('\n') : '(chưa có ảnh nào nối vào)' },
+];
+}
+
+if (node.type === 'director') {
+return [
+...common,
+{ label: 'Prompt Hệ Thống', value: (node.data.systemPrompt || '').trim() || DEFAULT_DIRECTOR_SYSTEM_PROMPT },
+{ label: 'Ý tưởng / Ghi chú', value: node.data.localPrompt?.trim() || '(trống — tự đề xuất kịch bản từ đầu)' },
+{ label: 'Số ảnh tham chiếu gửi kèm', value: String(refCount) },
+];
+}
+
+if (node.type === 'character') {
+return [
+...common,
+{ label: 'Ảnh trực diện đầu vào', value: ctx.sourceImages.length > 0 ? 'Đã nối — dùng làm reference cho cả 3 góc bên dưới' : '(chưa nối — cần 1 ảnh ở chân "ảnh")' },
+...CHARACTER_ANGLES.map(a => ({ label: `Prompt góc "${a.label}" (cố định, không chỉnh trong Settings)`, value: a.prompt })),
+];
+}
+
+if (node.type === 'scenePlanner') {
+const sourceAudio = ctx.sourceAudios[0];
+const sourceVideo = ctx.sourceVideos[0];
+if (!sourceAudio?.timingSentences?.length) {
+return [
+...common,
+{ label: 'Trạng thái', value: 'Chưa có audio kèm mốc thời gian từng câu (timingSentences) nối vào — cần nối audio Vbee/Làm Đẹp Âm Thanh để xem trước được prompt thật.' },
+];
+}
+const skeleton = buildScenesSkeleton(
+sourceAudio.timingSentences,
+sourceAudio.durationSeconds ?? sourceAudio.timingSentences[sourceAudio.timingSentences.length - 1].end,
+node.data.targetSceneSeconds ?? 6.0,
+);
+const instruction = buildSceneDetailsInstruction(skeleton.map(s => ({ id: s.id, start: s.start, end: s.end, vo: s.vo })), ctx.positiveStyle || undefined);
+return [
+...common,
+{ label: 'Video gốc đầu vào', value: sourceVideo ? 'Đã nối' : '(chưa nối — cần video gốc để Gemini phân tích hình ảnh thật, không chỉ đoán qua lời thoại)' },
+{ label: `Khung phân cảnh dự kiến (${skeleton.length} cảnh, trước khi Gemini điền setting/subject/light/camera)`, value: skeleton.map(s => `${s.id} (${s.start}s → ${s.end}s): "${s.vo}"`).join('\n') },
+{ label: 'Prompt gửi kèm video cho Gemini', value: instruction },
+];
+}
+
+if (node.type === 'videoGen') {
+const isOmniFlash = node.data.model === 'Omni Flash';
+let firstFrame, lastFrame;
+if (node.data.videoMode === 'frame') {
+if (ctx.referenceImages?.[0]) firstFrame = ctx.referenceImages[0];
+if (ctx.referenceImages?.[1]) lastFrame = ctx.referenceImages[1];
+}
+const videoParams = {
+prompt: ctx.finalPrompt,
+negativePrompt: ctx.negativeStyle || undefined,
+model: resolveVideoModelId(node.data.model),
+aspectRatio: node.data.aspectRatio,
+resolution: node.data.resolution,
+firstFrame,
+lastFrame,
+referenceImages: node.data.videoMode === 'reference' ? ctx.referenceImages?.slice(0, 5) : undefined,
+durationSeconds: isOmniFlash ? Math.min(Math.max(node.data.duration ?? 8, 4), 10) : 8,
+};
+// Gọi ĐÚNG hàm dựng payload mà lúc chạy thật sẽ dùng (geminiVideoProvider/
+// geminiOmniFlashProvider) — preview không bao giờ lệch với request thật.
+const { url, body } = isOmniFlash ? buildOmniFlashRequestPayload(videoParams) : buildVideoRequestPayload(videoParams);
+return [
+...common,
+{ label: 'Prompt', value: ctx.finalPrompt },
+...(ctx.negativeStyle ? [{ label: 'Negative Prompt', value: ctx.negativeStyle }] : []),
+{ label: 'Chế độ', value: node.data.videoMode === 'frame' ? 'Khung (firstFrame/lastFrame từ ảnh)' : 'Tham chiếu' },
+{ label: 'Tỷ lệ / Độ phân giải', value: `${node.data.aspectRatio || '?'} · ${node.data.resolution || '?'}` },
+{ label: 'Thời lượng', value: isOmniFlash ? `${node.data.duration ?? 8}s` : '8s (cố định)' },
+{ label: 'Số ảnh tham chiếu gửi kèm', value: String(refCount) },
+...requestPayloadFields(url, body),
+];
+}
+
+if (node.type === 'imageGen') {
+const imageParams = {
+prompt: ctx.finalPrompt,
+negativePrompt: ctx.negativeStyle || undefined,
+referenceImages: ctx.referenceImages,
+aspectRatio: node.data.aspectRatio,
+model: resolveImageModelId(node.data.model),
+};
+const { url, body } = buildImageRequestPayload(imageParams);
+return [
+...common,
+{ label: 'Prompt', value: ctx.finalPrompt },
+...(ctx.negativeStyle ? [{ label: 'Negative Prompt', value: ctx.negativeStyle }] : []),
+{ label: 'Số ảnh tham chiếu gửi kèm', value: String(refCount) },
+...requestPayloadFields(url, body),
+];
+}
+
+// textGen và các loại còn lại — dùng GeminiTextProvider (generateContent với
+// cấu trúc khác Image/Video), chưa hiển thị payload thật ở đây.
+return [
+...common,
+{ label: 'Prompt', value: ctx.finalPrompt },
+...(ctx.negativeStyle ? [{ label: 'Negative Prompt', value: ctx.negativeStyle }] : []),
+{ label: 'Số ảnh tham chiếu gửi kèm', value: String(refCount) },
+];
+};
+
+const handlePreviewNodeRequest = useCallback(async (nodeId: string) => {
+try {
+const ctx = await buildNodeRequestContext(nodeId);
+if (!ctx) return;
+setDebugPreview({ label: ctx.node.data.label || ctx.node.type || 'Node', fields: buildDebugFields(ctx.node, ctx) });
+} catch (e: any) {
+setFlowStatus({ message: `LỖI XEM TRƯỚC REQUEST: ${e?.message || e}`, type: 'error' });
+setTimeout(() => setFlowStatus(null), 4000);
+}
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
 const executeWorkflow = useCallback(async (nodeIdsToRun: string[]) => {
 if (runningChain || activeJobsRef.current > 0 || nodeIdsToRun.length === 0) return;
 
@@ -1060,7 +1434,7 @@ const currentEdges = getEdges();
 const readyNodes = Array.from(remainingNodes).filter(id => {
 const node = currentNodes.find(n => n.id === id);
 if (!node) return false;
-if (node.type === 'mediaSource' || node.type === 'styleNode' || node.type === 'textReview' || node.type === 'sceneReview') {
+if (node.type === 'mediaSource' || node.type === 'styleNode' || node.type === 'textReview' || node.type === 'sceneReview' || node.type === 'scenePass') {
 completedNodes.add(id);
 remainingNodes.delete(id);
 return false;
@@ -1128,6 +1502,29 @@ setExecutionLogs(prev => [
 ]);
 }, []);
 
+// Chạy nhiều node đang chọn cùng lúc — gom "single mode" (node đó + tổ tiên
+// chưa xong) của TỪNG node lại thành 1 danh sách, rồi giao hết cho
+// executeWorkflow — bản thân executeWorkflow đã tự chạy song song theo đúng
+// giới hạn `concurrency` và tôn trọng thứ tự phụ thuộc giữa các node, không
+// cần tự viết logic song song riêng ở đây.
+const handleExecuteSelected = useCallback(() => {
+const currentNodes = getNodes();
+const currentEdges = getEdges();
+const selectedNodes = currentNodes.filter(n => n.selected);
+if (selectedNodes.length === 0) return;
+
+const targetSet = new Set<string>();
+selectedNodes.forEach(n => {
+const ancestors = getAncestors(n.id, currentNodes, currentEdges);
+ancestors.filter(id => {
+const a = currentNodes.find(item => item.id === id);
+return a && isNodeDirty(a, currentEdges);
+}).forEach(id => targetSet.add(id));
+targetSet.add(n.id);
+});
+executeWorkflow(Array.from(targetSet));
+}, [getNodes, getEdges, isNodeDirty, executeWorkflow]);
+
 const handleExecuteNode = (nodeId: string, mode: ExecutionMode = 'single') => {
 const currentNodes = getNodes();
 const currentEdges = getEdges();
@@ -1164,6 +1561,7 @@ setIsNodeLibraryOpen(false);
 };
 const hDup = (e: any) => onDuplicateNode(e.detail.nodeId);
 const hDown = (e: any) => handleDownloadNode(e.detail.nodeId);
+const hUpload = (e: any) => handleUploadNodeResult(e.detail.nodeId);
 const hVec = (e: any) => handleVectorizeNode(e.detail.nodeId);
 const hSceneEdit = (e: any) => {
 setActiveSceneEdit({ nodeId: e.detail.nodeId, sceneId: e.detail.sceneId });
@@ -1171,25 +1569,49 @@ setActiveSettingsNodeId(null);
 setActiveStyleSettingsNodeId(null);
 setIsNodeLibraryOpen(false);
 };
+const hDebugPreview = (e: any) => { handlePreviewNodeRequest(e.detail.nodeId); };
 
 window.addEventListener('execute-node' as any, hEx);
 window.addEventListener('open-preview' as any, hPrev);
 window.addEventListener('open-node-settings' as any, hSettings);
 window.addEventListener('duplicate-node' as any, hDup);
 window.addEventListener('download-node' as any, hDown);
+window.addEventListener('upload-node-result' as any, hUpload);
 window.addEventListener('vectorize-node' as any, hVec);
 window.addEventListener('open-scene-edit' as any, hSceneEdit);
+window.addEventListener('debug-node-request' as any, hDebugPreview);
 return () => {
 window.removeEventListener('execute-node' as any, hEx);
 window.removeEventListener('open-preview' as any, hPrev);
 window.removeEventListener('open-node-settings' as any, hSettings);
 window.removeEventListener('duplicate-node' as any, hDup);
 window.removeEventListener('download-node' as any, hDown);
+window.removeEventListener('upload-node-result' as any, hUpload);
 window.removeEventListener('vectorize-node' as any, hVec);
 window.removeEventListener('open-scene-edit' as any, hSceneEdit);
+window.removeEventListener('debug-node-request' as any, hDebugPreview);
 };
 // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [getNodes, getEdges, isNodeDirty, onDuplicateNode, handleDownloadNode, handleVectorizeNode]);
+}, [getNodes, getEdges, isNodeDirty, onDuplicateNode, handleDownloadNode, handleUploadNodeResult, handleVectorizeNode, handlePreviewNodeRequest]);
+
+// Tách riêng khỏi effect chung ở trên: effect đó có nhiều dependency dễ đổi
+// tham chiếu qua mỗi lần render (hàm useCallback lồng nhau), mỗi lần đổi là
+// gỡ hết listener rồi đăng ký lại — nếu đúng lúc đó có sự kiện hover-edge bắn
+// ra (di chuột nhanh qua nhiều icon nhỏ liền kề) thì sự kiện bị rớt mất giữa
+// khoảng gỡ/đăng ký lại, làm hoveredEdgeId kẹt sai giá trị mãi mãi (bug thật
+// Huy gặp: hết hover mà dây vẫn mờ như đang hover node khác). Effect riêng
+// này không phụ thuộc gì cả — chỉ đăng ký đúng 1 lần lúc mount, setHoveredEdgeId
+// từ useState luôn ổn định, không bao giờ bị gỡ/đăng ký lại giữa chừng.
+useEffect(() => {
+const hHoverEdge = (e: any) => {
+setHoveredEdgeId(prev => {
+if (e.detail.hovered) return e.detail.edgeId;
+return prev === e.detail.edgeId ? null : prev;
+});
+};
+window.addEventListener('hover-edge' as any, hHoverEdge);
+return () => window.removeEventListener('hover-edge' as any, hHoverEdge);
+}, []);
 
 const handleSaveSettings = useCallback(async (next: AppSettings) => {
 setAppSettings(next);
@@ -1208,7 +1630,7 @@ concurrency={concurrency} onChangeConcurrency={() => {}}
 onRunPipeline={() => {
 const currentNodes = getNodes();
 const currentEdges = getEdges();
-const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt' || n.type === 'vbee' || n.type === 'audioMaster' || n.type === 'scenePlanner' || n.type === 'character') && isNodeDirty(n, currentEdges));
+const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt' || n.type === 'vbee' || n.type === 'audioMaster' || n.type === 'scenePlanner' || n.type === 'character' || n.type === 'director' || n.type === 'mediaGroup') && isNodeDirty(n, currentEdges));
 const ids = new Set<string>();
 dirty.forEach(n => { ids.add(n.id); getDescendants(n.id, currentNodes, currentEdges).forEach(d => ids.add(d)); });
 executeWorkflow(Array.from(ids));
@@ -1244,7 +1666,7 @@ className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all
 <span className="material-symbols-outlined text-[18px]">download</span>
 </button>
 <button onClick={handleExportAll} title="Xuất tất cả workflow (backup)" className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#F1641E]/10 border border-[#F1641E]/20 hover:bg-[#F1641E]/20 transition-all text-[#F1641E]">
-<span className="material-symbols-outlined text-[18px]">backup</span>
+<span className="material-symbols-outlined text-[18px]">download_for_offline</span>
 </button>
 <div className="w-8 h-[1px] bg-white/10 my-1" />
 <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} title="Cài đặt" className="w-9 h-9 rounded-lg flex items-center justify-center bg-white/[0.03] border border-white/10 text-[#94a3b8] hover:text-white hover:bg-white/10 transition-all">
@@ -1254,7 +1676,7 @@ className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all
 </div>
 <div className="flex-1 relative bg-[#1C1C1C] flex">
 {isNodeLibraryOpen && <NodeLibraryPanel onAdd={(type) => onAddManualNode(type)} onClose={() => setIsNodeLibraryOpen(false)} />}
-{activeSettingsNodeId && <NodeSettingsPanel nodeId={activeSettingsNodeId} nodes={nodes} onUpdateData={(id, key, val) => {
+{activeSettingsNodeId && <NodeSettingsPanel nodeId={activeSettingsNodeId} nodes={nodes} edges={edges} onUpdateData={(id, key, val) => {
 setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, [key]: val } } : n));
 if (key === 'characterCount') {
 // Giảm số nhân vật thì xoá luôn dây đang nối vào các chân bị mất, không để treo lơ lửng.
@@ -1264,7 +1686,7 @@ const idx = parseInt(e.targetHandle.replace('character-in-', ''), 10);
 return idx < val;
 }));
 }
-}} onClose={() => setActiveSettingsNodeId(null)} />}
+}} onDisconnectSceneIn={(id) => setEdges(eds => eds.filter(e => !(e.target === id && e.targetHandle === 'scene-in')))} onClose={() => setActiveSettingsNodeId(null)} />}
 {activeStyleSettingsNodeId && <StyleSettingsModal isOpen={!!activeStyleSettingsNodeId} nodeId={activeStyleSettingsNodeId} nodes={nodes} onUpdate={(id, key, val) => setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, [key]: val } } : n))} onClose={() => setActiveStyleSettingsNodeId(null)} />}
 {activeSceneEdit && <SceneEditPanel
 nodeId={activeSceneEdit.nodeId}
@@ -1279,6 +1701,7 @@ onClose={() => setActiveSceneEdit(null)}
 />}
 {isLogPanelOpen && <ExecutionLogPanel logs={executionLogs} onClear={() => setExecutionLogs([])} onClose={() => setIsLogPanelOpen(false)} />}
 {isSettingsOpen && <SettingsPanel settings={appSettings} onSave={handleSaveSettings} onClose={() => setIsSettingsOpen(false)} filenamePrefix={filenamePrefix} onChangePrefix={setFilenamePrefix} />}
+<HoveredEdgeContext.Provider value={hoveredEdgeId}>
 <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
 onConnect={handleConnect}
 onPaneContextMenu={(e) => { e.preventDefault(); const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY }); setMenuState({ x: e.clientX, y: e.clientY, flowPos, visible: true }); }}
@@ -1292,19 +1715,86 @@ proOptions={{ hideAttribution: true }}
 <Controls showInteractive={false} position="bottom-left" />
 <Panel position="bottom-right" className="m-4"><BatchExportPanel nodes={nodes} globalPrefix={filenamePrefix} /></Panel>
 {nodes.some(n => n.selected) && (
-<Panel position="top-center" className="m-4">
+<Panel position="top-center" className="m-4 flex items-center gap-2">
 <button
-onClick={handleFanOutFromSelection}
+onClick={handleExecuteSelected}
+disabled={runningChain}
+className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 disabled:opacity-30 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95 border border-white/10"
+title="Chạy tất cả node đang chọn cùng lúc (kèm tổ tiên chưa xong của từng node) — chạy song song theo giới hạn concurrency, vẫn tôn trọng thứ tự phụ thuộc giữa các node."
+>
+<span className="material-symbols-outlined text-[16px]">play_arrow</span>
+Chạy {nodes.filter(n => n.selected).length} node đã chọn
+</button>
+<button
+onClick={handleCloneSelection}
 className="flex items-center gap-2 px-4 py-2.5 bg-[#F1641E] hover:bg-[#F1641E]/80 text-black rounded-xl text-[10px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95"
-title="Nhân bản các node đang chọn thành nhiều bản, mỗi bản 1 phân cảnh — điểm vào của chain sẽ tự nhận prompt riêng từng cảnh"
+title="Nhân bản các node đang chọn thành 1 bản mới, giữ nguyên dây nối (Style/Nhân Vật...). Bấm nhiều lần để ra nhiều bản. Muốn 1 node lấy prompt theo cảnh nào thì tự kéo dây từ chân cảnh (Duyệt Phân Cảnh) vào chân scene-in của node đó."
 >
 <span className="material-symbols-outlined text-[16px]">content_copy</span>
-Nhân bản theo phân cảnh
+Nhân bản cụm
 </button>
 </Panel>
 )}
 </ReactFlow>
+</HoveredEdgeContext.Provider>
 {menuState && <ContextMenu x={menuState.x} y={menuState.y} onAddManualNode={(type) => onAddManualNode(type, menuState.flowPos)} onClose={() => setMenuState(null)} />}
+{pendingSceneConnection && (
+<div className="fixed inset-0 z-[100000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+<div className="w-full max-w-sm bg-[#0b1019] border border-[#F1641E]/20 rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
+<div className="flex items-center gap-2.5">
+<span className="material-symbols-outlined text-[#F1641E] text-xl">warning</span>
+<h3 className="text-[12px] font-black text-white uppercase tracking-widest">Ghi đè prompt?</h3>
+</div>
+<p className="text-[11px] text-white/60 leading-relaxed">
+Node "<span className="text-white font-bold">{pendingSceneConnection.targetLabel}</span>" đang có sẵn prompt riêng. Nối cảnh "<span className="text-white font-bold">{pendingSceneConnection.sceneLabel}</span>" vào sẽ khiến prompt của cảnh được dùng thay thế lúc chạy — prompt hiện tại vẫn còn lưu, không mất, chỉ không dùng tới cho tới khi bạn xoá dây này.
+</p>
+<p className="text-[10px] text-white/30 italic leading-relaxed line-clamp-3 bg-black/40 rounded-xl p-2.5 border border-white/5">
+"{pendingSceneConnection.existingPrompt}"
+</p>
+<div className="flex gap-3 mt-1">
+<button
+onClick={() => setPendingSceneConnection(null)}
+className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-[10px] font-black uppercase tracking-widest transition-all"
+>
+Huỷ
+</button>
+<button
+onClick={() => { addConnectionEdge(pendingSceneConnection.connection, true); setPendingSceneConnection(null); }}
+className="flex-1 py-2.5 rounded-xl bg-[#F1641E] hover:bg-[#F1641E]/80 text-black text-[10px] font-black uppercase tracking-widest transition-all"
+>
+Đồng ý, nối dây
+</button>
+</div>
+</div>
+</div>
+)}
+{debugPreview && (
+<div className="fixed inset-0 z-[100000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+<div className="w-full max-w-lg bg-[#0b1019] border border-amber-500/30 rounded-2xl shadow-2xl p-6 flex flex-col gap-4 max-h-[85vh]">
+<div className="flex items-center justify-between shrink-0">
+<div className="flex items-center gap-2.5">
+<span className="material-symbols-outlined text-amber-400 text-xl">bug_report</span>
+<div>
+<h3 className="text-[12px] font-black text-white uppercase tracking-widest">Xem trước request (dev)</h3>
+<p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] mt-0.5">{debugPreview.label}</p>
+</div>
+</div>
+<button onClick={() => setDebugPreview(null)} className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-all">
+<span className="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4 pr-1">
+{debugPreview.fields.map((f, i) => (
+<div key={i} className="flex flex-col gap-1.5">
+<span className="text-[9px] font-black text-amber-400/80 uppercase tracking-widest">{f.label}</span>
+<p className="text-[11px] text-white/80 leading-relaxed whitespace-pre-wrap bg-black/40 border border-white/5 rounded-xl p-3 font-mono">{f.value}</p>
+</div>
+))}
+</div>
+<p className="text-[9px] text-white/20 leading-relaxed shrink-0">Không gọi API — chỉ tính lại đúng nội dung sẽ gửi nếu bạn bấm chạy node này ngay bây giờ.</p>
+</div>
+</div>
+)}
 {isBatchCombinedModalOpen && <BatchCombinedModal prefix={filenamePrefix} onChangePrefix={setFilenamePrefix} onConfirm={handleBatchConfirm} onCancel={() => setIsBatchCombinedModalOpen(false)} />}
 {pendingImport?.kind === 'single' && (
 <ImportChoiceModal

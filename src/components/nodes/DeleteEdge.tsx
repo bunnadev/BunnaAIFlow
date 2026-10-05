@@ -5,6 +5,7 @@ getBezierPath,
 EdgeLabelRenderer,
 useReactFlow,
 } from 'reactflow';
+import { useHoveredEdgeId } from '../../lib/edgeHoverContext';
 
 export default function DeleteEdge({
 id,
@@ -19,6 +20,7 @@ markerEnd,
 }: EdgeProps) {
 const { setEdges } = useReactFlow();
 const [isHovered, setIsHovered] = useState(false);
+const hoveredEdgeId = useHoveredEdgeId();
 const [edgePath, labelX, labelY] = getBezierPath({
 sourceX,
 sourceY,
@@ -33,12 +35,20 @@ evt.stopPropagation();
 setEdges((edges) => edges.filter((edge) => edge.id !== id));
 };
 
+// Dim theo hover trên icon tham chiếu ở node (xem App.tsx HoveredEdgeContext)
+// — đọc qua Context thay vì edge.data để không đụng vào state gốc của edge.
+const isDimmed = hoveredEdgeId !== null && hoveredEdgeId !== id;
+const renderStyle = {
+...style,
+...(isDimmed && { opacity: 0.15 }),
+};
+
 return (
 <>
 {/* Path thực tế */}
 <path
 id={id}
-style={style}
+style={renderStyle}
 className="react-flow__edge-path"
 d={edgePath}
 markerEnd={markerEnd}

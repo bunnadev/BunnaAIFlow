@@ -3,10 +3,11 @@ import type { Node, Edge, Connection } from 'reactflow';
 /** Node nào có chân nối (targetHandle) nào — dùng để biết node đang chọn có tương thích với chân vừa kéo dây tới hay không. */
 export function nodeHasHandle(node: Node, handleId: string): boolean {
   const type = node.type;
-  if (handleId === 'media-in') return ['imageGen', 'videoGen', 'textGen', 'stt', 'audioMaster', 'scenePlanner', 'character'].includes(type as string);
-  if (handleId === 'style-in') return ['imageGen', 'videoGen', 'scenePlanner'].includes(type as string);
+  if (handleId === 'media-in') return ['imageGen', 'videoGen', 'textGen', 'stt', 'audioMaster', 'scenePlanner', 'character', 'director', 'mediaGroup'].includes(type as string);
+  if (handleId === 'style-in') return ['imageGen', 'videoGen', 'scenePlanner', 'director'].includes(type as string);
   if (handleId === 'text-in') return type === 'textReview' || type === 'vbee';
   if (handleId === 'scenes-in') return type === 'sceneReview';
+  if (handleId === 'scene-in') return ['imageGen', 'videoGen', 'textGen', 'scenePass'].includes(type as string);
   if (handleId.startsWith('character-in-')) {
     const idx = parseInt(handleId.replace('character-in-', ''), 10);
     return (type === 'imageGen' || type === 'videoGen') && ((node.data as any)?.characterCount ?? 0) > idx;

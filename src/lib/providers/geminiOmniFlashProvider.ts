@@ -24,6 +24,57 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
+export interface OmniFlashRequestPayload {
+  url: string;
+  body: Record<string, unknown>;
+}
+
+// Tách riêng phần dựng request khỏi generateVideo() — cùng lý do với
+// buildVideoRequestPayload trong geminiVideoProvider.ts: nút xem trước
+// request (App.tsx) gọi đúng hàm này nên không bao giờ lệch với request
+// thật sự gửi đi.
+export function buildOmniFlashRequestPayload(params: VideoGenParams): OmniFlashRequestPayload {
+  let promptText = params.prompt;
+  if (params.negativePrompt?.trim()) {
+    promptText += `\n\nTránh các yếu tố sau: ${params.negativePrompt.trim()}`;
+  }
+
+  const images = [params.firstFrame, params.lastFrame, ...(params.referenceImages ?? [])].filter(
+    (img): img is NonNullable<typeof img> => !!img,
+  );
+
+  const input: unknown[] = images.map((img) => ({
+    type: 'image',
+    data: img.base64,
+    mime_type: img.mimeType,
+  }));
+  input.push({ type: 'text', text: promptText });
+
+  const task = params.firstFrame || params.lastFrame
+    ? 'image_to_video'
+    : params.referenceImages?.length
+    ? 'reference_to_video'
+    : 'text_to_video';
+
+  const resolution = RESOLUTION_MAP[params.resolution ?? '720p'] ?? '720p';
+
+  return {
+    url: `${API_BASE}/interactions`,
+    body: {
+      model: params.model,
+      input,
+      response_format: {
+        type: 'video',
+        aspect_ratio: params.aspectRatio,
+        resolution,
+        delivery: 'uri',
+        duration: `${params.durationSeconds}s`,
+      },
+      generation_config: { video_config: { task } },
+    },
+  };
+}
+
 /**
  * Gọi Gemini Omni Flash qua "Interactions API" (POST /v1beta/interactions) —
  * KHÔNG phải Veo, khác hẳn cấu trúc request/response với GeminiVideoProvider.
@@ -33,11 +84,13 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  * CHƯA test bằng key thật — cần Huy tự chạy thử và debug lại field chính xác
  * (đặc biệt phần poll file ACTIVE và map resolution) khi tới lượt test.
  *
- * Thời lượng: docs công khai KHÔNG liệt kê rõ tên tham số durationSeconds
- * cho Interactions API (khác Veo dùng durationSeconds trong `parameters`),
- * nhưng UI thật của Google Flow cho chọn 4/6/8/10s ở model này, nên tạm gửi
- * `duration_seconds` trong generation_config.video_config (đoán theo quy ước
- * snake_case của API này) — CẦN xác nhận lại tên field thật khi Huy test.
+ * Thời lượng: XÁC NHẬN qua tài liệu tham chiếu chính thức
+ * (ai.google.dev/api/interactions-api) — generation_config.video_config CHỈ
+ * có field `task`, không có duration nào. Tham số thời lượng thật ra nằm ở
+ * response_format (VideoResponseFormat), field `duration`, kiểu string dạng
+ * "8s" (số giây + hậu tố "s"), không phải số nguyên. Lỗi 400 trước đó
+ * ("Unknown parameter 'duration_seconds' at 'generation_config.video_config'")
+ * là do đặt sai chỗ + sai kiểu — đã sửa theo đúng field thật.
  */
 export class GeminiOmniFlashProvider implements VideoGenProvider {
   constructor(private apiKey: string) {}
@@ -47,47 +100,15 @@ export class GeminiOmniFlashProvider implements VideoGenProvider {
       throw new Error('Chưa có Gemini API key. Vào Settings để nhập.');
     }
 
-    let promptText = params.prompt;
-    if (params.negativePrompt?.trim()) {
-      promptText += `\n\nTránh các yếu tố sau: ${params.negativePrompt.trim()}`;
-    }
+    const { url, body } = buildOmniFlashRequestPayload(params);
 
-    const images = [params.firstFrame, params.lastFrame, ...(params.referenceImages ?? [])].filter(
-      (img): img is NonNullable<typeof img> => !!img,
-    );
-
-    const input: unknown[] = images.map((img) => ({
-      type: 'image',
-      data: img.base64,
-      mime_type: img.mimeType,
-    }));
-    input.push({ type: 'text', text: promptText });
-
-    const task = params.firstFrame || params.lastFrame
-      ? 'image_to_video'
-      : params.referenceImages?.length
-      ? 'reference_to_video'
-      : 'text_to_video';
-
-    const resolution = RESOLUTION_MAP[params.resolution ?? '720p'] ?? '720p';
-
-    const startRes = await fetch(`${API_BASE}/interactions`, {
+    const startRes = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-goog-api-key': this.apiKey,
       },
-      body: JSON.stringify({
-        model: params.model,
-        input,
-        response_format: {
-          type: 'video',
-          aspect_ratio: params.aspectRatio,
-          resolution,
-          delivery: 'uri',
-        },
-        generation_config: { video_config: { task, duration_seconds: params.durationSeconds } },
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!startRes.ok) {

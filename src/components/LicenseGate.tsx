@@ -10,6 +10,7 @@ const RECHECK_INTERVAL_MS = 30 * 60 * 1000;
 interface ValidateResult {
   valid: boolean;
   message: string;
+  definitive: boolean;
 }
 
 const LicenseGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -21,18 +22,22 @@ const LicenseGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const runValidation = async (pub: string, sec: string) => {
     setValidating(true);
-    setError(null);
     try {
       const result = await invoke<ValidateResult>('validate_license', { publicKey: pub, secretKey: sec });
       if (result.valid) {
         setStatus('unlocked');
+        setError(null);
       } else {
-        setStatus('locked');
         setError(result.message);
+        // Chỉ khoá phiên đang mở khi server THẬT SỰ xác nhận key sai
+        // (definitive). Lỗi mạng/lỗi tạm thời phía server trong lần kiểm tra
+        // định kỳ không được phép đá người dùng ra giữa lúc đang làm việc —
+        // giữ nguyên trạng thái unlocked, app sẽ tự thử lại ở lần recheck sau.
+        setStatus((prev) => (result.definitive || prev !== 'unlocked') ? 'locked' : prev);
       }
     } catch (e: any) {
-      setStatus('locked');
       setError(e?.message || 'Không xác thực được license.');
+      setStatus((prev) => prev !== 'unlocked' ? 'locked' : prev);
     } finally {
       setValidating(false);
     }

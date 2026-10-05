@@ -10,8 +10,13 @@
     "fs:allow-app-write-recursive",
     "fs:allow-mkdir",
     "fs:allow-exists",
+    "fs:allow-read-file",
     "dialog:allow-open",
     "dialog:allow-save",
+    {
+      "identifier": "fs:scope",
+      "allow": ["$HOME/**"]
+    },
     {
       "identifier": "http:default",
       "allow": [

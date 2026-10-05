@@ -4,8 +4,8 @@ import type { ImageGenProvider, ImageGenParams, GenResult } from './types';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 /**
- * Gọi Gemini API để tạo ảnh (model họ "Nano Banana": gemini-3-pro-image-preview,
- * gemini-3-1-flash-image...). Gemini không có tham số negative-prompt riêng như
+ * Gọi Gemini API để tạo ảnh (model họ "Nano Banana": gemini-3-pro-image,
+ * gemini-3.1-flash-image...). Gemini không có tham số negative-prompt riêng như
  * các API diffusion cổ điển — cách đúng với model đa phương thức kiểu này là gộp
  * ràng buộc âm vào cuối câu lệnh tự nhiên ("Tránh: ...").
  *
@@ -13,6 +13,40 @@ const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
  * (đặc biệt `imageConfig.aspectRatio`) cần đối chiếu lại với tài liệu Gemini API
  * hiện hành và test bằng key thật — có thể cần chỉnh khi thấy lỗi 400 từ API.
  */
+export interface GeminiImageRequestPayload {
+  url: string;
+  body: Record<string, unknown>;
+}
+
+// Tách riêng phần dựng request khỏi generateImage() — nút xem trước request
+// (App.tsx) gọi đúng hàm này nên preview không bao giờ lệch với request
+// thật sự gửi đi, cùng cách làm với geminiVideoProvider.ts.
+export function buildImageRequestPayload(params: ImageGenParams): GeminiImageRequestPayload {
+  const parts: Record<string, unknown>[] = [];
+  for (const ref of params.referenceImages ?? []) {
+    parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.base64 } });
+  }
+
+  let promptText = params.prompt;
+  if (params.negativePrompt?.trim()) {
+    promptText += `\n\nTránh các yếu tố sau: ${params.negativePrompt.trim()}`;
+  }
+  parts.push({ text: promptText });
+
+  return {
+    url: `${API_BASE}/models/${params.model}:generateContent`,
+    body: {
+      contents: [{ parts }],
+      generationConfig: {
+        responseModalities: ['IMAGE'],
+        imageConfig: {
+          aspectRatio: params.aspectRatio,
+        },
+      },
+    },
+  };
+}
+
 export class GeminiImageProvider implements ImageGenProvider {
   constructor(private apiKey: string) {}
 
@@ -21,28 +55,9 @@ export class GeminiImageProvider implements ImageGenProvider {
       throw new Error('Chưa có Gemini API key. Vào Settings để nhập.');
     }
 
-    const parts: Record<string, unknown>[] = [];
-    for (const ref of params.referenceImages ?? []) {
-      parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.base64 } });
-    }
+    const { url, body } = buildImageRequestPayload(params);
 
-    let promptText = params.prompt;
-    if (params.negativePrompt?.trim()) {
-      promptText += `\n\nTránh các yếu tố sau: ${params.negativePrompt.trim()}`;
-    }
-    parts.push({ text: promptText });
-
-    const body = {
-      contents: [{ parts }],
-      generationConfig: {
-        responseModalities: ['IMAGE'],
-        imageConfig: {
-          aspectRatio: params.aspectRatio,
-        },
-      },
-    };
-
-    const res = await fetch(`${API_BASE}/models/${params.model}:generateContent`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

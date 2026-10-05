@@ -116,7 +116,7 @@ const SttNode = ({ id, data }: any) => {
 
       <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col gap-4 -translate-x-2 pointer-events-none z-50">
         <div className="flex items-center gap-1.5">
-          <Handle type="target" position={Position.Left} id="media-in" className="!bg-[#22c55e] !w-2 !h-2 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+          <Handle type="target" position={Position.Left} id="media-in" className="!bg-[#22c55e] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />
           <span className="text-[7px] font-black text-white/30 lowercase tracking-[0.1em] -translate-y-[0.5px]">video/audio</span>
         </div>
       </div>
@@ -216,7 +216,7 @@ const SttNode = ({ id, data }: any) => {
       </div>
 
       <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center translate-x-2 pointer-events-none z-50">
-        <Handle type="source" position={Position.Right} id="text-out" className="!bg-[#22c55e] !w-2 !h-2 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+        <Handle type="source" position={Position.Right} id="text-out" className="!bg-[#22c55e] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />
       </div>
     </div>
   );

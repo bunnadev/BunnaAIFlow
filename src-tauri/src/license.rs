@@ -13,6 +13,18 @@ const LICENSE_API_BASE: &str = "https://dev_api.bunna.dev";
 pub struct LicenseResult {
     pub valid: bool,
     pub message: String,
+    /// true = server đã thực sự xác nhận access key sai (nên khoá app ngay).
+    /// false = lỗi mạng hoặc lỗi tạm thời phía server khi đang kiểm tra lại
+    /// định kỳ — không phải key sai, nên KHÔNG được khoá phiên đang mở.
+    pub definitive: bool,
+}
+
+/// Body lỗi server license trả về, dùng để phân biệt "key thật sự sai" với
+/// "server đang tự gặp sự cố" (error = INTERNAL_ERROR) — 2 trường hợp cần xử
+/// lý khác nhau ở phía app.
+#[derive(Deserialize, Default)]
+struct LicenseErrorBody {
+    error: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -45,7 +57,7 @@ fn sign(secret_key: &str, method: &str, path: &str) -> Result<(String, String), 
 #[tauri::command]
 pub async fn validate_license(public_key: String, secret_key: String) -> Result<LicenseResult, String> {
     if public_key.trim().is_empty() || secret_key.trim().is_empty() {
-        return Ok(LicenseResult { valid: false, message: "Chưa nhập access key.".into() });
+        return Ok(LicenseResult { valid: false, message: "Chưa nhập access key.".into(), definitive: true });
     }
 
     let path = "/license/aiflow/validate";
@@ -62,23 +74,36 @@ pub async fn validate_license(public_key: String, secret_key: String) -> Result<
         .await
     {
         Ok(r) => r,
-        Err(e) => {
+        Err(_) => {
             return Ok(LicenseResult {
                 valid: false,
-                message: format!("Không kết nối được server license: {}", e),
+                message: "Không kết nối được server license. Kiểm tra kết nối mạng, app sẽ tự thử lại.".into(),
+                definitive: false,
             })
         }
     };
 
     if resp.status().is_success() {
-        Ok(LicenseResult { valid: true, message: "OK".into() })
+        Ok(LicenseResult { valid: true, message: "OK".into(), definitive: true })
     } else {
         let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        Ok(LicenseResult {
-            valid: false,
-            message: format!("Access key không hợp lệ ({}): {}", status, body),
-        })
+        let body_text = resp.text().await.unwrap_or_default();
+        let parsed: LicenseErrorBody = serde_json::from_str(&body_text).unwrap_or_default();
+
+        // "INTERNAL_ERROR" nghĩa là chính server license đang lỗi, không phải
+        // access key sai — cùng với mọi lỗi 5xx, đây là lỗi tạm thời phía
+        // server, KHÔNG nên khoá phiên đang mở. Chỉ 401/403 kèm lý do xác thực
+        // thật sự mới coi là key sai và khoá ngay.
+        let is_server_side_issue = status.is_server_error() || parsed.error.as_deref() == Some("INTERNAL_ERROR");
+        let is_auth_rejection = (status.as_u16() == 401 || status.as_u16() == 403) && !is_server_side_issue;
+
+        let message = if is_auth_rejection {
+            "Access key không hợp lệ hoặc đã bị thu hồi. Kiểm tra lại key hoặc liên hệ để được cấp key mới.".to_string()
+        } else {
+            "Không xác thực được access key do server license đang gặp sự cố tạm thời. App sẽ tự thử lại sau.".to_string()
+        };
+
+        Ok(LicenseResult { valid: false, message, definitive: is_auth_rejection })
     }
 }
 

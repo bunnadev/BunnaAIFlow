@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react';
-import { Handle, Position, useReactFlow, useEdges, useNodes } from 'reactflow';
+import React, { useEffect, useMemo } from 'react';
+import { Handle, Position, useReactFlow, useEdges, useNodes, useUpdateNodeInternals } from 'reactflow';
 
 const SceneReviewNode = ({ id, data }: any) => {
-  const { setNodes, deleteElements } = useReactFlow();
+  const { setNodes, setEdges, deleteElements } = useReactFlow();
   const edges = useEdges();
   const nodes = useNodes();
+  const updateNodeInternals = useUpdateNodeInternals();
 
   const incomingScenes = useMemo(() => {
     const edge = edges.find(e => e.target === id && e.targetHandle === 'scenes-in');
@@ -17,7 +18,18 @@ const SceneReviewNode = ({ id, data }: any) => {
 
   const editedScenes: any[] = data.editedScenes ?? [];
 
+  // Mỗi cảnh có 1 cổng ra riêng (scene-out-<id>) — số cổng đổi theo số cảnh,
+  // ReactFlow cần được báo lại (giống chân character-in-N) không thì dây nối
+  // cũ vẽ sai vị trí trên canvas.
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [editedScenes.length, id, updateNodeInternals]);
+
+  // Đổi danh sách cảnh xong luôn dọn theo dây nào đang nối vào cổng ra của
+  // cảnh không còn tồn tại nữa (VD scene-in của 1 node Image/Video AI) — nếu
+  // không dây đó treo lơ lửng, trỏ vào 1 cổng đã biến mất.
   const setScenes = (scenes: any[]) => {
+    const validIds = new Set(scenes.map((s) => s.id));
     setNodes((nds) =>
       nds.map((node) =>
         node.id === id
@@ -25,12 +37,22 @@ const SceneReviewNode = ({ id, data }: any) => {
           : node
       )
     );
+    setEdges((eds) => eds.filter((edge) => {
+      if (edge.source !== id || !edge.sourceHandle?.startsWith('scene-out-')) return true;
+      return validIds.has(edge.sourceHandle.replace('scene-out-', ''));
+    }));
   };
 
   const onPullFromInput = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!incomingScenes) return;
     setScenes(incomingScenes.map((s) => ({ ...s })));
+    // Lưu lại đúng bản vừa lấy để so sánh phát hiện "có bản mới" sau này —
+    // KHÔNG so với editedScenes (sẽ luôn khác ngay khi bạn tự sửa/xoá cảnh,
+    // báo động giả liên tục). So với bản đã lấy lần trước thì chỉ báo đúng
+    // khi thượng nguồn THẬT SỰ chạy lại ra kết quả khác, không quan tâm bạn
+    // đã tự chỉnh sửa gì sau đó.
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, lastPulledScenes: incomingScenes } } : n));
   };
 
   const onRemoveScene = (e: React.MouseEvent, sceneId: string) => {
@@ -63,7 +85,10 @@ const SceneReviewNode = ({ id, data }: any) => {
   };
 
   const incomingCount = incomingScenes?.length ?? 0;
-  const hasNewUpstream = incomingScenes !== null && incomingCount !== editedScenes.length;
+  // So với bản ĐÃ LẤY lần gần nhất (không phải editedScenes) — tự sửa/xoá
+  // cảnh sau khi lấy không làm chấm báo động bật sai; chỉ bật khi thượng
+  // nguồn thật sự có kết quả khác bản đã lấy (kể cả khi số cảnh không đổi).
+  const hasNewUpstream = incomingScenes !== null && JSON.stringify(incomingScenes) !== JSON.stringify(data.lastPulledScenes ?? null);
 
   return (
     <div className="node-container !bg-[#0d1424] !border-[#f43f5e]/20 !w-[300px] !p-0 overflow-hidden group/node">
@@ -90,7 +115,7 @@ const SceneReviewNode = ({ id, data }: any) => {
 
       <div className="absolute left-0 top-1/2 -translate-y-1/2 flex flex-col gap-4 -translate-x-2 pointer-events-none z-50">
         <div className="flex items-center gap-1.5">
-          <Handle type="target" position={Position.Left} id="scenes-in" className="!bg-[#f43f5e] !w-2 !h-2 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+          <Handle type="target" position={Position.Left} id="scenes-in" className="!bg-[#f43f5e] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />
           <span className="text-[7px] font-black text-white/30 lowercase tracking-[0.1em] -translate-y-[0.5px]">scenes</span>
         </div>
       </div>
@@ -119,15 +144,25 @@ const SceneReviewNode = ({ id, data }: any) => {
             {editedScenes.map((s: any) => (
               <div key={s.id} className="bg-black/40 border border-white/5 rounded-xl px-2.5 py-2 flex items-start gap-2 group/scene">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[8px] font-black text-[#f43f5e]">{s.id}</span>
-                    <span className="text-[7px] text-white/30 font-mono">{s.start}s → {s.end}s · {s.veo}s clip</span>
-                  </div>
-                  <p className="text-[8.5px] text-white/70 leading-snug mt-0.5">{s.vo}</p>
-                  {(s.setting || s.subject || s.light || s.camera) && (
-                    <p className="text-[7px] text-white/30 leading-snug mt-1 italic truncate">
-                      {[s.setting, s.subject, s.light, s.camera].filter(Boolean).join(' · ')}
-                    </p>
+                  {s.description !== undefined ? (
+                    <>
+                      <span className="text-[8px] font-black text-[#f43f5e]">{s.id}</span>
+                      <p className="text-[8.5px] text-white/70 leading-snug mt-0.5">{s.description}</p>
+                      {s.prompt && <p className="text-[7px] text-white/30 leading-snug mt-1 italic line-clamp-2">{s.prompt}</p>}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-black text-[#f43f5e]">{s.id}</span>
+                        <span className="text-[7px] text-white/30 font-mono">{s.start}s → {s.end}s · {s.veo}s clip</span>
+                      </div>
+                      <p className="text-[8.5px] text-white/70 leading-snug mt-0.5">{s.vo}</p>
+                      {(s.setting || s.subject || s.light || s.camera) && (
+                        <p className="text-[7px] text-white/30 leading-snug mt-1 italic truncate">
+                          {[s.setting, s.subject, s.light, s.camera].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
                 <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover/scene:opacity-100 transition-all">
@@ -162,8 +197,13 @@ const SceneReviewNode = ({ id, data }: any) => {
         )}
       </div>
 
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center translate-x-2 pointer-events-none z-50">
-        <Handle type="source" position={Position.Right} id="scenes-out" className="!bg-[#f43f5e] !w-2 !h-2 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col gap-2 translate-x-2 pointer-events-none z-50">
+        {editedScenes.map((s: any) => (
+          <div key={`out-${s.id}`} className="flex items-center gap-1.5" title={s.description || s.vo || s.id}>
+            <span className="text-[7px] font-black text-white/30 lowercase tracking-[0.1em]">{s.id}</span>
+            <Handle type="source" position={Position.Right} id={`scene-out-${s.id}`} className="!bg-[#f43f5e] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+          </div>
+        ))}
       </div>
     </div>
   );

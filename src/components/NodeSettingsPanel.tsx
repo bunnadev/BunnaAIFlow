@@ -1,33 +1,27 @@
 import React from 'react';
 import { FieldDropdown, SegmentedToggle, RangeSlider, SectionLabel } from './UI';
 import { VBEE_VOICE_NAMES } from '../lib/vbeeVoices';
+import { resolveConnectedScene, composeScenePrompt } from '../lib/sceneGrouping';
 
 interface Props {
 nodeId: string;
 nodes: any[];
+edges: any[];
 onUpdateData: (id: string, key: string, val: any) => void;
+onDisconnectSceneIn: (nodeId: string) => void;
 onClose: () => void;
 }
 
 const VIDEO_MODELS = ['Omni Flash', 'Veo 3.1 - Fast', 'Veo 3.1 - Lite', 'Veo 3.1 - Quality'];
 const IMAGE_MODELS = ['Nano Banana Pro', 'Nano Banana 2', 'Nano Banana 2 Lite'];
 const TEXT_MODELS = ['Gemini 2.5 Flash', 'Gemini 3.6 Flash', 'Gemini 3.7 Flash', 'Gemini 3 Pro'];
-const VOICES = [
-"Zephyr — Sáng", "Puck — Vui vẻ", "Charon — Thông tin", "Kore — Cương quyết",
-"Fenrir — Phấn khích", "Leda — Trẻ trung", "Orus — Cương quyết", "Aoede — Nhẹ nhàng",
-"Callirrhoe — Dễ gần", "Autonoe — Sáng", "Enceladus — Hơi nhẹ",
-"Iapetus — Rõ ràng", "Umbriel — Dễ gần", "Algieba — Mượt màng",
-"Despina — Mượt mà", "Erinome — Rõ ràng", "Algenib — Khàn",
-"Rasalgethi — Thông tin", "Laomedeia — Vui vẻ", "Achernar — Mềm mại",
-"Alnilam — Cương quyết", "Schedar — Đều", "Gacrux — Trưởng thành",
-"Pulcherrima — Trực diện", "Achird — Thân thiện", "Zubenelgenubi — Bình thường",
-"Vindemiatrix — Dịu dàng", "Sadachbia — Sống động", "Sadaltager — Hiểu biết",
-"Sulafat — Ấm áp"
-];
 
-const NodeSettingsPanel: React.FC<Props> = ({ nodeId, nodes, onUpdateData, onClose }) => {
+const NodeSettingsPanel: React.FC<Props> = ({ nodeId, nodes, edges, onUpdateData, onDisconnectSceneIn, onClose }) => {
 const node = nodes.find(n => n.id === nodeId);
 if (!node) return null;
+
+const connectedScene = resolveConnectedScene(nodes as any, edges as any, nodeId);
+const connectedScenePrompt = connectedScene ? composeScenePrompt(connectedScene) : null;
 
 const isImage = node.type === 'imageGen';
 const isVideo = node.type === 'videoGen';
@@ -39,6 +33,7 @@ const isAudioMaster = node.type === 'audioMaster';
 const isScenePlanner = node.type === 'scenePlanner';
 const isSceneReview = node.type === 'sceneReview';
 const isCharacter = node.type === 'character';
+const isDirector = node.type === 'director';
 const isMediaSource = node.type === 'mediaSource';
 const data = node.data;
 
@@ -49,13 +44,70 @@ onUpdateData(nodeId, 'duration', 8);
 }
 };
 
+// Đang nối chân "cảnh" thì prompt mặc định sống theo cảnh đó — hiện đúng nội
+// dung thật đang dùng (không phải bản chụp 1 lần) và khoá lại không cho gõ,
+// tránh nhầm lẫn "tưởng prompt tay đang chạy nhưng thực ra không dùng tới".
+// Riêng cho những cảnh ra kết quả xấu (VD Frame mode làm lệch chi tiết sản
+// phẩm giữa clip), bật "Sửa tay" để ghi đè bằng câu lệnh tự viết CHO ĐÚNG
+// NODE NÀY — vẫn giữ dây nối cảnh (không mất đồng bộ cho các node khác dùng
+// chung cảnh), chỉ node này ngừng nghe theo cảnh cho tới khi tắt lại. Bật
+// lần đầu tự chép nguyên văn prompt cảnh hiện tại vào làm điểm xuất phát,
+// đỡ phải gõ lại từ đầu. Prompt tay không bị xoá khi tắt — bật lại là còn y
+// nguyên. Ngắt kết nối (khác với Sửa tay) bỏ hẳn dây nối cảnh.
+const isOverridingScene = connectedScenePrompt !== null && !!data.promptOverrideEnabled;
+const showAsConnected = connectedScenePrompt !== null && !isOverridingScene;
+const renderPromptField = () => (
+<div className="flex flex-col gap-3.5">
+<div className="flex items-center justify-between gap-2">
+<SectionLabel>Câu lệnh</SectionLabel>
+{connectedScenePrompt !== null && (
+<div className="flex items-center gap-2 shrink-0">
+<button
+onClick={() => {
+if (!isOverridingScene && !data.localPrompt?.trim()) {
+onUpdateData(nodeId, 'localPrompt', connectedScenePrompt);
+}
+onUpdateData(nodeId, 'promptOverrideEnabled', !isOverridingScene);
+}}
+className={`text-[9px] font-black uppercase tracking-widest transition-all ${isOverridingScene ? 'text-amber-400 hover:text-white' : 'text-[#94a3b8] hover:text-white'}`}
+>
+{isOverridingScene ? 'Đang sửa tay' : 'Sửa tay'}
+</button>
+<button onClick={() => onDisconnectSceneIn(nodeId)} className="text-[9px] font-black text-[#f43f5e] hover:text-white uppercase tracking-widest transition-all">
+Ngắt kết nối cảnh
+</button>
+</div>
+)}
+</div>
+<textarea
+value={showAsConnected ? connectedScenePrompt! : data.localPrompt}
+onChange={(e) => updateNode('localPrompt', e.target.value)}
+disabled={showAsConnected}
+className={`w-full h-[134px] bg-[#050a10] border border-white/5 hover:border-white/10 rounded-xl p-3 text-[12px] text-white outline-none transition-all custom-scrollbar leading-relaxed ${showAsConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+/>
+{showAsConnected ? (
+<p className="text-[9.5px] text-[#f43f5e]/80 leading-relaxed">
+Đang lấy prompt từ cảnh "{connectedScene?.id}" (chân "cảnh") — nội dung ở trên chỉ để xem, không gõ được. Bấm "Sửa tay" để ghi đè riêng cho node này, hoặc "Ngắt kết nối cảnh" để tự nhập lại từ đầu.
+</p>
+) : isOverridingScene ? (
+<p className="text-[9.5px] text-amber-400/80 leading-relaxed">
+Đang ghi đè prompt cảnh "{connectedScene?.id}" bằng nội dung tay ở trên — chỉ node này, dây nối cảnh vẫn còn. Bấm "Đang sửa tay" để tắt, quay lại dùng đúng nội dung cảnh.
+</p>
+) : (
+<p className="text-[9.5px] text-[#94a3b8] leading-relaxed">
+Nối chân "cảnh" (bên trái node) vào 1 cổng ra của Duyệt Phân Cảnh để dùng prompt của đúng cảnh đó thay vì câu lệnh này.
+</p>
+)}
+</div>
+);
+
 return (
 <div className="absolute top-0 left-0 h-full w-[288px] bg-[#0b1019] border-r border-[#F1641E]/20 z-30 flex flex-col shadow-2xl animate-slide-panel">
 <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
 <div className="flex items-center gap-2.5">
-<div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : isText ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : isStt ? 'bg-[#22c55e]/10 text-[#22c55e]' : isTextReview ? 'bg-[#a855f7]/10 text-[#a855f7]' : isVbee ? 'bg-[#eab308]/10 text-[#eab308]' : isAudioMaster ? 'bg-[#06b6d4]/10 text-[#06b6d4]' : isScenePlanner ? 'bg-[#ec4899]/10 text-[#ec4899]' : isSceneReview ? 'bg-[#f43f5e]/10 text-[#f43f5e]' : isCharacter ? 'bg-[#8b5cf6]/10 text-[#8b5cf6]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
+<div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : isText ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : isStt ? 'bg-[#22c55e]/10 text-[#22c55e]' : isTextReview ? 'bg-[#a855f7]/10 text-[#a855f7]' : isVbee ? 'bg-[#eab308]/10 text-[#eab308]' : isAudioMaster ? 'bg-[#06b6d4]/10 text-[#06b6d4]' : isScenePlanner ? 'bg-[#ec4899]/10 text-[#ec4899]' : isSceneReview ? 'bg-[#f43f5e]/10 text-[#f43f5e]' : isCharacter ? 'bg-[#8b5cf6]/10 text-[#8b5cf6]' : isDirector ? 'bg-[#14b8a6]/10 text-[#14b8a6]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
 <span className="material-symbols-outlined text-[19px]">
-{isImage ? 'palette' : isVideo ? 'movie' : isText ? 'data_object' : isStt ? 'graphic_eq' : isTextReview ? 'edit_note' : isVbee ? 'record_voice_over' : isAudioMaster ? 'equalizer' : isScenePlanner ? 'movie_filter' : isSceneReview ? 'playlist_add_check' : isCharacter ? 'face' : isMediaSource ? 'perm_media' : 'settings'}
+{isImage ? 'palette' : isVideo ? 'movie' : isText ? 'data_object' : isStt ? 'graphic_eq' : isTextReview ? 'edit_note' : isVbee ? 'record_voice_over' : isAudioMaster ? 'equalizer' : isScenePlanner ? 'movie_filter' : isSceneReview ? 'playlist_add_check' : isCharacter ? 'face' : isDirector ? 'theater_comedy' : isMediaSource ? 'perm_media' : 'settings'}
 </span>
 </div>
 <div>
@@ -89,14 +141,7 @@ className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 r
 <SectionLabel>Cấu hình Model</SectionLabel>
 <FieldDropdown label="Mẫu AI" value={data.model} options={TEXT_MODELS} onChange={(v) => updateNode('model', v)} />
 </div>
-<div className="flex flex-col gap-3.5">
-<SectionLabel>Câu lệnh</SectionLabel>
-<textarea
-value={data.localPrompt}
-onChange={(e) => updateNode('localPrompt', e.target.value)}
-className="w-full h-[134px] bg-[#050a10] border border-white/5 hover:border-white/10 rounded-xl p-3 text-[12px] text-white outline-none transition-all custom-scrollbar leading-relaxed"
-/>
-</div>
+{renderPromptField()}
 </>
 )}
 
@@ -183,6 +228,9 @@ Node gom các câu liền nhau (theo mốc thời gian từ audio Vbee) thành t
 <p className="text-[10px] text-[#94a3b8] leading-relaxed">
 Node này không gọi AI, chỉ giữ danh sách cảnh bạn tự lọc. Bấm nút "Lấy từ input" ngay trên node để tải shotlist mới nhất, rồi bỏ những cảnh không cần (VD cảnh quảng cáo trong video gốc) bằng nút xoá từng dòng.
 </p>
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Mỗi cảnh có 1 cổng ra riêng bên phải node (gắn nhãn theo id cảnh) — kéo thẳng vào chân "cảnh" của Image AI/Video AI/Text AI để node đó lấy prompt đúng cảnh này khi chạy, không cần nhân bản theo cảnh nữa.
+</p>
 </div>
 )}
 
@@ -213,7 +261,36 @@ Nối 1 ảnh trực diện hoàn chỉnh vào chân bên trái, node sẽ tự 
 </>
 )}
 
-{!isMediaSource && !isText && !isStt && !isTextReview && !isVbee && !isAudioMaster && !isScenePlanner && !isSceneReview && !isCharacter && (
+{isDirector && (
+<>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Cấu hình Model</SectionLabel>
+<FieldDropdown label="Mẫu AI" value={data.model} options={TEXT_MODELS} onChange={(v) => updateNode('model', v)} />
+</div>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Ý tưởng / Ghi chú</SectionLabel>
+<textarea
+value={data.localPrompt}
+onChange={(e) => updateNode('localPrompt', e.target.value)}
+placeholder="Để trống nếu chưa có ý tưởng — node sẽ tự đề xuất kịch bản shot. Hoặc điền thông tin sản phẩm / ý tưởng từng shot để node phân tích, bổ sung và hoàn thiện."
+className="w-full h-[110px] bg-[#050a10] border border-white/5 hover:border-white/10 rounded-xl p-3 text-[12px] text-white outline-none transition-all custom-scrollbar leading-relaxed placeholder:text-white/20"
+/>
+</div>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Prompt Hệ Thống</SectionLabel>
+<textarea
+value={data.systemPrompt}
+onChange={(e) => updateNode('systemPrompt', e.target.value)}
+className="w-full h-[220px] bg-[#050a10] border border-white/5 hover:border-white/10 rounded-xl p-3 text-[11px] text-white outline-none transition-all custom-scrollbar leading-relaxed font-mono"
+/>
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Chỉ dẫn gửi kèm Gemini để lên kịch bản shot — sửa thoải mái trong lúc tinh chỉnh. Cần nối ảnh (media-in) và có thể nối style (style-in, không bắt buộc).
+</p>
+</div>
+</>
+)}
+
+{!isMediaSource && !isText && !isStt && !isTextReview && !isVbee && !isAudioMaster && !isScenePlanner && !isSceneReview && !isCharacter && !isDirector && (
 <>
 <div className="flex flex-col gap-3.5">
 <SectionLabel>Cấu hình Model</SectionLabel>
@@ -247,38 +324,18 @@ Nối 1 ảnh trực diện hoàn chỉnh vào chân bên trái, node sẽ tự 
 )}
 </div>
 
+{!(isVideo && data.videoMode === 'frame') && (
 <div className="flex flex-col gap-3.5">
 <SectionLabel>Nhân vật nhất quán</SectionLabel>
 <RangeSlider label="Số nhân vật" value={data.characterCount ?? 0} min={0} max={5} step={1} formatValue={(v) => v === 0 ? 'Không dùng' : `${v}`} onChange={(v) => updateNode('characterCount', v)} />
 <p className="text-[10px] text-[#94a3b8] leading-relaxed">
-Mỗi nhân vật sẽ có 1 chân nối riêng (nv 1, nv 2...) bên trái node — nối thẳng node Nhân Vật vào từng chân. {isVideo && 'Bỏ trống (0) nếu chạy chế độ Khung từ ảnh đã gen sẵn — lúc đó ảnh khung đã là nhân vật nhất quán rồi.'}
+Mỗi nhân vật sẽ có 1 chân nối riêng (nv 1, nv 2...) bên trái node — nối thẳng node Nhân Vật vào từng chân.
 </p>
 </div>
-
-<div className="flex flex-col gap-3.5">
-<SectionLabel>Câu lệnh</SectionLabel>
-<textarea
-value={data.localPrompt}
-onChange={(e) => updateNode('localPrompt', e.target.value)}
-className="w-full h-[134px] bg-[#050a10] border border-white/5 hover:border-white/10 rounded-xl p-3 text-[12px] text-white outline-none transition-all custom-scrollbar leading-relaxed"
-/>
-</div>
-
-{isVideo && (
-<div className="flex flex-col gap-3.5">
-<SectionLabel>Thuyết minh</SectionLabel>
-<div className="p-3.5 bg-black/40 rounded-xl border border-white/5 flex flex-col gap-3.5">
-<div className="flex items-center justify-between">
-<span className="text-[10px] font-black text-white/80 uppercase">Kích hoạt</span>
-<button
-onClick={() => updateNode('voiceOverEnabled', !data.voiceOverEnabled)}
-className={`w-[38px] h-[19px] rounded-full relative transition-all ${data.voiceOverEnabled ? 'bg-[#F1641E]' : 'bg-white/10'}`}
-><div className={`absolute top-0.5 w-[15px] h-[15px] rounded-full bg-white transition-all ${data.voiceOverEnabled ? 'left-[21px]' : 'left-0.5'}`} /></button>
-</div>
-{data.voiceOverEnabled && <FieldDropdown label="Giọng" value={data.voiceOverVoice} options={VOICES} onChange={(v) => updateNode('voiceOverVoice', v)} />}
-</div>
-</div>
 )}
+
+{renderPromptField()}
+
 </>
 )}
 </div>

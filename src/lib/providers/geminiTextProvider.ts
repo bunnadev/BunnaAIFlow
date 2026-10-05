@@ -11,6 +11,27 @@ export interface TextGenParams {
 }
 
 /**
+ * Chỉ dẫn gửi kèm video cho `fillSceneDetails()` — tách riêng thành hàm
+ * thuần (không gọi API) để nút debug (chỉ dev) trên node Phân Tích Cảnh có
+ * thể hiện đúng y hệt nội dung sẽ gửi, không phải viết lại/đoán lại.
+ */
+export function buildSceneDetailsInstruction(scenes: { id: string; start: number; end: number; vo: string }[], style?: string): string {
+  const sceneListText = scenes
+    .map((s) => `- ${s.id} (${s.start.toFixed(1)}s -> ${s.end.toFixed(1)}s): "${s.vo}"`)
+    .join('\n');
+
+  return (
+    'Đây là video gốc và danh sách phân cảnh đã chia sẵn theo lời thoại (mốc thời gian tính bằng giây). ' +
+    'Với MỖI phân cảnh, hãy xem đúng đoạn hình ảnh tương ứng trong video gốc tại khoảng thời gian đó, rồi mô tả lại thành ' +
+    '4 trường ngắn gọn bằng tiếng Việt, dùng để làm prompt tạo ảnh AI minh hoạ lại (không cần giống hệt, có thể diễn giải theo phong cách):\n' +
+    '- setting: bối cảnh/địa điểm\n- subject: nhân vật/chủ thể chính và hành động\n- light: ánh sáng/tông màu\n- camera: góc máy/khung hình\n\n' +
+    (style ? `Phong cách hình ảnh mong muốn: ${style}\n\n` : '') +
+    `Danh sách phân cảnh:\n${sceneListText}\n\n` +
+    'Trả về đúng số lượng phân cảnh như trên, giữ nguyên id, không bỏ sót cảnh nào.'
+  );
+}
+
+/**
  * Gọi Gemini API ở chế độ TEXT thuần (generateContent bình thường, KHÔNG ép
  * responseModalities: ['IMAGE'] như GeminiImageProvider) — dùng cho các tác vụ
  * cần model trả về chữ/code (vd tái tạo logo thành mã SVG), không phải ảnh.
@@ -123,14 +144,6 @@ export class GeminiTextProvider {
     return text;
   }
 
-  /**
-   * Nhận video gốc + khung phân cảnh (mốc thời gian + lời thoại, đã tính sẵn
-   * từ audio Vbee) + style, yêu cầu Gemini tự điền 4 trường setting/subject/
-   * light/camera cho TỪNG cảnh — dựa vào nội dung hình ảnh thật của video gốc
-   * tại đúng khoảng thời gian đó, không phải suy đoán từ lời thoại không.
-   * Dùng responseSchema để ép JSON đúng cấu trúc, đỡ phải tự parse/sửa lỗi
-   * định dạng như văn bản tự do.
-   */
   async fillSceneDetails(params: {
     videoBase64: string;
     videoMimeType: string;
@@ -142,18 +155,7 @@ export class GeminiTextProvider {
       throw new Error('Chưa có Gemini API key. Vào Settings để nhập.');
     }
 
-    const sceneListText = params.scenes
-      .map((s) => `- ${s.id} (${s.start.toFixed(1)}s -> ${s.end.toFixed(1)}s): "${s.vo}"`)
-      .join('\n');
-
-    const instruction =
-      'Đây là video gốc và danh sách phân cảnh đã chia sẵn theo lời thoại (mốc thời gian tính bằng giây). ' +
-      'Với MỖI phân cảnh, hãy xem đúng đoạn hình ảnh tương ứng trong video gốc tại khoảng thời gian đó, rồi mô tả lại thành ' +
-      '4 trường ngắn gọn bằng tiếng Việt, dùng để làm prompt tạo ảnh AI minh hoạ lại (không cần giống hệt, có thể diễn giải theo phong cách):\n' +
-      '- setting: bối cảnh/địa điểm\n- subject: nhân vật/chủ thể chính và hành động\n- light: ánh sáng/tông màu\n- camera: góc máy/khung hình\n\n' +
-      (params.style ? `Phong cách hình ảnh mong muốn: ${params.style}\n\n` : '') +
-      `Danh sách phân cảnh:\n${sceneListText}\n\n` +
-      'Trả về đúng số lượng phân cảnh như trên, giữ nguyên id, không bỏ sót cảnh nào.';
+    const instruction = buildSceneDetailsInstruction(params.scenes, params.style);
 
     const parts = [
       { inlineData: { mimeType: params.videoMimeType, data: params.videoBase64 } },
@@ -223,5 +225,91 @@ export class GeminiTextProvider {
       byId[s.id] = { setting: s.setting || '', subject: s.subject || '', light: s.light || '', camera: s.camera || '' };
     }
     return byId;
+  }
+
+  /**
+   * Node Đạo Diễn (Director/Prompt Enhancer) — nhận ảnh tham chiếu (người mẫu
+   * + sản phẩm) và ghi chú/ý tưởng của người dùng (có thể trống — brainstorm
+   * từ đầu, hoặc chi tiết theo từng shot — phân tích/bổ sung), trả về danh
+   * sách shot kèm prompt hoàn chỉnh. `systemPrompt` truyền từ ngoài vào (field
+   * editable trên node, xem lib/directorPrompt.ts) thay vì hardcode ở đây —
+   * cố ý để Huy tự chỉnh trong lúc tinh chỉnh prompt.
+   */
+  async planShots(params: {
+    systemPrompt: string;
+    notes?: string;
+    referenceImages?: ReferenceImage[];
+    model: string;
+  }): Promise<{ description: string; prompt: string }[]> {
+    if (!this.apiKey) {
+      throw new Error('Chưa có Gemini API key. Vào Settings để nhập.');
+    }
+
+    const instruction = params.notes?.trim()
+      ? `${params.systemPrompt}\n\nGhi chú/ý tưởng từ người dùng:\n${params.notes.trim()}`
+      : `${params.systemPrompt}\n\n(Người dùng chưa cung cấp ý tưởng cụ thể theo từng shot — tự đề xuất kịch bản đầy đủ dựa trên ảnh tham chiếu.)`;
+
+    const parts: Record<string, unknown>[] = [];
+    for (const ref of params.referenceImages ?? []) {
+      parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.base64 } });
+    }
+    parts.push({ text: instruction });
+
+    const responseSchema = {
+      type: 'OBJECT',
+      properties: {
+        shots: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              description: { type: 'STRING' },
+              prompt: { type: 'STRING' },
+            },
+            required: ['description', 'prompt'],
+          },
+        },
+      },
+      required: ['shots'],
+    };
+
+    const res = await fetch(`${API_BASE}/models/${params.model}:generateContent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': this.apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json',
+          responseSchema,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Gemini text API lỗi (${res.status}): ${errText}`);
+    }
+
+    const json = await res.json();
+    const candidate = json?.candidates?.[0];
+    const textParts = candidate?.content?.parts as Array<{ text?: string }> | undefined;
+    const rawText = textParts?.map((p) => p.text ?? '').join('').trim();
+
+    if (!rawText) {
+      throw new Error('Gemini không trả về shot nào. Kiểm tra lại ảnh đầu vào, ghi chú, hoặc model đã chọn.');
+    }
+
+    let parsed: { shots?: { description: string; prompt: string }[] };
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      throw new Error('Gemini trả về JSON không hợp lệ khi lên ý tưởng shot — thử chạy lại.');
+    }
+
+    return (parsed.shots ?? []).map((s) => ({ description: s.description || '', prompt: s.prompt || '' }));
   }
 }
