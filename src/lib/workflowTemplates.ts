@@ -110,18 +110,26 @@ KẾT LUẬN: ĐẠT  hoặc  ĐÃ SỬA
 
 Sau đó chép lại TOÀN BỘ bản thiết kế cuối cùng (đã áp dụng các sửa đổi, phần nào đúng thì giữ nguyên câu chữ) với đúng các mục như bản gốc: ⚠️ CẢNH BÁO NGUỒN (nếu cần), PHÂN TÍCH ẢNH THAM KHẢO (nếu bản gốc có), TÊN MẠCH, NGUYÊN LÝ, LINH KIỆN, DANH SÁCH DÂY (kèm dòng "Tổng: N dây"), ĐẾM CHÂN, THÔNG SỐ, LƯU Ý AN TOÀN, ĐÃ KIỂM TRA / ĐÃ SỬA.`;
 
-const CIRCUIT_CAPTION_PROMPT = `Từ bản thiết kế mạch ở phần NỘI DUNG ĐẦU VÀO, viết caption tiếng Việt cho bài đăng ẢNH mạch DIY trên Facebook / TikTok. Ảnh được đăng trước, video lắp thật sẽ đăng sau.
+const CIRCUIT_CAPTION_PROMPT = `Từ bản thiết kế mạch ở phần NỘI DUNG ĐẦU VÀO, viết caption cho bài đăng ẢNH mạch DIY. Ảnh được đăng trước, video lắp thật sẽ đăng sau. Viết 2 bản, theo đúng thứ tự dưới đây.
 
-Yêu cầu:
+## ENGLISH (kênh nước ngoài)
+Viết tự nhiên như người bản xứ làm kênh DIY electronics trên TikTok / Reels / YouTube Shorts / Facebook. KHÔNG dịch từng câu từ bản tiếng Việt, mà viết lại cho hợp văn phong người xem nước ngoài.
+- Dòng đầu: 1 câu hook ngắn, gây tò mò.
+- 2–3 câu: mạch làm được gì, dễ hiểu cho người không chuyên.
+- Danh sách linh kiện gọn (gạch đầu dòng, giá trị kèm đơn vị quốc tế: Ω, µF, V).
+- 1 câu báo video lắp thật sắp ra + mời follow, 1 câu hỏi để kéo bình luận.
+- 1 dòng lưu ý an toàn ngắn nếu mạch cần (điện áp/dòng lớn, nhiệt độ, cực tính).
+- 5–8 hashtag tiếng Anh phổ biến trong cộng đồng DIY điện tử (VD #electronics #diyelectronics #circuit #maker).
+
+## TIẾNG VIỆT (profile cá nhân)
 - Dòng đầu là câu hook ngắn, gây tò mò.
 - 2–3 câu giải thích mạch làm được gì, dễ hiểu cho người không chuyên.
 - Danh sách linh kiện gọn (gạch đầu dòng).
 - 1 câu nhắc video lắp thực tế sắp ra, mời theo dõi, và 1 câu hỏi để kéo bình luận.
-- 1 dòng lưu ý an toàn ngắn nếu mạch dùng điện áp/dòng lớn.
-- Cuối cùng 5–8 hashtag liên quan.
-- Không hứa hẹn quá mức so với thông số thật của mạch.
+- 1 dòng lưu ý an toàn ngắn nếu cần.
+- Cuối cùng 5–8 hashtag tiếng Việt / không dấu phổ biến.
 
-Chỉ trả về caption, không giải thích thêm.`;
+Quy tắc chung cho cả 2 bản: không hứa hẹn quá mức so với thông số thật của mạch; không nhắc tới AI, "kiểm tra chéo" hay quá trình thiết kế; chỉ trả về 2 phần caption với đúng 2 tiêu đề trên, không giải thích thêm.`;
 
 const CIRCUIT_PHOTO_PROMPT = `Turn this illustration into a realistic photograph of the EXACT same DIY circuit, actually built and photographed from directly above on a dark wooden workbench.
 
