@@ -18,11 +18,23 @@ const CIRCUIT_ENGINEER_PROMPT = `Bạn là kỹ sư điện tử nhiều kinh ng
 
 Nhiệm vụ: từ ý tưởng mạch ở phần NỘI DUNG ĐẦU VÀO, đưa ra 1 mạch THỰC SỰ CHẠY ĐƯỢC. Ảnh minh hoạ sẽ được app tự vẽ từ danh sách dây của bạn.
 
+Nếu có ẢNH MẠCH THAM KHẢO đính kèm (người dùng là người mới, hay lấy ý tưởng từ ảnh mạch trên mạng — nhiều ảnh do AI vẽ nên SAI):
+- Phân tích ảnh trước: mạch này định làm gì, nhận diện từng linh kiện (mã/giá trị đọc được trên thân hoặc nhãn), và lần theo từng dây nhìn thấy (nối từ chân nào tới chân nào).
+- Chỉ ra cụ thể chỗ sai / thiếu / nguy hiểm (VD transistor không được phân cực, chân để hở, linh kiện quá tải, sai cực tính, thiếu tản nhiệt) và giải thích dễ hiểu cho người mới.
+- Chỗ nào trong ảnh không nhìn rõ thì nói là không rõ, KHÔNG đoán bừa.
+- Sau đó thiết kế lại phiên bản ĐÚNG, giữ đúng mục đích và tinh thần của mạch trong ảnh (giữ linh kiện chính nếu hợp lý), kết hợp với yêu cầu ở phần NỘI DUNG ĐẦU VÀO.
+
 Thiết kế:
 - Ưu tiên các mạch kinh điển đã được kiểm chứng. Tính lại giá trị linh kiện (điện trở, công suất, điện áp chịu đựng).
 - Nếu ý tưởng gốc sai hoặc thiếu (VD transistor không được phân cực, thiếu tản nhiệt, linh kiện quá tải, thiếu tụ chặn DC ra loa) thì SỬA LẠI và nói rõ đã sửa gì, vì sao.
 - Gọn nhất có thể nhưng ĐỦ để chạy đúng và an toàn (thường 3–10 linh kiện). Linh kiện chỉ "cho đẹp/ổn định hơn" thì ghi vào phần gợi ý nâng cấp.
 - Thông số phải TRUNG THỰC: kiểm tra dòng kích cực B so với dòng qua cầu chiết áp, sụt áp khi có tải, công suất toả nhiệt. Dòng tối đa ghi theo mức mạch giữ được điện áp, không ghi theo giới hạn của transistor.
+- TỰ KIỂM TRA BẮT BUỘC trước khi trả lời (tính ra số, ghi vào mục ĐÃ KIỂM TRA):
+  1. Công suất trên từng điện trở/chiết áp ở điện áp nguồn lớn nhất: P = U²/R hoặc I²R, so với định mức (chiết áp thường 0,125–0,25W; điện trở thường 0,25W).
+  2. Điện áp chịu đựng của tụ ≥ 1,5 lần điện áp thực tế; tụ hoá đúng cực tính.
+  3. Transistor: được phân cực đúng, đủ dòng kích cho tải (dòng tải / hFE nhỏ nhất), công suất toả nhiệt ở trường hợp xấu nhất.
+  4. Diode: đúng chiều, chịu được dòng; diode chống ngược cực mắc nối tiếp (không mắc song song gây chập nguồn khi cắm ngược, trừ khi có cầu chì).
+  Hạng mục nào không đạt thì sửa thiết kế cho đạt rồi mới trả lời.
 - CHỈ dùng các loại linh kiện app vẽ được:
 ${partCatalogShort()}
   Nếu ý tưởng cần linh kiện khác, chọn phương án dùng được các loại trên hoặc nói rõ là chưa vẽ được.
@@ -35,6 +47,9 @@ Dây nối (QUAN TRỌNG — danh sách này dùng để vẽ ảnh và để l�
 - Mỗi dây 1 màu, quy ước: đỏ = dương nguồn, đen hoặc xanh dương = mass/âm, dây tín hiệu dùng màu khác nhau (vàng, xanh lá, cam, xanh ngọc…).
 
 Trả lời bằng tiếng Việt, ĐÚNG cấu trúc sau, không thêm lời chào:
+
+## PHÂN TÍCH ẢNH THAM KHẢO
+(CHỈ có mục này khi có ảnh đính kèm: mạch trong ảnh làm gì, linh kiện nhận ra được, cách nối trong ảnh, các lỗi tìm thấy và mức độ nghiêm trọng. Không có ảnh thì bỏ hẳn mục này.)
 
 ## TÊN MẠCH
 (ngắn gọn)
@@ -104,6 +119,7 @@ function buildDiyCircuitTemplate() {
   const common = { isLoading: false, statusText: '', result: null, isFinalized: false, isBatch: false };
   const ids = {
     idea: `textReview_${t}_idea`,
+    refImage: `mediaSource_${t}_ref`,
     engineer: `textGen_${t}_engineer`,
     review: `textReview_${t}_review`,
     draw: `circuitDraw_${t}_draw`,
@@ -114,6 +130,9 @@ function buildDiyCircuitTemplate() {
   const nodes: Node[] = [
     { id: ids.idea, type: 'textReview', position: { x: 0, y: 0 },
       data: { ...common, label: '1. Ý tưởng mạch', isFinalized: true, editedText: EXAMPLE_IDEA, result: { type: 'text', text: EXAMPLE_IDEA } } },
+    // Tuỳ chọn: ảnh mạch có sẵn (lấy trên mạng) để Kỹ sư phân tích, sửa lỗi rồi làm lại cho đúng
+    { id: ids.refImage, type: 'mediaSource', position: { x: 0, y: 360 },
+      data: { ...common, label: 'Ảnh mạch tham khảo (tuỳ chọn)', media: null } },
     { id: ids.engineer, type: 'textGen', position: { x: 340, y: 0 },
       data: { ...common, label: '2. Kỹ sư mạch', model: 'Gemini 3 Pro', localPrompt: CIRCUIT_ENGINEER_PROMPT } },
     { id: ids.review, type: 'textReview', position: { x: 680, y: 0 },
@@ -131,6 +150,7 @@ function buildDiyCircuitTemplate() {
 
   const edges: Edge[] = [
     edge(ids.idea, 'text-out', ids.engineer, 'text-in'),
+    edge(ids.refImage, 'media-out', ids.engineer, 'media-in'),
     edge(ids.engineer, 'text-out', ids.review, 'text-in'),
     edge(ids.review, 'text-out', ids.draw, 'text-in'),
     edge(ids.draw, 'media-out', ids.photo, 'media-in'),
@@ -144,7 +164,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'diy-circuit',
     label: 'Mạch DIY',
-    desc: 'Ý tưởng mạch → kỹ sư kiểm tra & sửa → duyệt → app tự vẽ ảnh mạch (dây luôn đúng chân) → bản giống thật (Nano Banana) + caption.',
+    desc: 'Ý tưởng (kèm ảnh mạch tham khảo nếu có) → kỹ sư kiểm tra & sửa → duyệt → app tự vẽ ảnh mạch (dây luôn đúng chân) → bản giống thật (Nano Banana) + caption.',
     icon: 'electrical_services',
     build: buildDiyCircuitTemplate,
   },
