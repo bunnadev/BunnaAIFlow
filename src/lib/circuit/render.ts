@@ -319,6 +319,9 @@ const DEFS = `
   <linearGradient id="gCapBody" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#3c4250"/><stop offset="0.5" stop-color="#1b1f27"/><stop offset="1" stop-color="#0d0f13"/>
   </linearGradient>
+  <linearGradient id="gCapBlue" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#1b2f57"/><stop offset="0.35" stop-color="#2f4f8f"/><stop offset="1" stop-color="#14223f"/>
+  </linearGradient>
   <radialGradient id="gCeramic" cx="0.4" cy="0.35" r="0.7">
     <stop offset="0" stop-color="#ffc35a"/><stop offset="1" stop-color="#d9861f"/>
   </radialGradient>
@@ -366,8 +369,20 @@ const DEFS = `
 function renderWire(w: Wire, rw: RoutedWire | null): { body: string; joints: string } {
   if (!rw) return { body: '', joints: '' };
   const pts = rw.points;
-  const [main, dark] = WIRE_COLORS[normalizeWireColor(w.color)];
+  const colorName = normalizeWireColor(w.color);
+  const [main, dark] = WIRE_COLORS[colorName];
   const d = roundedPath(pts);
+  // "silver" = chân linh kiện hàn thẳng vào nhau: vẽ mảnh như chân kim loại, không phải dây bọc nhựa
+  if (colorName === 'silver') {
+    const legBody =
+      `<g filter="url(#fWireShadow)">` +
+      `<path d="${d}" fill="none" stroke="#7d848c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<path d="${d}" fill="none" stroke="url(#gLeg)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `</g>`;
+    const joints = [pts[0], pts[pts.length - 1]]
+      .map((pt) => `<circle cx="${pt.x}" cy="${pt.y}" r="8" fill="url(#gSolder)" stroke="#6f767d" stroke-width="1.5"/>`).join('');
+    return { body: legBody, joints };
+  }
   const body =
     `<g filter="url(#fWireShadow)">` +
     `<path d="${d}" fill="none" stroke="${dark}" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>` +

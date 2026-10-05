@@ -98,20 +98,29 @@ const diode: PartDef = {
     (p.marking ? upright(p, -8, 1, `<text x="-8" y="7" font-size="17" font-weight="700" fill="#d9d9d9" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif">${esc(p.marking)}</text>`) : ''),
 };
 
+/**
+ * Tụ hoá loại đứng (radial) — loại người làm DIY hay dùng: 2 chân ra cùng 1 đầu,
+ * chân + dài hơn, vạch sáng dọc thân có dấu "−". Trước đây vẽ kiểu nằm ngang
+ * 2 chân 2 đầu, thân đen vạch xám → nhìn y hệt diode, người xem dễ nhầm.
+ */
 const capElec: PartDef = {
-  desc: 'Tụ hoá (điện phân), nằm ngang',
-  w: 200, h: 62,
-  pins: { '+': { x: -100, y: 0 }, '-': { x: 100, y: 0 } },
-  pinNote: 'nằm ngang, chân + trái, chân - phải (phía vạch xám có dấu −)',
-  render: (p) =>
-    leg(-100, 0, -64, 0, 6) + leg(64, 0, 100, 0, 6) +
-    `<rect x="-66" y="-30" width="132" height="60" rx="10" fill="url(#gCapBody)"/>` +
-    `<rect x="30" y="-30" width="30" height="60" fill="#c9ced6"/>` +
-    `<text x="45" y="-6" font-size="20" font-weight="900" fill="#26303f" text-anchor="middle">−</text>` +
-    `<text x="45" y="20" font-size="20" font-weight="900" fill="#26303f" text-anchor="middle">−</text>` +
-    `<rect x="-64" y="-27" width="128" height="10" rx="5" fill="#fff" opacity="0.18"/>` +
-    `<rect x="-66" y="-30" width="6" height="60" rx="3" fill="#9aa3ad"/>` +
-    (p.marking ? upright(p, -18, 1, `<text x="-18" y="7" font-size="15" font-weight="700" fill="#e8ecf2" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif">${esc(p.marking)}</text>`) : ''),
+  desc: 'Tụ hoá (điện phân) loại đứng — thân trụ xanh, 2 chân ra cùng một đầu',
+  w: 70, h: 210,
+  pins: { '+': { x: -14, y: 104 }, '-': { x: 14, y: 92 } },
+  pinNote: 'thân dựng đứng, 2 chân chĩa XUỐNG ở cùng một đầu: + bên trái (chân dài hơn), − bên phải (phía vạch sáng có dấu −)',
+  render: (p) => {
+    const minus = [-58, -34, -10, 14].map((y) => `<rect x="17" y="${y}" width="9" height="3" rx="1.5" fill="#1f3354"/>`).join('');
+    return leg(-14, 36, -14, 104, 5) + leg(14, 36, 14, 92, 5) +
+      // thân + đầu nhôm + đệm cao su
+      `<rect x="-34" y="-80" width="68" height="116" rx="10" fill="url(#gCapBlue)"/>` +
+      `<rect x="-34" y="-82" width="68" height="12" rx="6" fill="url(#gSilver)" stroke="#7d848c" stroke-width="1"/>` +
+      `<rect x="-30" y="32" width="60" height="8" rx="3" fill="#15171a"/>` +
+      // vạch âm dọc thân
+      `<rect x="12" y="-70" width="20" height="102" fill="#c9d6ea"/>` + minus +
+      `<rect x="-31" y="-68" width="8" height="96" rx="4" fill="#fff" opacity="0.22"/>` +
+      `<text x="-26" y="84" font-size="15" font-weight="900" fill="#ffb4b4" text-anchor="middle">+</text>` +
+      (p.marking ? upright(p, -6, -21, `<text x="0" y="0" font-size="13" font-weight="700" fill="#e8eef8" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" transform="translate(-6 -21) rotate(-90)">${esc(p.marking)}</text>`) : '');
+  },
 };
 
 const capCeramic: PartDef = {

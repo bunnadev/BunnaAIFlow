@@ -1527,7 +1527,7 @@ setTimeout(() => setFlowStatus(null), 4000);
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
 
-const executeWorkflow = useCallback(async (nodeIdsToRun: string[]) => {
+const executeWorkflow = useCallback(async (nodeIdsToRun: string[], forceNodeIds: Set<string> = new Set()) => {
 if (runningChain || activeJobsRef.current > 0 || nodeIdsToRun.length === 0) return;
 
 setRunningChain(true);
@@ -1606,7 +1606,7 @@ if (activeJobsRef.current >= concurrency || stopFlagRef.current || chainFailed) 
 const node = currentNodes.find(n => n.id === nodeId);
 if (!node) { remainingNodes.delete(nodeId); continue; }
 
-if (!isNodeDirty(node, currentEdges)) {
+if (!isNodeDirty(node, currentEdges) && !forceNodeIds.has(nodeId)) {
 remainingNodes.delete(nodeId);
 completedNodes.add(nodeId);
 addLog(nodeId, node.data.label || nodeId, 'success', 'Bỏ qua (Dữ liệu đã sẵn sàng).');
@@ -1699,7 +1699,11 @@ targetNodes = [...unfinishedAncestors, nodeId];
 const descendants = getDescendants(nodeId, currentNodes, currentEdges);
 targetNodes = [nodeId, ...descendants];
 }
-executeWorkflow(targetNodes);
+// Bấm "Vẽ mạch" là muốn AI lên bố cục MỚI (rẻ, chỉ gọi model text) — luôn chạy
+// lại. Các node khác giữ cách cũ: đã xong + đầu vào không đổi thì bỏ qua,
+// muốn tạo lại phải xoá kết quả trước (tránh lỡ tay tạo lại ảnh/video tốn tiền).
+const clicked = currentNodes.find(n => n.id === nodeId);
+executeWorkflow(targetNodes, clicked?.type === 'circuitDraw' && mode === 'single' ? new Set([nodeId]) : new Set());
 };
 
 useEffect(() => {
