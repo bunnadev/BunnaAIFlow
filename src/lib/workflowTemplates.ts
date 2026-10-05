@@ -18,6 +18,10 @@ const CIRCUIT_ENGINEER_PROMPT = `Bạn là kỹ sư điện tử nhiều kinh ng
 
 Nhiệm vụ: từ ý tưởng mạch ở phần NỘI DUNG ĐẦU VÀO, đưa ra 1 mạch THỰC SỰ CHẠY ĐƯỢC. Ảnh minh hoạ sẽ được app tự vẽ từ danh sách dây của bạn.
 
+Nguồn điện của người dùng: máy cấp nguồn bàn {{NGUON_TEN}}, tối đa {{NGUON_V}}V / {{NGUON_A}}A. Người dùng là người mới, chỉ làm mạch điện áp thấp.
+- Ưu tiên thiết kế chạy được bằng nguồn này.
+- Nếu mạch (theo ý tưởng hoặc ảnh tham khảo) cần điện áp hoặc dòng VƯỢT mức trên, hoặc dùng điện áp trên 36V (nguy hiểm khi chạm), hoặc nối điện lưới 220V: vẫn thiết kế theo ý tưởng, nhưng MỞ ĐẦU câu trả lời bằng mục "## ⚠️ CẢNH BÁO NGUỒN" — nói rõ mạch cần bao nhiêu V/A, vượt bao nhiêu so với máy của người dùng, rủi ro cụ thể, và đề xuất 1 phương án thay thế chạy được trong giới hạn (VD hạ điện áp, giảm tải). Mạch nằm trong giới hạn thì KHÔNG có mục này.
+
 Nếu có ẢNH MẠCH THAM KHẢO đính kèm (người dùng là người mới, hay lấy ý tưởng từ ảnh mạch trên mạng — nhiều ảnh do AI vẽ nên SAI):
 - Phân tích ảnh trước: mạch này định làm gì, nhận diện từng linh kiện (mã/giá trị đọc được trên thân hoặc nhãn), và lần theo từng dây nhìn thấy (nối từ chân nào tới chân nào).
 - Chỉ ra cụ thể chỗ sai / thiếu / nguy hiểm (VD transistor không được phân cực, chân để hở, linh kiện quá tải, sai cực tính, thiếu tản nhiệt) và giải thích dễ hiểu cho người mới.
@@ -47,6 +51,9 @@ Dây nối (QUAN TRỌNG — danh sách này dùng để vẽ ảnh và để l�
 - Mỗi dây 1 màu, quy ước: đỏ = dương nguồn, đen hoặc xanh dương = mass/âm, dây tín hiệu dùng màu khác nhau (vàng, xanh lá, cam, xanh ngọc…).
 
 Trả lời bằng tiếng Việt, ĐÚNG cấu trúc sau, không thêm lời chào:
+
+## ⚠️ CẢNH BÁO NGUỒN
+(CHỈ có mục này khi mạch vượt giới hạn máy nguồn / dùng điện áp nguy hiểm — xem quy tắc ở trên.)
 
 ## PHÂN TÍCH ẢNH THAM KHẢO
 (CHỈ có mục này khi có ảnh đính kèm: mạch trong ảnh làm gì, linh kiện nhận ra được, cách nối trong ảnh, các lỗi tìm thấy và mức độ nghiêm trọng. Không có ảnh thì bỏ hẳn mục này.)
@@ -79,6 +86,30 @@ Mỗi linh kiện 1 dòng, liệt kê từng chân và dây nào nối vào (ho�
 ## ĐÃ KIỂM TRA / ĐÃ SỬA
 (mạch có chạy không; nếu đã sửa so với ý tưởng gốc thì liệt kê thay đổi; gợi ý nâng cấp nếu có)`;
 
+const CIRCUIT_CROSS_CHECK_PROMPT = `Bạn là kỹ sư điện tử thứ hai, được nhờ KIỂM TRA CHÉO bản thiết kế mạch DIY do một AI khác viết (phần NỘI DUNG ĐẦU VÀO). Nếu có ảnh mạch tham khảo đính kèm, đó là ảnh người dùng lấy trên mạng làm ý tưởng ban đầu.
+
+Người đọc là người mới học điện tử, sẽ lắp mạch thật theo bản thiết kế, bằng máy cấp nguồn bàn {{NGUON_TEN}} tối đa {{NGUON_V}}V / {{NGUON_A}}A.
+
+Việc cần làm — đừng tin các con số trong bản gốc, tự tính lại:
+1. Công suất trên từng điện trở / chiết áp ở điện áp nguồn lớn nhất, so với định mức (chiết áp thường 0,125–0,25W, điện trở thường 0,25W).
+2. Tụ: điện áp chịu đựng ≥ 1,5 lần thực tế, đúng cực tính.
+3. Transistor / IC: phân cực đúng, đủ dòng kích cho tải ghi trong THÔNG SỐ (dòng tải / hFE nhỏ nhất), công suất toả nhiệt trường hợp xấu nhất, cần tản nhiệt không. THÔNG SỐ ghi có trung thực không.
+4. Diode: đúng chiều, chịu được dòng; chống ngược cực phải mắc nối tiếp.
+5. DANH SÁCH DÂY khớp với ĐẾM CHÂN: không thiếu dây, không sai chân, không chập nguồn, đúng tên chân theo datasheet; "Tổng: N dây" đúng số dây.
+6. Chỉ dùng các loại linh kiện app vẽ được (cột "Loại vẽ"):
+${partCatalogShort()}
+7. Nguồn: mạch có vượt {{NGUON_V}}V / {{NGUON_A}}A, dùng điện áp trên 36V hay điện lưới không — nếu có phải có mục "## ⚠️ CẢNH BÁO NGUỒN" rõ ràng.
+8. Nếu có ảnh tham khảo: phần phân tích ảnh có đúng với ảnh không, có bỏ sót lỗi quan trọng nào trong ảnh không.
+
+Trả lời bằng tiếng Việt, không chào hỏi, đúng thứ tự:
+
+## KIỂM TRA CHÉO
+KẾT LUẬN: ĐẠT  hoặc  ĐÃ SỬA
+- Liệt kê từng vấn đề tìm thấy: mức độ (NGHIÊM TRỌNG / NÊN SỬA / GÓP Ý), giải thích ngắn dễ hiểu cho người mới, và đã sửa thế nào. Không có vấn đề thì ghi "Không tìm thấy lỗi."
+- Chỗ nào bạn không chắc chắn thì nói rõ là không chắc, đừng sửa bừa.
+
+Sau đó chép lại TOÀN BỘ bản thiết kế cuối cùng (đã áp dụng các sửa đổi, phần nào đúng thì giữ nguyên câu chữ) với đúng các mục như bản gốc: ⚠️ CẢNH BÁO NGUỒN (nếu cần), PHÂN TÍCH ẢNH THAM KHẢO (nếu bản gốc có), TÊN MẠCH, NGUYÊN LÝ, LINH KIỆN, DANH SÁCH DÂY (kèm dòng "Tổng: N dây"), ĐẾM CHÂN, THÔNG SỐ, LƯU Ý AN TOÀN, ĐÃ KIỂM TRA / ĐÃ SỬA.`;
+
 const CIRCUIT_CAPTION_PROMPT = `Từ bản thiết kế mạch ở phần NỘI DUNG ĐẦU VÀO, viết caption tiếng Việt cho bài đăng ẢNH mạch DIY trên Facebook / TikTok. Ảnh được đăng trước, video lắp thật sẽ đăng sau.
 
 Yêu cầu:
@@ -103,7 +134,7 @@ The illustration is a precise wiring diagram that people will copy to build the 
 
 Only change the look: real wood grain, real PVC-insulated wires with soft contact shadows, shiny solder joints, realistic metal, plastic, ceramic and copper textures, soft natural studio light from the top-left. Everything in sharp focus, no blur, no hands, no extra objects.`;
 
-const EXAMPLE_IDEA = 'Mạch hạ áp DC chỉnh được từ 0V đến khoảng 48V, dùng transistor 2N3055 và chiết áp 5K, nguồn vào tối đa 50V DC. Có diode bảo vệ ngược cực.';
+const EXAMPLE_IDEA = 'Mạch đèn LED nhấp nháy luân phiên 2 bóng dùng 2 transistor BC547, nguồn 9V.';
 
 function edge(source: string, sourceHandle: string, target: string, targetHandle: string): Edge {
   return {
@@ -121,6 +152,7 @@ function buildDiyCircuitTemplate() {
     idea: `textReview_${t}_idea`,
     refImage: `mediaSource_${t}_ref`,
     engineer: `textGen_${t}_engineer`,
+    crossCheck: `textGen_${t}_crosscheck`,
     review: `textReview_${t}_review`,
     draw: `circuitDraw_${t}_draw`,
     photo: `imageGen_${t}_photo`,
@@ -135,23 +167,28 @@ function buildDiyCircuitTemplate() {
       data: { ...common, label: 'Ảnh mạch tham khảo (tuỳ chọn)', media: null } },
     { id: ids.engineer, type: 'textGen', position: { x: 340, y: 0 },
       data: { ...common, label: '2. Kỹ sư mạch', model: 'Gemini 3 Pro', localPrompt: CIRCUIT_ENGINEER_PROMPT } },
-    { id: ids.review, type: 'textReview', position: { x: 680, y: 0 },
+    // Claude soát lại bản thiết kế của Gemini (2 model khác hãng hay sai ở chỗ khác nhau) — cần Claude API key trong Cài đặt
+    { id: ids.crossCheck, type: 'textGen', position: { x: 680, y: 0 },
+      data: { ...common, label: '2b. Kiểm tra chéo (Claude)', model: 'Claude Opus 5.5', localPrompt: CIRCUIT_CROSS_CHECK_PROMPT } },
+    { id: ids.review, type: 'textReview', position: { x: 1020, y: 0 },
       data: { ...common, label: '3. Duyệt mạch', isFinalized: true, editedText: '' } },
-    { id: ids.draw, type: 'circuitDraw', position: { x: 1020, y: -120 },
+    { id: ids.draw, type: 'circuitDraw', position: { x: 1360, y: -120 },
       data: { ...common, label: '4. Vẽ mạch', model: 'Gemini 3.6 Flash', localPrompt: '' } },
     // Ảnh giống thật: Nano Banana tô lại từ sơ đồ code vẽ. Đôi khi vẫn đổi màu/thêm
     // dây (đã thử, kể cả AI tự soi cũng báo sai) — sơ đồ ở node 4 mới là bản chuẩn,
     // nên đăng kèm cả 2 ảnh và tự so trước khi đăng.
-    { id: ids.photo, type: 'imageGen', position: { x: 1380, y: -120 },
+    { id: ids.photo, type: 'imageGen', position: { x: 1720, y: -120 },
       data: { ...common, label: '5. Ảnh giống thật', model: 'Nano Banana Pro', aspectRatio: '4:5', resolution: '2k', localPrompt: CIRCUIT_PHOTO_PROMPT } },
-    { id: ids.caption, type: 'textGen', position: { x: 1020, y: 420 },
+    { id: ids.caption, type: 'textGen', position: { x: 1360, y: 420 },
       data: { ...common, label: 'Caption bài đăng', model: 'Gemini 3.6 Flash', localPrompt: CIRCUIT_CAPTION_PROMPT } },
   ];
 
   const edges: Edge[] = [
     edge(ids.idea, 'text-out', ids.engineer, 'text-in'),
     edge(ids.refImage, 'media-out', ids.engineer, 'media-in'),
-    edge(ids.engineer, 'text-out', ids.review, 'text-in'),
+    edge(ids.engineer, 'text-out', ids.crossCheck, 'text-in'),
+    edge(ids.refImage, 'media-out', ids.crossCheck, 'media-in'),
+    edge(ids.crossCheck, 'text-out', ids.review, 'text-in'),
     edge(ids.review, 'text-out', ids.draw, 'text-in'),
     edge(ids.draw, 'media-out', ids.photo, 'media-in'),
     edge(ids.review, 'text-out', ids.caption, 'text-in'),
@@ -164,7 +201,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'diy-circuit',
     label: 'Mạch DIY',
-    desc: 'Ý tưởng (kèm ảnh mạch tham khảo nếu có) → kỹ sư kiểm tra & sửa → duyệt → app tự vẽ ảnh mạch (dây luôn đúng chân) → bản giống thật (Nano Banana) + caption.',
+    desc: 'Ý tưởng (kèm ảnh mạch tham khảo nếu có) → kỹ sư (Gemini) → kiểm tra chéo (Claude) → duyệt → app tự vẽ ảnh mạch (dây luôn đúng chân) → bản giống thật (Nano Banana) + caption.',
     icon: 'electrical_services',
     build: buildDiyCircuitTemplate,
   },

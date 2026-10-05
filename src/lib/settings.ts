@@ -9,7 +9,15 @@ export interface AppSettings {
   /** BYOK cho node Vbee TTS — App-Id/Token cấp qua tài khoản Vbee của Huy. */
   vbeeAppId?: string;
   vbeeToken?: string;
+  /** Anthropic API key — dùng khi chọn model Claude ở Text AI / Vẽ Mạch. */
+  anthropicApiKey?: string;
+  /** Máy cấp nguồn đang có — Kỹ sư mạch cảnh báo nếu mạch cần vượt mức này. */
+  psuName?: string;
+  psuMaxVoltage?: number;
+  psuMaxCurrent?: number;
 }
+
+export const DEFAULT_PSU = { name: 'Sugon', maxVoltage: 30, maxCurrent: 5 };
 
 const SETTINGS_FILENAME = 'settings.json';
 

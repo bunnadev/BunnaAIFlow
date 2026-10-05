@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SectionLabel } from './UI';
-import type { AppSettings } from '../lib/settings';
+import { DEFAULT_PSU, type AppSettings } from '../lib/settings';
 
 interface Props {
 settings: AppSettings;
@@ -16,6 +16,10 @@ const [licensePublicKey, setLicensePublicKey] = useState(settings.licensePublicK
 const [licenseSecretKey, setLicenseSecretKey] = useState(settings.licenseSecretKey ?? '');
 const [vbeeAppId, setVbeeAppId] = useState(settings.vbeeAppId ?? '');
 const [vbeeToken, setVbeeToken] = useState(settings.vbeeToken ?? '');
+const [anthropicApiKey, setAnthropicApiKey] = useState(settings.anthropicApiKey ?? '');
+const [psuName, setPsuName] = useState(settings.psuName ?? DEFAULT_PSU.name);
+const [psuMaxVoltage, setPsuMaxVoltage] = useState(String(settings.psuMaxVoltage ?? DEFAULT_PSU.maxVoltage));
+const [psuMaxCurrent, setPsuMaxCurrent] = useState(String(settings.psuMaxCurrent ?? DEFAULT_PSU.maxCurrent));
 
 const handleSave = () => {
 onSave({
@@ -25,6 +29,10 @@ licensePublicKey: licensePublicKey.trim(),
 licenseSecretKey: licenseSecretKey.trim(),
 vbeeAppId: vbeeAppId.trim(),
 vbeeToken: vbeeToken.trim(),
+anthropicApiKey: anthropicApiKey.trim(),
+psuName: psuName.trim() || DEFAULT_PSU.name,
+psuMaxVoltage: parseFloat(psuMaxVoltage) || DEFAULT_PSU.maxVoltage,
+psuMaxCurrent: parseFloat(psuMaxCurrent) || DEFAULT_PSU.maxCurrent,
 });
 onClose();
 };
@@ -71,6 +79,45 @@ className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 r
 Không có key vẫn tạo/chỉnh workflow được — chỉ khi bấm "Xử lý Node" hoặc "Start" mới cần key.
 Lấy key tại{' '}
 <span className="text-[#F1641E] font-bold">aistudio.google.com/apikey</span>.
+</p>
+</div>
+
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Claude API Key</SectionLabel>
+<input
+type="password"
+value={anthropicApiKey}
+onChange={(e) => setAnthropicApiKey(e.target.value)}
+placeholder="sk-ant-..."
+className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 rounded-xl px-3 py-2.5 text-[12px] text-white outline-none transition-all font-mono"
+/>
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Dùng khi chọn model Claude ở Text AI / Vẽ Mạch (VD node "Kiểm tra chéo" của mẫu Mạch DIY). Lấy key tại{' '}
+<span className="text-[#F1641E] font-bold">console.anthropic.com</span> — tính phí riêng với Gemini.
+</p>
+</div>
+
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Máy cấp nguồn của tôi</SectionLabel>
+<input
+type="text"
+value={psuName}
+onChange={(e) => setPsuName(e.target.value)}
+placeholder="Tên máy (VD Sugon 3005D)"
+className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 rounded-xl px-3 py-2.5 text-[12px] text-white outline-none transition-all"
+/>
+<div className="flex gap-2">
+<div className="flex-1 flex items-center gap-1.5 bg-[#050a10] border border-white/5 rounded-xl px-3">
+<input type="number" min="0" step="0.5" value={psuMaxVoltage} onChange={(e) => setPsuMaxVoltage(e.target.value)} className="w-full bg-transparent py-2.5 text-[12px] text-white outline-none font-mono" />
+<span className="text-[11px] text-[#94a3b8] font-bold">V</span>
+</div>
+<div className="flex-1 flex items-center gap-1.5 bg-[#050a10] border border-white/5 rounded-xl px-3">
+<input type="number" min="0" step="0.5" value={psuMaxCurrent} onChange={(e) => setPsuMaxCurrent(e.target.value)} className="w-full bg-transparent py-2.5 text-[12px] text-white outline-none font-mono" />
+<span className="text-[11px] text-[#94a3b8] font-bold">A</span>
+</div>
+</div>
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Mức tối đa máy nguồn cấp được. Mẫu Mạch DIY sẽ cảnh báo nổi bật khi mạch cần điện áp/dòng vượt mức này (hoặc điện áp cao dễ nguy hiểm), để bạn cân nhắc có làm hay không.
 </p>
 </div>
 

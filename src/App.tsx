@@ -58,7 +58,7 @@ import AboutModal from './components/AboutModal';
 import { QuickPreviewModal } from './components/UI';
 
 import type { Workspace, LogEntry, MediaAsset } from './types';
-import { loadSettings, saveSettings, type AppSettings } from './lib/settings';
+import { loadSettings, saveSettings, DEFAULT_PSU, type AppSettings } from './lib/settings';
 import { loadWorkspaceState, saveWorkspaceState } from './lib/workspaceStore';
 import { exportSingleWorkspace, exportAllWorkspaces, importWorkspaces, type ImportedBundle } from './lib/exportImport';
 import { saveAssetFromBase64, saveAssetFromBytes, readAssetAsBase64, deleteAsset, mimeTypeFromExtension } from './lib/assets';
@@ -74,7 +74,8 @@ import { CHARACTER_ANGLES } from './lib/characterAngles';
 import { DEFAULT_DIRECTOR_SYSTEM_PROMPT } from './lib/directorPrompt';
 import { computeBulkConnectEdges } from './lib/bulkConnect';
 import { HoveredEdgeContext } from './lib/edgeHoverContext';
-import { resolveImageModelId, resolveVideoModelId, resolveTextModelId } from './lib/models';
+import { resolveImageModelId, resolveVideoModelId, resolveTextModelId, isClaudeModelId } from './lib/models';
+import { ClaudeTextProvider } from './lib/providers/claudeTextProvider';
 import { save as saveDialog, open as openDialog } from '@tauri-apps/plugin-dialog';
 import { writeFile, readFile } from '@tauri-apps/plugin-fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
@@ -925,7 +926,13 @@ characterGroups.push({ name: undefined, images: [mediaData] });
 // promptOverrideEnabled: cho phép 1 node CỤ THỂ bỏ qua prompt sống-theo-cảnh
 // (VD kết quả xấu ở 1 cảnh, cần tự viết lại riêng node này) mà không phải
 // ngắt hẳn dây nối "cảnh" — xem ghi chú ở NodeSettingsPanel.tsx.
-const ownPrompt = (scenePromptOverride && !node.data.promptOverrideEnabled) ? scenePromptOverride : (node.data.localPrompt || '').trim();
+// Biến dùng chung trong prompt (VD prompt mẫu Mạch DIY nhắc tới máy cấp nguồn của người dùng)
+const psu = appSettingsRef.current;
+const fillPromptVars = (text: string) => text
+.replace(/\{\{NGUON_TEN\}\}/g, psu.psuName || DEFAULT_PSU.name)
+.replace(/\{\{NGUON_V\}\}/g, String(psu.psuMaxVoltage ?? DEFAULT_PSU.maxVoltage))
+.replace(/\{\{NGUON_A\}\}/g, String(psu.psuMaxCurrent ?? DEFAULT_PSU.maxCurrent));
+const ownPrompt = fillPromptVars((scenePromptOverride && !node.data.promptOverrideEnabled) ? scenePromptOverride : (node.data.localPrompt || '').trim());
 // Text AI / Image AI có chân text-in: text nối vào là NỘI DUNG, prompt riêng
 // của node (nếu có) là CHỈ DẪN xử lý nội dung đó — VD Text AI "Kỹ sư" nhận ý
 // tưởng mạch, Image AI nhận thẳng prompt vẽ do Text AI viết. Vbee đọc
@@ -1044,11 +1051,14 @@ const omniFlashProvider = new GeminiOmniFlashProvider(apiKey);
 const textProvider = new GeminiTextProvider(apiKey);
 
 if (node.type === 'textGen') {
-const text = await textProvider.generateText({
+const textModelId = resolveTextModelId(node.data.model);
+const text = isClaudeModelId(textModelId)
+? await new ClaudeTextProvider(appSettingsRef.current.anthropicApiKey ?? '').generateText({ prompt: finalPrompt, referenceImages, model: textModelId })
+: await textProvider.generateText({
 prompt: finalPrompt,
 negativePrompt: negativeStyle || undefined,
 referenceImages,
-model: resolveTextModelId(node.data.model),
+model: textModelId,
 // Gemini 3 (đặc biệt bản Pro) tính cả token suy nghĩ vào giới hạn này — 8192
 // mặc định từng làm prompt dài (VD Kỹ sư mạch) bị cắt ngang. Chỉ là trần, không tốn thêm nếu không dùng tới.
 maxOutputTokens: 32768,
@@ -1204,9 +1214,12 @@ return;
 if (node.type === 'circuitDraw') {
 const design = sourceTexts.join('\n\n').trim();
 const expectedWires = expectedWireCountFromDesign(design);
-const askLayout = async (prompt: string) => parseLayout(await textProvider.generateText({
+const layoutModelId = resolveTextModelId(node.data.model);
+const askLayout = async (prompt: string) => parseLayout(isClaudeModelId(layoutModelId)
+? await new ClaudeTextProvider(appSettingsRef.current.anthropicApiKey ?? '').generateText({ prompt, model: layoutModelId })
+: await textProvider.generateText({
 prompt,
-model: resolveTextModelId(node.data.model),
+model: layoutModelId,
 jsonMode: true,
 // Gemini 3 tính cả token suy nghĩ vào giới hạn này — bố cục nhiều linh kiện dễ vượt 8192 mặc định.
 maxOutputTokens: 32768,
@@ -1526,6 +1539,29 @@ const remainingNodes = new Set(nodeIdsToRun);
 const completedNodes = new Set<string>();
 const processingNodes = new Set<string>();
 let chainFailed = false;
+let pausedAtReview: string | null = null;
+
+/**
+ * Node Duyệt Text là điểm dừng để người dùng duyệt: chưa lấy nội dung, hoặc
+ * node phía trước vừa ra bản mới hơn bản đã lấy → các node phía sau KHÔNG được
+ * chạy (trước đây chúng chạy song song rồi báo lỗi "chưa có nội dung", làm
+ * dừng luôn cả các nhánh khác đang chờ chạy).
+ */
+const reviewNeedsAttention = (review: Node, currentNodes: Node[], currentEdges: Edge[]) => {
+const inEdge = currentEdges.find(e => e.target === review.id && e.targetHandle === 'text-in');
+if (!inEdge) return false;
+const upstreamText: string | undefined = currentNodes.find(n => n.id === inEdge.source)?.data?.result?.text;
+const own = String(review.data.editedText ?? '').trim();
+if (!own) return true;
+// pulledText chỉ có từ bản này trở đi — workflow cũ chưa có thì coi như đã duyệt
+return review.data.pulledText !== undefined && upstreamText !== undefined && upstreamText !== review.data.pulledText;
+};
+
+const pauseAt = (review: Node, currentNodes: Node[], currentEdges: Edge[]) => {
+remainingNodes.delete(review.id);
+getDescendants(review.id, currentNodes, currentEdges).forEach(d => remainingNodes.delete(d));
+pausedAtReview = review.data.label || 'Duyệt Text';
+};
 
 const isNodeReady = (nodeId: string, currentEdges: Edge[]) => {
 const parentEdges = currentEdges.filter(e => e.target === nodeId);
@@ -1542,7 +1578,21 @@ const currentEdges = getEdges();
 const readyNodes = Array.from(remainingNodes).filter(id => {
 const node = currentNodes.find(n => n.id === id);
 if (!node) return false;
-if (node.type === 'mediaSource' || node.type === 'styleNode' || node.type === 'textReview' || node.type === 'sceneReview' || node.type === 'scenePass') {
+if (node.type === 'textReview') {
+// Đợi các node phía trước trong lượt chạy này xong rồi mới quyết định
+if (!isNodeReady(id, currentEdges)) return false;
+if (reviewNeedsAttention(node, currentNodes, currentEdges)) { pauseAt(node, currentNodes, currentEdges); return false; }
+completedNodes.add(id);
+remainingNodes.delete(id);
+return false;
+}
+// Node phụ thuộc 1 Duyệt Text KHÔNG nằm trong lượt chạy (VD chỉ node sau bị dirty) mà chưa duyệt → cũng dừng
+const blockingReview = currentEdges
+.filter(e => e.target === id)
+.map(e => currentNodes.find(n => n.id === e.source))
+.find(src => src?.type === 'textReview' && !remainingNodes.has(src.id) && !completedNodes.has(src.id) && reviewNeedsAttention(src, currentNodes, currentEdges));
+if (blockingReview) { pauseAt(blockingReview, currentNodes, currentEdges); return false; }
+if (node.type === 'mediaSource' || node.type === 'styleNode' || node.type === 'sceneReview' || node.type === 'scenePass') {
 completedNodes.add(id);
 remainingNodes.delete(id);
 return false;
@@ -1596,10 +1646,10 @@ await new Promise(r => setTimeout(r, 400));
 setRunningChain(false);
 setIsStopping(false);
 setFlowStatus({
-message: chainFailed ? 'LỖI WORKFLOW.' : (stopFlagRef.current ? 'ĐÃ DỪNG.' : 'HOÀN TẤT.'),
-type: chainFailed ? 'error' : (stopFlagRef.current ? 'warning' : 'success')
+message: chainFailed ? 'LỖI WORKFLOW.' : (stopFlagRef.current ? 'ĐÃ DỪNG.' : (pausedAtReview ? `DỪNG CHỜ DUYỆT Ở "${String(pausedAtReview).toUpperCase()}" — BẤM "LẤY TỪ INPUT", DUYỆT RỒI START LẠI.` : 'HOÀN TẤT.')),
+type: chainFailed ? 'error' : (stopFlagRef.current || pausedAtReview ? 'warning' : 'success')
 });
-setTimeout(() => setFlowStatus(null), 3000);
+setTimeout(() => setFlowStatus(null), pausedAtReview ? 10000 : 3000);
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [getNodes, getEdges, concurrency, runningChain, isNodeDirty]);
 

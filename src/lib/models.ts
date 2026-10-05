@@ -31,7 +31,9 @@ export const TEXT_MODEL_IDS: Record<string, string> = {
   'Gemini 2.5 Flash': 'gemini-2.5-flash',
   'Gemini 3.6 Flash': 'gemini-3.6-flash',
   'Gemini 3.7 Flash': 'gemini-3.7-flash',
-  'Gemini 3 Pro': 'gemini-3.1-pro-preview', // đã đổi từ "gemini-3-pro-preview" — docs hiện chỉ liệt kê "Gemini 3.1 Pro" (preview), không có bản "3 Pro" trần
+  'Gemini 3 Pro': 'gemini-3.1-pro-preview',
+  'Claude Opus 5.5': 'claude-opus-5-5',
+  'Claude Sonnet 5.5': 'claude-sonnet-5-5', // đã đổi từ "gemini-3-pro-preview" — docs hiện chỉ liệt kê "Gemini 3.1 Pro" (preview), không có bản "3 Pro" trần
 };
 
 export function resolveImageModelId(displayName: string): string {
@@ -45,3 +47,6 @@ export function resolveVideoModelId(displayName: string): string {
 export function resolveTextModelId(displayName: string): string {
   return TEXT_MODEL_IDS[displayName] ?? displayName;
 }
+
+/** Model Claude (Anthropic) — gọi qua ClaudeTextProvider thay vì Gemini. */
+export const isClaudeModelId = (id: string) => id.startsWith('claude-');

@@ -28,7 +28,15 @@ const TextReviewNode = ({ id, data }: any) => {
   const onPullFromInput = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (incomingText === null) return;
-    setEditedText(incomingText);
+    // pulledText = bản gốc lúc bấm lấy — để biết node phía trước có ra bản MỚI
+    // hơn hay không, kể cả khi người dùng đã sửa tay editedText sau đó.
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === id
+          ? { ...node, data: { ...node.data, editedText: incomingText, pulledText: incomingText, result: { type: 'text', text: incomingText } } }
+          : node
+      )
+    );
   };
 
   const onDownload = () => {
@@ -50,7 +58,7 @@ const TextReviewNode = ({ id, data }: any) => {
     deleteElements({ nodes: [{ id }] });
   };
 
-  const hasNewUpstreamText = incomingText !== null && incomingText !== (data.editedText ?? '');
+  const hasNewUpstreamText = incomingText !== null && incomingText !== (data.pulledText ?? data.editedText ?? '');
 
   return (
     <div className="node-container !bg-[#0d1424] !border-[#a855f7]/20 !w-[240px] !p-0 overflow-hidden group/node">

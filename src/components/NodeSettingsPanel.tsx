@@ -15,6 +15,8 @@ onClose: () => void;
 const VIDEO_MODELS = ['Omni Flash', 'Veo 3.1 - Fast', 'Veo 3.1 - Lite', 'Veo 3.1 - Quality'];
 const IMAGE_MODELS = ['Nano Banana Pro', 'Nano Banana 2', 'Nano Banana 2 Lite'];
 const TEXT_MODELS = ['Gemini 2.5 Flash', 'Gemini 3.6 Flash', 'Gemini 3.7 Flash', 'Gemini 3 Pro'];
+// Claude chỉ có ở node chỉ cần sinh chữ (Text AI, Vẽ Mạch) — các node khác dùng tính năng riêng của Gemini (nghe audio/video, responseSchema).
+const TEXT_MODELS_WITH_CLAUDE = [...TEXT_MODELS, 'Claude Opus 5.5', 'Claude Sonnet 5.5'];
 
 const NodeSettingsPanel: React.FC<Props> = ({ nodeId, nodes, edges, onUpdateData, onDisconnectSceneIn, onClose }) => {
 const node = nodes.find(n => n.id === nodeId);
@@ -140,7 +142,7 @@ className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 r
 <>
 <div className="flex flex-col gap-3.5">
 <SectionLabel>Cấu hình Model</SectionLabel>
-<FieldDropdown label="Mẫu AI" value={data.model} options={TEXT_MODELS} onChange={(v) => updateNode('model', v)} />
+<FieldDropdown label="Mẫu AI" value={data.model} options={TEXT_MODELS_WITH_CLAUDE} onChange={(v) => updateNode('model', v)} />
 </div>
 {renderPromptField()}
 </>
@@ -150,7 +152,7 @@ className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 r
 <>
 <div className="flex flex-col gap-3.5">
 <SectionLabel>Cấu hình Model (lên bố cục)</SectionLabel>
-<FieldDropdown label="Mẫu AI" value={data.model} options={TEXT_MODELS} onChange={(v) => updateNode('model', v)} />
+<FieldDropdown label="Mẫu AI" value={data.model} options={TEXT_MODELS_WITH_CLAUDE} onChange={(v) => updateNode('model', v)} />
 </div>
 <div className="flex flex-col gap-3.5">
 <SectionLabel>Ghi chú bố cục (không bắt buộc)</SectionLabel>
