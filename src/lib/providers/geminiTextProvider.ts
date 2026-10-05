@@ -8,6 +8,10 @@ export interface TextGenParams {
   negativePrompt?: string;
   referenceImages?: ReferenceImage[];
   model: string;
+  /** Ép trả về JSON thuần (responseMimeType application/json). */
+  jsonMode?: boolean;
+  /** Mặc định 8192 — model "thinking" (Gemini 3) tính cả token suy nghĩ vào đây. */
+  maxOutputTokens?: number;
 }
 
 /**
@@ -63,7 +67,10 @@ export class GeminiTextProvider {
       },
       body: JSON.stringify({
         contents: [{ parts }],
-        generationConfig: { maxOutputTokens: 8192 },
+        generationConfig: {
+          maxOutputTokens: params.maxOutputTokens ?? 8192,
+          ...(params.jsonMode ? { responseMimeType: 'application/json' } : {}),
+        },
       }),
     });
 

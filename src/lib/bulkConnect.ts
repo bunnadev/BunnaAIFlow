@@ -5,7 +5,7 @@ export function nodeHasHandle(node: Node, handleId: string): boolean {
   const type = node.type;
   if (handleId === 'media-in') return ['imageGen', 'videoGen', 'textGen', 'stt', 'audioMaster', 'scenePlanner', 'character', 'director', 'mediaGroup'].includes(type as string);
   if (handleId === 'style-in') return ['imageGen', 'videoGen', 'scenePlanner', 'director'].includes(type as string);
-  if (handleId === 'text-in') return type === 'textReview' || type === 'vbee';
+  if (handleId === 'text-in') return ['textReview', 'vbee', 'textGen', 'imageGen', 'circuitDraw'].includes(type as string);
   if (handleId === 'scenes-in') return type === 'sceneReview';
   if (handleId === 'scene-in') return ['imageGen', 'videoGen', 'textGen', 'scenePass'].includes(type as string);
   if (handleId.startsWith('character-in-')) {

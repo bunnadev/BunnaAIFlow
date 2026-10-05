@@ -1,11 +1,13 @@
 import React from 'react';
+import { WORKFLOW_TEMPLATES } from '../lib/workflowTemplates';
 
 interface Props {
 onAdd: (type: string) => void;
+onAddTemplate: (templateId: string) => void;
 onClose: () => void;
 }
 
-const NodeLibraryPanel: React.FC<Props> = ({ onAdd, onClose }) => {
+const NodeLibraryPanel: React.FC<Props> = ({ onAdd, onAddTemplate, onClose }) => {
 const nodeTypes = [
 { type: 'mediaSource', label: 'Media Source', desc: 'Nguồn ảnh/video từ máy.', icon: 'perm_media', color: 'text-[#F1641E]', bg: 'bg-[#F1641E]/10' },
 { type: 'styleNode', label: 'Phong cách', desc: 'Style prompt cho workflow.', icon: 'auto_awesome', color: 'text-[#F1641E]', bg: 'bg-[#F1641E]/10' },
@@ -21,6 +23,7 @@ const nodeTypes = [
 { type: 'character', label: 'Nhân Vật', desc: 'Nối 1 ảnh trực diện, tự tạo thêm 3 góc nhìn — nối vào chân "nv" của Image/Video AI để giữ nhân vật nhất quán.', icon: 'face', color: 'text-[#8b5cf6]', bg: 'bg-[#8b5cf6]/10' },
 { type: 'director', label: 'Đạo Diễn', desc: 'Ảnh (người mẫu + sản phẩm) + ý tưởng vào, tự lên kịch bản shot kèm prompt — dùng cho video affiliate.', icon: 'theater_comedy', color: 'text-[#14b8a6]', bg: 'bg-[#14b8a6]/10' },
 { type: 'scenePass', label: 'Chuyển Tiếp Cảnh', desc: 'Relay 1 cảnh từ Duyệt Phân Cảnh tới nhiều node — nối 1 lần, nhân bản cụm không cần nối lại từng node.', icon: 'cable', color: 'text-[#f43f5e]', bg: 'bg-[#f43f5e]/10' },
+{ type: 'circuitDraw', label: 'Vẽ Mạch', desc: 'Bản thiết kế mạch vào, AI lên bố cục rồi app tự vẽ ảnh mạch DIY — dây luôn nối đúng chân.', icon: 'electrical_services', color: 'text-[#84cc16]', bg: 'bg-[#84cc16]/10' },
 { type: 'mediaGroup', label: 'Gộp Media', desc: 'Gom nhiều ảnh nối vào thành 1 bó — nối 1 dây duy nhất sang Image AI/Video AI thay vì kéo lại từng ảnh.', icon: 'collections', color: 'text-[#0ea5e9]', bg: 'bg-[#0ea5e9]/10' }
 ];
 
@@ -39,6 +42,23 @@ return (
 </div>
 
 <div className="flex-1 overflow-y-auto custom-scrollbar p-3 flex flex-col gap-2.5">
+<span className="text-[8px] font-black text-[#94a3b8] uppercase tracking-widest px-1">Mẫu workflow (mở tab mới)</span>
+{WORKFLOW_TEMPLATES.map((tpl) => (
+<button
+key={tpl.id}
+onClick={() => onAddTemplate(tpl.id)}
+className="w-full p-3 bg-[#F1641E]/5 border border-[#F1641E]/30 hover:border-[#F1641E]/70 rounded-xl flex items-start gap-3 transition-all group text-left"
+>
+<div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform bg-[#F1641E]/15 text-[#F1641E]">
+<span className="material-symbols-outlined text-[20px]">{tpl.icon}</span>
+</div>
+<div className="flex-1 flex flex-col">
+<span className="text-[9px] font-black text-white uppercase tracking-widest group-hover:text-[#F1641E]">{tpl.label}</span>
+<span className="text-[7.5px] text-[#94a3b8] leading-tight line-clamp-2 mt-0.5">{tpl.desc}</span>
+</div>
+</button>
+))}
+<span className="text-[8px] font-black text-[#94a3b8] uppercase tracking-widest px-1 mt-2">Node</span>
 {nodeTypes.map((item) => (
 <button
 key={item.type}

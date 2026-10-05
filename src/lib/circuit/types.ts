@@ -1,0 +1,53 @@
+/**
+ * Bố cục mạch DIY dạng dữ liệu — AI (Text AI) chỉ quyết định đặt linh kiện ở
+ * đâu và dây nào nối chân nào; app tự vẽ ra ảnh bằng thư viện linh kiện
+ * (parts.ts). Đầu dây luôn gắn đúng toạ độ chân linh kiện nên không thể vẽ
+ * nhầm chân như khi để model ảnh tự vẽ.
+ */
+
+export type Rotation = 0 | 90 | 180 | 270;
+export type LabelSide = 'left' | 'right' | 'top' | 'bottom';
+
+export interface PlacedPart {
+  /** Ký hiệu duy nhất, VD "Q1", "R1", "IN+" — dùng trong wire.from/to ("Q1.B"). */
+  id: string;
+  /** Loại linh kiện trong thư viện, VD "resistor", "to3". */
+  type: string;
+  /** Toạ độ TÂM linh kiện trên canvas. */
+  x: number;
+  y: number;
+  rotation?: Rotation;
+  /** Chữ in thật trên thân (VD "2N3055", "B50K", "104"). */
+  marking?: string;
+  /** Giá trị điện (điện trở dùng để tô vạch màu, VD "220", "4.7k"). */
+  value?: string;
+  /** Nhãn xanh lá cạnh linh kiện (VD "2N3055", "220Ω"). Bỏ trống = không có nhãn. */
+  label?: string;
+  labelSide?: LabelSide;
+  /** Có tản nhiệt phía sau (TO-3/TO-220). */
+  heatsink?: boolean;
+  /** Chỉ cho "bus" (thanh mass đồng): chiều dài. */
+  length?: number;
+}
+
+export interface Wire {
+  /** Số thứ tự dây trong bản thiết kế (DANH SÁCH DÂY). */
+  n?: number;
+  /** "PartId.pin" hoặc "BusId@toạ_độ" (VD "GND@420"). */
+  from: string;
+  to: string;
+  color: string;
+  /** Các điểm gấp khúc ở giữa (toạ độ tuyệt đối). */
+  via?: [number, number][];
+}
+
+export interface CircuitLayout {
+  width?: number;
+  height?: number;
+  titleTop?: string;
+  titleBottom?: string;
+  parts: PlacedPart[];
+  wires: Wire[];
+}
+
+export interface Point { x: number; y: number }

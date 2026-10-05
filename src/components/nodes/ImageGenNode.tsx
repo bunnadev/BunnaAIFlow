@@ -224,6 +224,10 @@ title="Xoá node"
 <Handle type="target" position={Position.Left} id="scene-in" className="!bg-[#f43f5e] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />
 <span className="text-[7px] font-black text-white/30 lowercase tracking-[0.1em] -translate-y-[0.5px]">cảnh</span>
 </div>
+<div className="flex items-center gap-1.5">
+<Handle type="target" position={Position.Left} id="text-in" className="!bg-[#a855f7] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />
+<span className="text-[7px] font-black text-white/30 lowercase tracking-[0.1em] -translate-y-[0.5px]">text</span>
+</div>
 {Array.from({ length: characterCount }, (_, i) => (
 <div className="flex items-center gap-1.5" key={`character-in-${i}`}>
 <Handle type="target" position={Position.Left} id={`character-in-${i}`} className="!bg-[#8b5cf6] !w-4 !h-4 !static !translate-x-0 !border-2 !border-[#0d1424]" />

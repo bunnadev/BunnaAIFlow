@@ -124,6 +124,13 @@ color: 'text-[#f43f5e]',
 bg: 'hover:bg-[#f43f5e]/10'
 },
 {
+type: 'circuitDraw',
+label: 'Vẽ Mạch',
+icon: 'electrical_services',
+color: 'text-[#84cc16]',
+bg: 'hover:bg-[#84cc16]/10'
+},
+{
 type: 'mediaGroup',
 label: 'Gộp Media',
 icon: 'collections',

@@ -22,7 +22,7 @@ import { saveAssetFromBase64, readAssetAsBase64 } from './assets';
  *   File cũ chưa có `kind` được suy ra tạm theo số lượng workspace trong file.
  */
 
-const IMAGE_RESULT_NODE_TYPES = new Set(['imageGen']);
+const IMAGE_RESULT_NODE_TYPES = new Set(['imageGen', 'circuitDraw']);
 const HEAVY_MEDIA_RESULT_NODE_TYPES = new Set(['videoGen', 'vbee', 'audioMaster']);
 const LIGHT_RESULT_NODE_TYPES = new Set(['textGen', 'stt', 'scenePlanner', 'director']); // giữ nguyên result, không cần path/base64
 

@@ -41,6 +41,12 @@ import NodeSettingsPanel from './components/NodeSettingsPanel';
 import StyleSettingsModal from './components/StyleSettingsModal';
 import SceneEditPanel from './components/SceneEditPanel';
 import NodeLibraryPanel from './components/NodeLibraryPanel';
+import { WORKFLOW_TEMPLATES } from './lib/workflowTemplates';
+import CircuitDrawNode from './components/nodes/CircuitDrawNode';
+import { renderCircuitSvg, validateLayout, parseLayout, expectedWireCountFromDesign, severeIssues } from './lib/circuit/render';
+import { buildCircuitLayoutPrompt, buildCircuitRepairPrompt } from './lib/circuit/prompt';
+import { svgToPngBase64 } from './lib/circuit/rasterize';
+import type { CircuitLayout } from './lib/circuit/types';
 import ExecutionLogPanel from './components/ExecutionLogPanel';
 import BatchExportPanel from './components/BatchExportPanel';
 import BatchCombinedModal from './components/BatchCombinedModal';
@@ -91,7 +97,7 @@ function withFreshEdgeIds(ws: Workspace): Workspace {
 }
 
 export const getNodeFileName = (node: Node, index: number, prefix: string = 'BUNNA_FLOW') => {
-const typeCode = node.type === 'imageGen' ? 'IMG' : (node.type === 'videoGen' ? 'VID' : ((node.type === 'vbee' || node.type === 'audioMaster') ? 'AUD' : ((node.type === 'scenePlanner' || node.type === 'sceneReview' || node.type === 'director') ? 'SCN' : (node.type === 'character' ? 'CHR' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES')))));
+const typeCode = (node.type === 'imageGen' || node.type === 'circuitDraw') ? 'IMG' : (node.type === 'videoGen' ? 'VID' : ((node.type === 'vbee' || node.type === 'audioMaster') ? 'AUD' : ((node.type === 'scenePlanner' || node.type === 'sceneReview' || node.type === 'director') ? 'SCN' : (node.type === 'character' ? 'CHR' : ((node.type === 'textGen' || node.type === 'stt' || node.type === 'textReview') ? 'TXT' : 'RES')))));
 const extension = node.data.result?.type === 'video' ? 'mp4' : (node.data.result?.type === 'text' ? 'txt' : (node.data.result?.type === 'audio' ? 'wav' : (node.data.result?.type === 'sceneList' ? 'json' : 'jpg')));
 const label = (node.data.label || 'ASSET').replace(/[^a-z0-9]/gi, '_').toUpperCase();
 return `${prefix}_${typeCode}_${index + 1}_${label}.${extension}`;
@@ -104,6 +110,7 @@ videoGen: VideoGenNode,
 textGen: TextGenNode,
 stt: SttNode,
 textReview: TextReviewNode,
+circuitDraw: CircuitDrawNode,
 vbee: VbeeNode,
 audioMaster: AudioMasterNode,
 scenePlanner: ScenePlannerNode,
@@ -177,7 +184,7 @@ setHoveredEdgeId(null);
 }, [edges, hoveredEdgeId]);
 
 const [undoStack, setUndoStack] = useState<UndoState[]>([]);
-const { screenToFlowPosition, getNodes, getEdges, setViewport, getViewport } = useReactFlow();
+const { screenToFlowPosition, getNodes, getEdges, setViewport, getViewport, fitView } = useReactFlow();
 
 const stopFlagRef = useRef(false);
 const activeJobsRef = useRef(0);
@@ -262,7 +269,7 @@ setUndoStack(prev => [...prev, { nodes: getNodes(), edges: getEdges() }]);
 
 const handleResetAllResults = useCallback(() => {
 setNodes(nds => nds.map(node => {
-if (node.type === 'imageGen' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee' || node.type === 'audioMaster' || node.type === 'scenePlanner' || node.type === 'character' || node.type === 'director' || node.type === 'mediaGroup') {
+if (node.type === 'imageGen' || node.type === 'circuitDraw' || node.type === 'videoGen' || node.type === 'textGen' || node.type === 'stt' || node.type === 'vbee' || node.type === 'audioMaster' || node.type === 'scenePlanner' || node.type === 'character' || node.type === 'director' || node.type === 'mediaGroup') {
 return {
 ...node,
 data: { ...node.data, result: null, statusText: '', isFinalized: false, isLoading: false }
@@ -300,6 +307,21 @@ setActiveWorkspaceId(newId);
 setNodes([]);
 setEdges([]);
 }, [saveCurrentToWorkspace, workspaces.length, setNodes, setEdges]);
+
+const handleAddTemplateWorkspace = useCallback((templateId: string) => {
+const template = WORKFLOW_TEMPLATES.find(t => t.id === templateId);
+if (!template) return;
+saveCurrentToWorkspace();
+const { name, nodes: tplNodes, edges: tplEdges } = template.build();
+const newId = uuidv4();
+const newWs: Workspace = { id: newId, name, nodes: tplNodes, edges: tplEdges };
+setWorkspaces(prev => [...prev, newWs]);
+setActiveWorkspaceId(newId);
+setNodes(tplNodes);
+setEdges(tplEdges);
+setIsNodeLibraryOpen(false);
+setTimeout(() => fitView({ padding: 0.15 }), 50);
+}, [saveCurrentToWorkspace, setNodes, setEdges, fitView]);
 
 const handleDeleteWorkspace = useCallback((id: string) => {
 if (workspaces.length <= 1) return;
@@ -508,6 +530,7 @@ case 'character': newNode = { id, type, position: finalPos, data: { ...commonDat
 case 'director': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Đạo Diễn', model: 'Gemini 3.6 Flash', localPrompt: '', systemPrompt: DEFAULT_DIRECTOR_SYSTEM_PROMPT } }; break;
 case 'scenePass': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Chuyển Tiếp Cảnh' } }; break;
 case 'mediaGroup': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Gộp Media' } }; break;
+case 'circuitDraw': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Vẽ Mạch', model: 'Gemini 3.6 Flash', localPrompt: '' } }; break;
 case 'styleNode': newNode = { id, type, position: finalPos, data: { ...commonData, label: 'Phong cách', positivePrompt: '', negativePrompt: '' } }; break;
 default: return;
 }
@@ -902,7 +925,15 @@ characterGroups.push({ name: undefined, images: [mediaData] });
 // promptOverrideEnabled: cho phép 1 node CỤ THỂ bỏ qua prompt sống-theo-cảnh
 // (VD kết quả xấu ở 1 cảnh, cần tự viết lại riêng node này) mà không phải
 // ngắt hẳn dây nối "cảnh" — xem ghi chú ở NodeSettingsPanel.tsx.
-const basePrompt = (scenePromptOverride && !node.data.promptOverrideEnabled) ? scenePromptOverride : (node.data.localPrompt || 'A cinematic masterpiece');
+const ownPrompt = (scenePromptOverride && !node.data.promptOverrideEnabled) ? scenePromptOverride : (node.data.localPrompt || '').trim();
+// Text AI / Image AI có chân text-in: text nối vào là NỘI DUNG, prompt riêng
+// của node (nếu có) là CHỈ DẪN xử lý nội dung đó — VD Text AI "Kỹ sư" nhận ý
+// tưởng mạch, Image AI nhận thẳng prompt vẽ do Text AI viết. Vbee đọc
+// sourceTexts riêng ở runNodeLogic, không đi qua đây.
+const incomingText = (node.type === 'textGen' || node.type === 'imageGen') ? sourceTexts.join('\n\n').trim() : '';
+const basePrompt = incomingText
+? (ownPrompt ? `${ownPrompt}\n\n--- NỘI DUNG ĐẦU VÀO ---\n${incomingText}` : incomingText)
+: (ownPrompt || 'A cinematic masterpiece');
 
 // Mode "Khung" của Video AI dùng đúng 2 ảnh sourceImages làm firstFrame/lastFrame
 // theo thứ tự cố định — ảnh nhân vật (character-in-N) không có chỗ trong mô hình
@@ -943,6 +974,46 @@ mimeType: m.mimeType,
 return { node, finalPrompt, positiveStyle, negativeStyle, referenceImages, sourceImages, sourceVideos, sourceAudios, sourceTexts, scenePromptOverride };
 };
 
+/**
+ * Vẽ bố cục mạch thành PNG rồi gắn vào node Vẽ Mạch. Bố cục JSON luôn được
+ * lưu lại (kể cả khi lỗi) để sửa tay trong Cài đặt rồi bấm "Vẽ lại".
+ */
+const drawCircuitIntoNode = async (nodeId: string, layout: CircuitLayout, expectedWires?: number, runHash?: string) => {
+const layoutJson = JSON.stringify(layout, null, 2);
+const { errors, warnings } = validateLayout(layout, expectedWires);
+if (errors.length) {
+setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, layoutJson, circuitWarnings: errors } } : n));
+throw new Error(`Bố cục mạch có lỗi: ${errors.join(' | ')}`);
+}
+const width = layout.width ?? 1080;
+const height = layout.height ?? 1350;
+const b64 = await svgToPngBase64(renderCircuitSvg(layout), width, height);
+const asset = await saveAssetFromBase64(b64, 'image/png');
+setNodes(nds => nds.map(n => n.id === nodeId ? {
+...n,
+data: {
+...n.data, isLoading: false, statusText: 'Hoàn tất', isFinalized: true,
+...(runHash ? { lastRunHash: runHash } : {}),
+layoutJson, circuitWarnings: warnings,
+result: { ...asset, type: 'image', resolution: `${width}x${height}` },
+}
+} : n));
+};
+
+const handleCircuitRedraw = async (nodeId: string) => {
+const node = getNodes().find(n => n.id === nodeId);
+if (!node?.data.layoutJson) return;
+const designEdge = getEdges().find(e => e.target === nodeId && e.targetHandle === 'text-in');
+const design = getNodes().find(n => n.id === designEdge?.source)?.data?.result?.text ?? '';
+setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, isLoading: true, statusText: 'Đang vẽ lại...' } } : n));
+try {
+await drawCircuitIntoNode(nodeId, parseLayout(node.data.layoutJson), expectedWireCountFromDesign(design));
+} catch (e: any) {
+setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, isLoading: false, statusText: 'Lỗi' } } : n));
+setFlowStatus({ message: `VẼ LẠI LỖI: ${e?.message || e}`, type: 'error' });
+}
+};
+
 const runNodeLogic = async (nodeId: string, nodesSnapshot?: Node[], edgesSnapshot?: Edge[]) => {
 const currentNodes = nodesSnapshot || getNodes();
 const currentEdges = edgesSnapshot || getEdges();
@@ -956,6 +1027,16 @@ const ctx = await buildNodeRequestContext(nodeId, nodesSnapshot, edgesSnapshot);
 if (!ctx) throw new Error('Không tìm thấy node.');
 const { finalPrompt, negativeStyle, referenceImages, sourceImages, sourceVideos, sourceAudios, sourceTexts, positiveStyle } = ctx;
 
+// Có nối dây text-in mà chưa có chữ nào (thường là Duyệt Text chưa bấm "Lấy
+// từ input") thì dừng hẳn — chạy tiếp sẽ ra kết quả rác từ mỗi phần chỉ dẫn.
+// Chạy cả workflow coi Duyệt Text là xong ngay, nên đây chính là điểm dừng
+// để người dùng duyệt rồi mới chạy tiếp.
+if ((node.type === 'textGen' || node.type === 'imageGen' || node.type === 'circuitDraw')
+&& currentEdges.some(e => e.target === nodeId && e.targetHandle === 'text-in')
+&& !sourceTexts.some(t => t.trim())) {
+throw new Error('Dây "text" đã nối nhưng chưa có nội dung — duyệt xong node phía trước (VD bấm "Lấy từ input" ở Duyệt Text) rồi chạy lại.');
+}
+
 const apiKey = appSettingsRef.current.geminiApiKey ?? '';
 const imageProvider = new GeminiImageProvider(apiKey);
 const videoProvider = new GeminiVideoProvider(apiKey);
@@ -968,6 +1049,9 @@ prompt: finalPrompt,
 negativePrompt: negativeStyle || undefined,
 referenceImages,
 model: resolveTextModelId(node.data.model),
+// Gemini 3 (đặc biệt bản Pro) tính cả token suy nghĩ vào giới hạn này — 8192
+// mặc định từng làm prompt dài (VD Kỹ sư mạch) bị cắt ngang. Chỉ là trần, không tốn thêm nếu không dùng tới.
+maxOutputTokens: 32768,
 });
 setNodes(nds => nds.map(n => n.id === nodeId ? {
 ...n,
@@ -1114,6 +1198,30 @@ lastRunHash: getNodeStateHash(node, currentEdges),
 result: { type: 'sceneList', scenes, style: positiveStyle || undefined }
 }
 } : n));
+return;
+}
+
+if (node.type === 'circuitDraw') {
+const design = sourceTexts.join('\n\n').trim();
+const expectedWires = expectedWireCountFromDesign(design);
+const askLayout = async (prompt: string) => parseLayout(await textProvider.generateText({
+prompt,
+model: resolveTextModelId(node.data.model),
+jsonMode: true,
+// Gemini 3 tính cả token suy nghĩ vào giới hạn này — bố cục nhiều linh kiện dễ vượt 8192 mặc định.
+maxOutputTokens: 32768,
+}));
+const setStatus = (statusText: string) => setNodes(nds => nds.map(n => n.id === nodeId ? { ...n, data: { ...n.data, statusText } } : n));
+setStatus('Đang lên bố cục...');
+let layout = await askLayout(buildCircuitLayoutPrompt(design, node.data.localPrompt));
+// App tự kiểm tra (đè linh kiện, tràn khung, không đi được dây…) rồi nhờ AI sửa tối đa 2 vòng.
+for (let round = 1; round <= 2; round++) {
+const issues = severeIssues(validateLayout(layout, expectedWires));
+if (!issues.length || stopFlagRef.current) break;
+setStatus(`Đang sửa bố cục (${round}/2)...`);
+layout = await askLayout(buildCircuitRepairPrompt(design, JSON.stringify(layout), issues, node.data.localPrompt));
+}
+await drawCircuitIntoNode(nodeId, layout, expectedWires, getNodeStateHash(node, currentEdges));
 return;
 }
 
@@ -1570,6 +1678,7 @@ setActiveStyleSettingsNodeId(null);
 setIsNodeLibraryOpen(false);
 };
 const hDebugPreview = (e: any) => { handlePreviewNodeRequest(e.detail.nodeId); };
+const hCircuitRedraw = (e: any) => { handleCircuitRedraw(e.detail.nodeId); };
 
 window.addEventListener('execute-node' as any, hEx);
 window.addEventListener('open-preview' as any, hPrev);
@@ -1580,6 +1689,7 @@ window.addEventListener('upload-node-result' as any, hUpload);
 window.addEventListener('vectorize-node' as any, hVec);
 window.addEventListener('open-scene-edit' as any, hSceneEdit);
 window.addEventListener('debug-node-request' as any, hDebugPreview);
+window.addEventListener('circuit-redraw' as any, hCircuitRedraw);
 return () => {
 window.removeEventListener('execute-node' as any, hEx);
 window.removeEventListener('open-preview' as any, hPrev);
@@ -1590,6 +1700,7 @@ window.removeEventListener('upload-node-result' as any, hUpload);
 window.removeEventListener('vectorize-node' as any, hVec);
 window.removeEventListener('open-scene-edit' as any, hSceneEdit);
 window.removeEventListener('debug-node-request' as any, hDebugPreview);
+window.removeEventListener('circuit-redraw' as any, hCircuitRedraw);
 };
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [getNodes, getEdges, isNodeDirty, onDuplicateNode, handleDownloadNode, handleUploadNodeResult, handleVectorizeNode, handlePreviewNodeRequest]);
@@ -1630,7 +1741,7 @@ concurrency={concurrency} onChangeConcurrency={() => {}}
 onRunPipeline={() => {
 const currentNodes = getNodes();
 const currentEdges = getEdges();
-const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt' || n.type === 'vbee' || n.type === 'audioMaster' || n.type === 'scenePlanner' || n.type === 'character' || n.type === 'director' || n.type === 'mediaGroup') && isNodeDirty(n, currentEdges));
+const dirty = currentNodes.filter(n => (n.type === 'imageGen' || n.type === 'circuitDraw' || n.type === 'videoGen' || n.type === 'textGen' || n.type === 'stt' || n.type === 'vbee' || n.type === 'audioMaster' || n.type === 'scenePlanner' || n.type === 'character' || n.type === 'director' || n.type === 'mediaGroup') && isNodeDirty(n, currentEdges));
 const ids = new Set<string>();
 dirty.forEach(n => { ids.add(n.id); getDescendants(n.id, currentNodes, currentEdges).forEach(d => ids.add(d)); });
 executeWorkflow(Array.from(ids));
@@ -1675,7 +1786,7 @@ className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all
 </div>
 </div>
 <div className="flex-1 relative bg-[#1C1C1C] flex">
-{isNodeLibraryOpen && <NodeLibraryPanel onAdd={(type) => onAddManualNode(type)} onClose={() => setIsNodeLibraryOpen(false)} />}
+{isNodeLibraryOpen && <NodeLibraryPanel onAdd={(type) => onAddManualNode(type)} onAddTemplate={handleAddTemplateWorkspace} onClose={() => setIsNodeLibraryOpen(false)} />}
 {activeSettingsNodeId && <NodeSettingsPanel nodeId={activeSettingsNodeId} nodes={nodes} edges={edges} onUpdateData={(id, key, val) => {
 setNodes(nds => nds.map(n => n.id === id ? { ...n, data: { ...n.data, [key]: val } } : n));
 if (key === 'characterCount') {

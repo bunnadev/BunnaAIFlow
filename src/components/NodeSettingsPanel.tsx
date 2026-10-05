@@ -35,6 +35,7 @@ const isSceneReview = node.type === 'sceneReview';
 const isCharacter = node.type === 'character';
 const isDirector = node.type === 'director';
 const isMediaSource = node.type === 'mediaSource';
+const isCircuit = node.type === 'circuitDraw';
 const data = node.data;
 
 const updateNode = (key: string, val: any) => {
@@ -105,9 +106,9 @@ return (
 <div className="absolute top-0 left-0 h-full w-[288px] bg-[#0b1019] border-r border-[#F1641E]/20 z-30 flex flex-col shadow-2xl animate-slide-panel">
 <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
 <div className="flex items-center gap-2.5">
-<div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : isText ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : isStt ? 'bg-[#22c55e]/10 text-[#22c55e]' : isTextReview ? 'bg-[#a855f7]/10 text-[#a855f7]' : isVbee ? 'bg-[#eab308]/10 text-[#eab308]' : isAudioMaster ? 'bg-[#06b6d4]/10 text-[#06b6d4]' : isScenePlanner ? 'bg-[#ec4899]/10 text-[#ec4899]' : isSceneReview ? 'bg-[#f43f5e]/10 text-[#f43f5e]' : isCharacter ? 'bg-[#8b5cf6]/10 text-[#8b5cf6]' : isDirector ? 'bg-[#14b8a6]/10 text-[#14b8a6]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
+<div className={`w-[34px] h-[34px] rounded-lg flex items-center justify-center ${isImage ? 'bg-[#e53935]/10 text-[#e53935]' : isVideo ? 'bg-[#f5a623]/10 text-[#f5a623]' : isText ? 'bg-[#3b82f6]/10 text-[#3b82f6]' : isStt ? 'bg-[#22c55e]/10 text-[#22c55e]' : isTextReview ? 'bg-[#a855f7]/10 text-[#a855f7]' : isVbee ? 'bg-[#eab308]/10 text-[#eab308]' : isAudioMaster ? 'bg-[#06b6d4]/10 text-[#06b6d4]' : isScenePlanner ? 'bg-[#ec4899]/10 text-[#ec4899]' : isSceneReview ? 'bg-[#f43f5e]/10 text-[#f43f5e]' : isCharacter ? 'bg-[#8b5cf6]/10 text-[#8b5cf6]' : isDirector ? 'bg-[#14b8a6]/10 text-[#14b8a6]' : isCircuit ? 'bg-[#84cc16]/10 text-[#84cc16]' : 'bg-[#F1641E]/10 text-[#F1641E]'}`}>
 <span className="material-symbols-outlined text-[19px]">
-{isImage ? 'palette' : isVideo ? 'movie' : isText ? 'data_object' : isStt ? 'graphic_eq' : isTextReview ? 'edit_note' : isVbee ? 'record_voice_over' : isAudioMaster ? 'equalizer' : isScenePlanner ? 'movie_filter' : isSceneReview ? 'playlist_add_check' : isCharacter ? 'face' : isDirector ? 'theater_comedy' : isMediaSource ? 'perm_media' : 'settings'}
+{isImage ? 'palette' : isVideo ? 'movie' : isText ? 'data_object' : isStt ? 'graphic_eq' : isTextReview ? 'edit_note' : isVbee ? 'record_voice_over' : isAudioMaster ? 'equalizer' : isScenePlanner ? 'movie_filter' : isSceneReview ? 'playlist_add_check' : isCharacter ? 'face' : isDirector ? 'theater_comedy' : isCircuit ? 'electrical_services' : isMediaSource ? 'perm_media' : 'settings'}
 </span>
 </div>
 <div>
@@ -142,6 +143,42 @@ className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 r
 <FieldDropdown label="Mẫu AI" value={data.model} options={TEXT_MODELS} onChange={(v) => updateNode('model', v)} />
 </div>
 {renderPromptField()}
+</>
+)}
+
+{isCircuit && (
+<>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Cấu hình Model (lên bố cục)</SectionLabel>
+<FieldDropdown label="Mẫu AI" value={data.model} options={TEXT_MODELS} onChange={(v) => updateNode('model', v)} />
+</div>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Ghi chú bố cục (không bắt buộc)</SectionLabel>
+<textarea
+value={data.localPrompt || ''}
+onChange={(e) => updateNode('localPrompt', e.target.value)}
+placeholder="VD: đặt sò công suất ở giữa, loa góc dưới phải, tiêu đề trên là 'AMP 12V'…"
+className="w-full h-[80px] bg-[#050a10] border border-white/5 hover:border-white/10 rounded-xl p-3 text-[12px] text-white outline-none transition-all custom-scrollbar leading-relaxed placeholder:text-white/20"
+/>
+</div>
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Bố cục JSON (sửa tay rồi bấm Vẽ lại)</SectionLabel>
+<textarea
+value={data.layoutJson || ''}
+onChange={(e) => updateNode('layoutJson', e.target.value)}
+placeholder="Chạy node 1 lần để AI tạo bố cục — sau đó có thể chỉnh toạ độ (x, y), xoay (rotation), nhãn, điểm gấp dây (via) ở đây."
+spellCheck={false}
+className="w-full h-[320px] bg-[#050a10] border border-white/5 hover:border-white/10 rounded-xl p-3 text-[10.5px] font-mono text-white outline-none transition-all custom-scrollbar leading-relaxed placeholder:text-white/20"
+/>
+<button
+onClick={() => window.dispatchEvent(new CustomEvent('circuit-redraw', { detail: { nodeId: node.id } }))}
+disabled={!data.layoutJson}
+className="w-full bg-[#84cc16] hover:bg-[#65a30d] disabled:bg-white/10 disabled:text-white/20 text-black py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all uppercase tracking-[0.1em]"
+>
+<span className="material-symbols-outlined text-[16px]">refresh</span>
+Vẽ lại từ JSON (không gọi AI)
+</button>
+</div>
 </>
 )}
 
@@ -290,7 +327,7 @@ Chỉ dẫn gửi kèm Gemini để lên kịch bản shot — sửa thoải má
 </>
 )}
 
-{!isMediaSource && !isText && !isStt && !isTextReview && !isVbee && !isAudioMaster && !isScenePlanner && !isSceneReview && !isCharacter && !isDirector && (
+{!isMediaSource && !isCircuit && !isText && !isStt && !isTextReview && !isVbee && !isAudioMaster && !isScenePlanner && !isSceneReview && !isCharacter && !isDirector && (
 <>
 <div className="flex flex-col gap-3.5">
 <SectionLabel>Cấu hình Model</SectionLabel>
