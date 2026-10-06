@@ -1,5 +1,5 @@
 import { PARTS } from './parts';
-import { routeWires, type RoutedWire } from './route';
+import { pinDirection, routeWires, type RoutedWire } from './route';
 import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
 
 const FONT = 'Helvetica Neue, Arial, sans-serif';
@@ -435,27 +435,37 @@ function labelPlacement(p: PlacedPart, side: string, b: Box, size: number) {
   }
 }
 
+export interface LabelPlacement { partId: string; text: string; x: number; y: number; anchor: string; size: number; fill: string; box: Box }
+
 /**
- * Đặt nhãn: thử 8 vị trí quanh linh kiện (4 cạnh + 4 góc), chấm điểm theo mức
- * đè lên linh kiện khác / nhãn khác / dây / tràn khung, ưu tiên phía AI chọn.
- * AI hay ước lượng sai độ rộng chữ và không biết app sẽ đi dây chỗ nào.
+ * Đặt nhãn: nhãn đã kéo tay (labelPos) giữ đúng chỗ và đặt trước; nhãn còn lại
+ * thử 8 vị trí quanh linh kiện (4 cạnh + 4 góc), chấm điểm theo mức đè lên linh
+ * kiện khác / nhãn khác / dây / tràn khung, ưu tiên phía AI/người dùng chọn.
  */
-function renderLabels(parts: PlacedPart[], W: number, H: number, wireSegs: Box[]): string {
+function placeLabels(parts: PlacedPart[], W: number, H: number, wireSegs: Box[]): LabelPlacement[] {
   const partBoxes = parts.filter((p) => p.type !== 'lead' && p.type !== 'bus')
     .map((p) => ({ id: p.id, b: partBox(p, true)! })).filter((x) => x.b);
   const taken: Box[] = [];
-  let out = '';
+  const res: LabelPlacement[] = [];
   const area = (a: Box, b: Box) => Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1)) * Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1));
-  for (const p of parts) {
+  const ordered = [...parts.filter((p) => p.labelPos), ...parts.filter((p) => !p.labelPos)];
+  for (const p of ordered) {
     if (!p.label) continue;
     const b = partBox(p, true);
     if (!b) continue;
     const size = p.type === 'lead' ? 40 : 34;
     const fill = p.type === 'lead' ? '#ffffff' : '#8cff2e';
+    const w = p.label.length * size * 0.7;
+    if (p.labelPos) {
+      const cx = p.x + p.labelPos.dx, cy = p.y + p.labelPos.dy;
+      const box = { x1: cx - w / 2, y1: cy - size / 2, x2: cx + w / 2, y2: cy + size / 2 };
+      taken.push(box);
+      res.push({ partId: p.id, text: p.label, x: cx, y: cy + size * 0.35, anchor: 'middle', size, fill, box });
+      continue;
+    }
     const preferred = p.labelSide ?? (p.type === 'lead' ? 'top' : 'right');
     const cands = ['right', 'left', 'top', 'bottom'].map((side) => labelPlacement(p, side, b, size));
     // Góc: nhãn đặt chéo trên-phải / dưới-phải / trên-trái / dưới-trái
-    const w = p.label.length * size * 0.7;
     const corner = (x: number, y: number, anchor: string, bx: Box) => ({ x, y, anchor, box: bx });
     cands.push(
       corner(b.x2 + 10, b.y1 - 6, 'start', { x1: b.x2 + 10, y1: b.y1 - 6 - size * 0.8, x2: b.x2 + 10 + w, y2: b.y1 - 6 + size * 0.2 }),
@@ -481,7 +491,43 @@ function renderLabels(parts: PlacedPart[], W: number, H: number, wireSegs: Box[]
     // Chỗ nào cũng gần linh kiện khác hơn → bỏ nhãn còn hơn để người xem gán nhầm
     if (bestScore >= 20000) continue;
     taken.push(best.box);
-    out += labelText(best.x, best.y, p.label, size, best.anchor, fill);
+    res.push({ partId: p.id, text: p.label, x: best.x, y: best.y, anchor: best.anchor, size, fill, box: best.box });
+  }
+  return res;
+}
+
+function wireSegBoxes(routed: (RoutedWire | null)[]): Box[] {
+  const segs: Box[] = [];
+  for (const rw of routed) {
+    if (!rw) continue;
+    for (let k = 0; k < rw.points.length - 1; k++) {
+      const a = rw.points[k], c = rw.points[k + 1];
+      segs.push({ x1: Math.min(a.x, c.x) - 8, y1: Math.min(a.y, c.y) - 8, x2: Math.max(a.x, c.x) + 8, y2: Math.max(a.y, c.y) + 8 });
+    }
+  }
+  return segs;
+}
+
+/** Vị trí các nhãn — editor dùng để bắt chuột khi kéo nhãn. */
+export function labelPlacements(layout: CircuitLayout, routed: (RoutedWire | null)[] = routeWires(layout)): LabelPlacement[] {
+  const known = layout.parts.filter((p) => PARTS[p.type]);
+  return placeLabels(known, layout.width ?? 1080, layout.height ?? 1350, wireSegBoxes(routed));
+}
+
+/** Tên chân thật (pinNames) in cạnh chân, khi bật showPinNames. */
+function renderPinNames(layout: CircuitLayout, H: number): string {
+  let out = '';
+  for (const p of layout.parts) {
+    if (!p.showPinNames || !p.pinNames || !PARTS[p.type]) continue;
+    for (const [pin, name] of Object.entries(p.pinNames)) {
+      if (!name.trim()) continue;
+      const r = resolveEndpoint(layout, `${p.id}.${pin}`);
+      if (typeof r === 'string') continue;
+      const dir = pinDirection(p, pin, H) ?? 1;
+      // Chữ lùi về phía thân linh kiện (dây đi ra theo hướng chân, không đè lên dây)
+      const [dx, dy] = dir === 1 ? [0, -30] : dir === 3 ? [0, 44] : [0, -16];
+      out += `<text x="${(r.point.x + dx).toFixed(0)}" y="${(r.point.y + dy).toFixed(0)}" font-family="${FONT}" font-size="22" font-weight="900" text-anchor="middle" fill="#ffffff" stroke="#000" stroke-width="5" stroke-linejoin="round" paint-order="stroke">${esc(name)}</text>`;
+    }
   }
   return out;
 }
@@ -510,15 +556,9 @@ export function renderCircuitSvg(layout: CircuitLayout, opts: RenderOptions = {}
   const partsSvg = others.map((p) => `<g transform="${tf(p)}" filter="url(#fShadow)">${PARTS[p.type].render(p)}</g>`).join('');
   const routed = opts.routed ?? routeWires(layout);
   const wires = layout.wires.map((w, i) => renderWire(w, routed[i], opts.dashed?.has(i)));
-  const wireSegs: Box[] = [];
-  for (const rw of routed) {
-    if (!rw) continue;
-    for (let k = 0; k < rw.points.length - 1; k++) {
-      const a = rw.points[k], c = rw.points[k + 1];
-      wireSegs.push({ x1: Math.min(a.x, c.x) - 8, y1: Math.min(a.y, c.y) - 8, x2: Math.max(a.x, c.x) + 8, y2: Math.max(a.y, c.y) + 8 });
-    }
-  }
-  const labels = renderLabels(known, W, H, wireSegs);
+  const labels = placeLabels(known, W, H, wireSegBoxes(routed))
+    .map((l) => labelText(l.x, l.y, l.text, l.size, l.anchor, l.fill)).join('');
+  const pinNames = renderPinNames(layout, H);
 
   const title = (text: string | undefined, y: number) => text
     ? `<text x="${W / 2}" y="${y}" font-family="${FONT}" font-size="76" font-weight="900" text-anchor="middle" fill="#ffffff" stroke="#000" stroke-opacity="0.85" stroke-width="10" stroke-linejoin="round" paint-order="stroke">${esc(text)}</text>`
@@ -527,7 +567,7 @@ export function renderCircuitSvg(layout: CircuitLayout, opts: RenderOptions = {}
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
     DEFS + woodBackground(W, H) + behind + busSvg + partsSvg +
     wires.map((w) => w.body).join('') + wires.map((w) => w.joints).join('') +
-    labels + title(layout.titleTop, 92) + title(layout.titleBottom, H - 40) +
+    pinNames + labels + title(layout.titleTop, 92) + title(layout.titleBottom, H - 40) +
     `</svg>`;
 }
 
