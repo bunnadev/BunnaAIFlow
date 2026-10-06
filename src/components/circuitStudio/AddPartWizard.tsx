@@ -31,9 +31,10 @@ function guessDir(fx: number, fy: number, w: number, h: number): Dir {
 }
 
 export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved }: Props) {
-  const [step, setStep] = useState<'source' | 'pins' | 'save'>(existing ? 'pins' : 'source');
-  const [raw, setRaw] = useState<string | null>(existing?.dataUrl ?? null); // ảnh gốc (chưa xoá nền)
-  const [img, setImg] = useState<string | null>(existing?.dataUrl ?? null); // ảnh đang dùng
+  // Sửa linh kiện bị mất ảnh (dataUrl rỗng): bắt đầu từ bước lấy ảnh
+  const [step, setStep] = useState<'source' | 'pins' | 'save'>(existing?.dataUrl ? 'pins' : 'source');
+  const [raw, setRaw] = useState<string | null>(existing?.dataUrl || null); // ảnh gốc (chưa xoá nền)
+  const [img, setImg] = useState<string | null>(existing?.dataUrl || null); // ảnh đang dùng
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(existing ? { w: existing.file.w, h: existing.file.h } : null);
   const [tolerance, setTolerance] = useState(45);
   const [drawW, setDrawW] = useState(existing?.file.w ?? 160);

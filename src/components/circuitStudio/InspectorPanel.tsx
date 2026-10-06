@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PARTS } from '../../lib/circuit/parts';
 import { WIRE_COLORS } from '../../lib/circuit/render';
 import { deleteWire, resetWire, rotateParts, updatePart, updateWire } from '../../lib/circuit/ops';
@@ -11,17 +11,32 @@ interface Props {
   onCommit(l: CircuitLayout): void;
   onSelect(s: Selection): void;
   onError(msg: string): void;
+  /** Bố cục mới nhất (ghi từ ô nhập lúc bảng đang bị gỡ không được dựa vào bố cục cũ). */
+  getLayout?(): CircuitLayout;
 }
 
-/** Ô nhập chỉ ghi khi rời ô / Enter — gõ từng chữ không làm đầy lịch sử hoàn tác. */
+/**
+ * Ô nhập chỉ ghi khi rời ô / Enter — gõ từng chữ không làm đầy lịch sử hoàn tác.
+ * Bị gỡ khi còn giá trị chưa ghi (WKWebView không bắn blur) thì ghi lúc gỡ.
+ */
 function Field({ label, value, onCommit }: { label: string; value: string; onCommit(v: string): void }) {
   const [v, setV] = useState(value);
-  useEffect(() => setV(value), [value]);
+  const latest = useRef({ v, value, onCommit });
+  latest.current = { v, value, onCommit };
+  const committed = useRef<string | null>(null);
+  useEffect(() => { setV(value); committed.current = null; }, [value]);
+  const commitPending = () => {
+    const { v: cur, value: orig, onCommit: commit } = latest.current;
+    if (cur === orig || cur === committed.current) return;
+    committed.current = cur;
+    commit(cur);
+  };
+  useEffect(() => () => commitPending(), []);
   return (
     <label className="mb-2 block">
       <span className="mb-0.5 block text-white/50">{label}</span>
       <input value={v} onChange={(e) => setV(e.target.value)}
-        onBlur={() => { if (v !== value) onCommit(v); }}
+        onBlur={commitPending}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
         className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-white outline-none focus:border-[#F1641E]" />
     </label>
@@ -30,15 +45,20 @@ function Field({ label, value, onCommit }: { label: string; value: string; onCom
 
 const btn = 'rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-30';
 
-export default function InspectorPanel({ layout, selection, onCommit, onSelect, onError }: Props) {
+export default function InspectorPanel({ layout, selection, onCommit, onSelect, onError, getLayout }: Props) {
   const part = selection.parts.length === 1 ? layout.parts.find((p) => p.id === selection.parts[0]) : undefined;
   const wireIdx = selection.wire;
   const wire = wireIdx !== null ? layout.wires[wireIdx] : undefined;
 
-  const set = (patch: Partial<PlacedPart>) => {
+  /** Sửa linh kiện trên bố cục mới nhất; linh kiện đã bị xoá / hoàn tác mất thì bỏ qua. */
+  const set = (patchOrFn: Partial<PlacedPart> | ((live: PlacedPart) => Partial<PlacedPart>)) => {
     if (!part) return;
+    const cur = getLayout?.() ?? layout;
+    const live = cur.parts.find((p) => p.id === part.id);
+    if (!live) return;
+    const patch = typeof patchOrFn === 'function' ? patchOrFn(live) : patchOrFn;
     try {
-      onCommit(updatePart(layout, part.id, patch));
+      onCommit(updatePart(cur, part.id, patch));
       if (patch.id) onSelect({ parts: [patch.id.trim()], wire: null });
     } catch (e) {
       onError((e as Error).message);
@@ -72,7 +92,7 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               <div className="mb-1 text-white/50">Tên chân thật (VD C1815: 1 = E, 2 = C, 3 = B)</div>
               {Object.keys(PARTS[part.type].pins).map((pin) => (
                 <Field key={pin} label={`Chân ${pin}`} value={part.pinNames?.[pin] ?? ''}
-                  onCommit={(v) => set({ pinNames: { ...(part.pinNames ?? {}), [pin]: v } })} />
+                  onCommit={(v) => set((live) => ({ pinNames: { ...(live.pinNames ?? {}), [pin]: v } }))} />
               ))}
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={!!part.showPinNames} onChange={(e) => set({ showPinNames: e.target.checked })} /> In tên chân lên ảnh

@@ -240,6 +240,8 @@ useEffect(() => { appSettingsRef.current = appSettings; }, [appSettings]);
 // Keyboard Shortcuts (Ctrl+Z)
 useEffect(() => {
 const handleKeyDown = (e: KeyboardEvent) => {
+// Xưởng vẽ mạch đang mở: phím tắt thuộc về bàn vẽ, không hoàn tác workflow phía sau
+if (isCircuitStudioOpen) return;
 if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
 e.preventDefault();
 handleUndo();
@@ -248,7 +250,7 @@ handleUndo();
 window.addEventListener('keydown', handleKeyDown);
 return () => window.removeEventListener('keydown', handleKeyDown);
 // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [undoStack]);
+}, [undoStack, isCircuitStudioOpen]);
 
 const handleUndo = useCallback(() => {
 if (undoStack.length === 0) return;
@@ -1878,6 +1880,8 @@ onConnect={handleConnect}
 onPaneContextMenu={(e) => { e.preventDefault(); const flowPos = screenToFlowPosition({ x: e.clientX, y: e.clientY }); setMenuState({ x: e.clientX, y: e.clientY, flowPos, visible: true }); }}
 onPaneClick={() => { setMenuState(null); setIsNodeLibraryOpen(false); setActiveSettingsNodeId(null); setActiveStyleSettingsNodeId(null); }}
 onNodesDelete={onNodesDelete} onEdgesDelete={onEdgesDelete}
+deleteKeyCode={isCircuitStudioOpen ? null : 'Backspace'} panActivationKeyCode={isCircuitStudioOpen ? null : undefined}
+selectionKeyCode={isCircuitStudioOpen ? null : undefined} multiSelectionKeyCode={isCircuitStudioOpen ? null : undefined}
 nodeTypes={NODE_TYPES} edgeTypes={EDGE_TYPES} snapToGrid snapGrid={[10, 10]}
 panOnDrag={interactionMode === 'hand' ? true : [1, 2]} selectionOnDrag={interactionMode === 'select'} selectionMode={SelectionMode.Partial} panOnScroll zoomOnScroll minZoom={0.05} maxZoom={4}
 proOptions={{ hideAttribution: true }}

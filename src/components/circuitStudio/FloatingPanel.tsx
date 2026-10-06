@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { noFocusMouseDown } from './noFocus';
 
 interface Props {
   id: string;
@@ -51,8 +52,8 @@ export default function FloatingPanel({ id, title, defaultPos, width, children, 
       <div className="flex cursor-move items-center gap-1 border-b border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white/60"
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onLostPointerCapture={onUp}>
         <span className="flex-1 truncate">{title}</span>
-        <button className="rounded px-1 hover:bg-white/10" title={min ? 'Mở rộng' : 'Thu gọn'} onPointerDown={(e) => e.stopPropagation()} onClick={() => setMin(!min)}>{min ? '▸' : '▾'}</button>
-        {onClose && <button className="rounded px-1 hover:bg-white/10" title="Đóng" onPointerDown={(e) => e.stopPropagation()} onClick={onClose}>✕</button>}
+        <button className="rounded px-1 hover:bg-white/10" title={min ? 'Mở rộng' : 'Thu gọn'} onPointerDown={(e) => e.stopPropagation()} onMouseDown={noFocusMouseDown} onClick={() => setMin(!min)}>{min ? '▸' : '▾'}</button>
+        {onClose && <button className="rounded px-1 hover:bg-white/10" title="Đóng" onPointerDown={(e) => e.stopPropagation()} onMouseDown={noFocusMouseDown} onClick={onClose}>✕</button>}
       </div>
       {!min && <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>}
     </div>

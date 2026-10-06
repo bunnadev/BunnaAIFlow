@@ -9,12 +9,16 @@ import { addWire, deleteWire, movePartsBy, resetWire, resizeBus, setWirePoints, 
 import { addBend, moveSegment, removeCorner, segOrientation, simplify } from '../../lib/circuit/wireEdit';
 import { snapDelta, type Guide } from '../../lib/circuit/arrange';
 import { contentBounds } from '../../lib/circuit/world';
+import { blurActiveField } from './noFocus';
+import { wheelView } from '../../lib/circuit/viewport';
 
 export interface Selection { parts: string[]; wire: number | null }
 export interface CanvasApi {
   clientToLayout(x: number, y: number): Point | null;
   fit(): void;
   focusBox(b: Box): void;
+  /** Huỷ thao tác kéo đang dở (Esc) — không ghi gì; trả true nếu có thao tác bị huỷ. */
+  cancelDrag(): boolean;
 }
 
 interface Props {
@@ -49,6 +53,12 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
   const [hover, setHover] = useState<Point | null>(null);
   const [space, setSpace] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; wire: number } | null>(null);
+  // zoom/pan mới nhất cho chuỗi sự kiện lăn liên tiếp (không đợi React vẽ lại)
+  const viewState = useRef({ zoom, pan });
+  viewState.current = { zoom, pan };
+  const applyView = (z: number, p: Point) => { viewState.current = { zoom: z, pan: p }; setZoom(z); setPan(p); };
+  const dragRef = useRef(drag);
+  dragRef.current = drag;
 
   const toLayout = (cx: number, cy: number): Point | null => {
     const r = viewRef.current?.getBoundingClientRect();
@@ -62,17 +72,38 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
     const b = contentBounds(layout, routed) ?? { x1: 0, y1: 0, x2: 1080, y2: 1350 };
     const pad = 120;
     const z = Math.min(2, Math.max(0.1, Math.min(r.width / (b.x2 - b.x1 + pad * 2), r.height / (b.y2 - b.y1 + pad * 2))));
-    setZoom(z);
-    setPan({ x: r.width / 2 - ((b.x1 + b.x2) / 2) * z, y: r.height / 2 - ((b.y1 + b.y2) / 2) * z });
+    applyView(z, { x: r.width / 2 - ((b.x1 + b.x2) / 2) * z, y: r.height / 2 - ((b.y1 + b.y2) / 2) * z });
   };
   const focusBox = (b: Box) => {
     const r = viewRef.current?.getBoundingClientRect();
     if (!r) return;
-    setPan({ x: r.width / 2 - ((b.x1 + b.x2) / 2) * zoom, y: r.height / 2 - ((b.y1 + b.y2) / 2) * zoom });
+    applyView(zoom, { x: r.width / 2 - ((b.x1 + b.x2) / 2) * zoom, y: r.height / 2 - ((b.y1 + b.y2) / 2) * zoom });
+  };
+  const cancelDrag = () => {
+    const d = dragRef.current;
+    if (!d) return false;
+    if (d.kind === 'pan') applyView(viewState.current.zoom, d.basePan);
+    dragRef.current = null;
+    setDrag(null);
+    return true;
   };
 
   // Truyền api mới mỗi lần vẽ (pan/zoom/bố cục thay đổi thì toạ độ đổi theo)
-  useEffect(() => { onApi({ clientToLayout: toLayout, fit, focusBox }); });
+  useEffect(() => { onApi({ clientToLayout: toLayout, fit, focusBox, cancelDrag }); });
+
+  // Lăn chuột: gắn listener thường (không passive) để chặn trình duyệt tự phóng to cả trang khi chụm trackpad
+  useEffect(() => {
+    const el = viewRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const v = wheelView(viewState.current, e, e.clientX - r.left, e.clientY - r.top);
+      applyView(v.zoom, v.pan);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
   useEffect(() => {
     const isFormElement = (t: EventTarget | null): t is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement => {
       if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t instanceof HTMLButtonElement) return true;
@@ -127,17 +158,10 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
     [shown, shownRouted, preview],
   );
 
-  const onWheel = (e: React.WheelEvent) => {
-    const p = toLayout(e.clientX, e.clientY);
-    const r = viewRef.current?.getBoundingClientRect();
-    if (!p || !r) return;
-    const nz = Math.min(4, Math.max(0.1, zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)));
-    setZoom(nz);
-    setPan({ x: e.clientX - r.left - p.x * nz, y: e.clientY - r.top - p.y * nz });
-  };
-
   const onPointerDown = (e: React.PointerEvent) => {
     setMenu(null);
+    // Rời ô nhập ở cột chỉnh sửa trước (để ô ghi giá trị) rồi mới đổi lựa chọn
+    blurActiveField();
     if (e.button === 2) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     if (space || e.button === 1) { setDrag({ kind: 'pan', startClient: { x: e.clientX, y: e.clientY }, basePan: pan }); return; }
@@ -306,7 +330,6 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
         backgroundSize: `${1080 * zoom}px ${1350 * zoom}px`,
         backgroundPosition: `${pan.x}px ${pan.y}px`,
       }}
-      onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
