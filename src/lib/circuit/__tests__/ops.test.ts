@@ -1,0 +1,125 @@
+import { describe, expect, it } from 'vitest';
+import type { CircuitLayout } from '../types';
+import {
+  addPart, addWire, deleteParts, deleteWire, duplicateParts, movePartsBy, nextPartId, resetAllWires,
+  resetWire, resizeBus, rotateParts, setWirePoints, suggestWireColor, updatePart, updateWire, wirePoints,
+} from '../ops';
+
+const base = (): CircuitLayout => ({
+  width: 1080, height: 1350,
+  parts: [
+    { id: 'PWR', type: 'terminal2', x: 120, y: 300 },
+    { id: 'R1', type: 'resistor', x: 400, y: 300, value: '1k' },
+    { id: 'LED1', type: 'led', x: 700, y: 500 },
+    { id: 'GND', type: 'bus', x: 540, y: 1100, length: 600 },
+  ],
+  wires: [
+    { from: 'PWR.+', to: 'R1.1', color: 'red' },
+    { from: 'R1.2', to: 'LED1.A', color: 'yellow' },
+    { from: 'LED1.K', to: 'GND@700', color: 'black' },
+  ],
+});
+
+describe('ops: linh kiện', () => {
+  it('nextPartId theo loại / tên gốc', () => {
+    const l = base();
+    expect(nextPartId(l, 'resistor')).toBe('R2');
+    expect(nextPartId(l, 'dip8')).toBe('U1');
+    expect(nextPartId(l, 'bus', 'GND')).toBe('GND2');
+    expect(nextPartId(l, 'bus', 'VCC')).toBe('VCC');
+    expect(nextPartId(l, 'my_relay')).toBe('X1');
+  });
+
+  it('addPart bắt lưới 10 và có giá trị mặc định', () => {
+    const { layout, id } = addPart(base(), 'resistor', 503, 618);
+    const p = layout.parts.find((q) => q.id === id)!;
+    expect(id).toBe('R2');
+    expect([p.x, p.y]).toEqual([500, 620]);
+    expect(p.value).toBe('1k');
+  });
+
+  it('movePartsBy dời linh kiện; dây chỉnh tay bám theo; dây "@" của thanh dời theo', () => {
+    let l = setWirePoints(base(), 1, [{ x: 475, y: 300 }, { x: 475, y: 400 }, { x: 686, y: 400 }, { x: 686, y: 575 }]);
+    l = movePartsBy(l, ['R1'], 0, -50);
+    expect(l.parts.find((p) => p.id === 'R1')!.y).toBe(250);
+    const pts = wirePoints(l, 1)!;
+    expect(pts[0]).toEqual({ x: 475, y: 250 });
+    for (let k = 0; k < pts.length - 1; k++) expect(pts[k].x === pts[k + 1].x || pts[k].y === pts[k + 1].y).toBe(true);
+    const moved = movePartsBy(base(), ['GND'], 20, 0);
+    expect(moved.wires[2].to).toBe('GND@720');
+  });
+
+  it('rotateParts xoay, bỏ chỉnh tay của dây nối vào; không xoay thanh đồng', () => {
+    let l = setWirePoints(base(), 1, [{ x: 475, y: 300 }, { x: 686, y: 300 }, { x: 686, y: 575 }]);
+    l = rotateParts(l, ['R1', 'GND'], 1);
+    expect(l.parts.find((p) => p.id === 'R1')!.rotation).toBe(90);
+    expect(l.parts.find((p) => p.id === 'GND')!.rotation ?? 0).toBe(0);
+    expect(l.wires[1].manual).toBeFalsy();
+    expect(rotateParts(l, ['R1'], -1).parts.find((p) => p.id === 'R1')!.rotation).toBe(0);
+  });
+
+  it('deleteParts xoá luôn dây nối vào', () => {
+    const { layout, removedWires } = deleteParts(base(), ['R1']);
+    expect(layout.parts.map((p) => p.id)).not.toContain('R1');
+    expect(removedWires).toBe(2);
+    expect(layout.wires).toHaveLength(1);
+  });
+
+  it('duplicateParts tạo bản sao lệch 40px, ký hiệu mới, không kèm dây', () => {
+    const { layout, newIds } = duplicateParts(base(), ['R1', 'LED1']);
+    expect(newIds).toEqual(['R2', 'LED2']);
+    expect(layout.parts.find((p) => p.id === 'R2')).toMatchObject({ x: 440, y: 340, value: '1k' });
+    expect(layout.wires).toHaveLength(3);
+  });
+
+  it('updatePart đổi ký hiệu cập nhật cả đầu dây; chặn trùng/sai', () => {
+    const l = updatePart(base(), 'GND', { id: 'MASS' });
+    expect(l.wires[2].to).toBe('MASS@700');
+    expect(updatePart(base(), 'R1', { id: 'RX' }).wires[0].to).toBe('RX.1');
+    expect(() => updatePart(base(), 'R1', { id: 'LED1' })).toThrow();
+    expect(() => updatePart(base(), 'R1', { id: 'R 1' })).toThrow();
+    expect(updatePart(base(), 'R1', { marking: 'abc' }).parts.find((p) => p.id === 'R1')!.marking).toBe('abc');
+  });
+});
+
+describe('ops: dây', () => {
+  it('suggestWireColor: + đỏ, − / mass đen, còn lại xoay vòng', () => {
+    const l = base();
+    expect(suggestWireColor(l, 'PWR.+', 'R1.1')).toBe('red');
+    expect(suggestWireColor(l, 'LED1.K', 'PWR.-')).toBe('black');
+    expect(suggestWireColor(l, 'LED1.K', 'GND@500')).toBe('black');
+    expect(suggestWireColor(l, 'R1.2', 'LED1.K')).toBe('green'); // đã có 1 dây tín hiệu (vàng)
+  });
+
+  it('addWire: thêm mới; chặn tự nối và trùng cặp', () => {
+    const l = base();
+    const l2 = addWire(l, 'R1.2', 'GND@400');
+    expect(l2.wires).toHaveLength(4);
+    expect(addWire(l, 'R1.1', 'R1.1')).toBe(l);
+    expect(addWire(l, 'LED1.A', 'R1.2')).toBe(l);
+  });
+
+  it('updateWire / deleteWire', () => {
+    expect(updateWire(base(), 1, { color: 'blue' }).wires[1].color).toBe('blue');
+    expect(deleteWire(base(), 0).wires).toHaveLength(2);
+  });
+
+  it('setWirePoints: lưu via, đánh dấu chỉnh tay, đầu thanh đồng ghi theo điểm cuối', () => {
+    const l = setWirePoints(base(), 2, [{ x: 714, y: 575 }, { x: 714, y: 800 }, { x: 650, y: 800 }, { x: 650, y: 1100 }]);
+    expect(l.wires[2]).toMatchObject({ manual: true, to: 'GND@650', via: [[714, 800], [650, 800]] });
+    expect(wirePoints(l, 2)).toEqual([{ x: 714, y: 575 }, { x: 714, y: 800 }, { x: 650, y: 800 }, { x: 650, y: 1100 }]);
+    const r = resetWire(l, 2);
+    expect(r.wires[2].manual).toBeFalsy();
+    expect(r.wires[2].via).toBeUndefined();
+    expect(resetAllWires(l).wires.every((w) => !w.manual && !w.via)).toBe(true);
+  });
+
+  it('resizeBus kéo đầu thanh, kẹp đầu dây "@" vào trong thanh', () => {
+    const l = resizeBus(base(), 'GND', 1, 703);
+    const bus = l.parts.find((p) => p.id === 'GND')!;
+    expect(bus.length).toBe(460);
+    expect(bus.x).toBe(470);
+    expect(l.wires[2].to).toBe('GND@690');
+    expect(resizeBus(base(), 'GND', -1, 900).parts.find((p) => p.id === 'GND')!.length).toBe(100);
+  });
+});
