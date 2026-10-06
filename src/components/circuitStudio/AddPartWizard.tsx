@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { autoCrop, removeBackground } from '../../lib/circuit/bgRemove';
 import { makePartCode, partImagePrompt, type CustomPartFile } from '../../lib/circuit/imagePart';
 import { GeminiImageProvider } from '../../lib/providers/geminiImageProvider';
@@ -53,38 +53,54 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
   const [genImgs, setGenImgs] = useState<string[]>([]);
   const [genBusy, setGenBusy] = useState(false);
 
+  const genRun = useRef(0); // mã lần vẽ: bỏ kết quả của lần vẽ cũ
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+
   const generate = async () => {
+    if (genBusy) return;
     if (!geminiApiKey) { setError('Chưa có Gemini API key — vào Cài đặt để nhập.'); return; }
     if (!genDesc.trim()) return;
+    const run = ++genRun.current;
+    const live = () => mounted.current && genRun.current === run;
     setGenBusy(true); setError(null); setGenImgs([]);
-    const provider = new GeminiImageProvider(geminiApiKey);
-    const results = await Promise.allSettled([0, 1, 2].map(() => provider.generateImage({
-      prompt: partImagePrompt(genDesc), aspectRatio: '1:1', model: resolveImageModelId('Nano Banana Pro'),
-    })));
-    const ok = results.flatMap((r) => (r.status === 'fulfilled' ? [`data:${r.value.mimeType};base64,${r.value.base64}`] : []));
-    setGenImgs(ok);
-    if (!ok.length) {
+    try {
+      const provider = new GeminiImageProvider(geminiApiKey);
+      const results = await Promise.allSettled([0, 1, 2].map(() => provider.generateImage({
+        prompt: partImagePrompt(genDesc), aspectRatio: '1:1', model: resolveImageModelId('Nano Banana Pro'),
+      })));
+      if (!live()) return;
+      const ok = results.flatMap((r) => (r.status === 'fulfilled' ? [`data:${r.value.mimeType};base64,${r.value.base64}`] : []));
+      setGenImgs(ok);
       const first = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
-      setError(`Gemini không vẽ được: ${first?.reason?.message ?? first?.reason ?? 'lỗi không rõ'}`);
+      const reason = first ? String(first.reason?.message ?? first.reason ?? 'lỗi không rõ') : '';
+      if (!ok.length) setError(`Gemini không vẽ được: ${reason}`);
+      else if (first) setError(`Chỉ vẽ được ${ok.length}/3 ảnh. ${reason}`);
+    } catch (e) {
+      if (live()) setError(`Gemini không vẽ được: ${(e as Error).message ?? e}`);
+    } finally {
+      if (live()) setGenBusy(false);
     }
-    setGenBusy(false);
   };
 
   const pickGenerated = async (url: string) => {
-    setRaw(url);
-    setPins([]); // ảnh mới: chân cũ không còn đúng chỗ
-    setTolerance(70);
-    // Ảnh Gemini nền xanh #00FF00 → tự xoá nền + khử ám xanh ở viền
+    if (busy) return;
     setBusy(true); setError(null);
     try {
+      // Ảnh Gemini nền xanh #00FF00 → tự xoá nền + khử ám xanh ở viền; tính xong mới ghi state
       const rgba = autoCrop(removeBackground(await dataUrlToRGBA(url), 70, true));
-      setImg(rgbaToDataUrl(rgba));
+      const out = rgbaToDataUrl(rgba);
+      if (!mounted.current) return;
+      setRaw(url);
+      setPins([]); // ảnh mới: chân cũ không còn đúng chỗ
+      setTolerance(70);
+      setImg(out);
       setNatural({ w: rgba.width, h: rgba.height });
       if (!name) setName(genDesc.trim().slice(0, 40));
     } catch (e) {
-      setError((e as Error).message);
+      if (mounted.current) setError((e as Error).message);
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
 
@@ -174,7 +190,7 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
               <div className="mb-2 font-semibold">✨ Nhờ Gemini vẽ (ưu tiên)</div>
               <div className="flex gap-2">
                 <input value={genDesc} onChange={(e) => setGenDesc(e.target.value)} placeholder="VD Relay 12V SRD-12VDC-SL-C, 5 chân"
-                  onKeyDown={(e) => { if (e.key === 'Enter') generate(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) generate(); }}
                   className="flex-1 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-sm outline-none focus:border-[#F1641E]" />
                 <button className={primary} disabled={genBusy || !genDesc.trim()} onClick={generate}>{genBusy ? 'Đang vẽ…' : genImgs.length ? '↻ Vẽ lại' : 'Vẽ 3 ảnh'}</button>
               </div>
@@ -182,7 +198,7 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
               {genImgs.length > 0 && (
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {genImgs.map((u, i) => (
-                    <button key={i} onClick={() => pickGenerated(u)} className="overflow-hidden rounded-md border-2 border-transparent hover:border-[#F1641E]">
+                    <button key={i} disabled={busy} onClick={() => pickGenerated(u)} className="overflow-hidden rounded-md border-2 border-transparent hover:border-[#F1641E] disabled:opacity-40">
                       <img src={u} alt="" className="aspect-square w-full object-cover" />
                     </button>
                   ))}
