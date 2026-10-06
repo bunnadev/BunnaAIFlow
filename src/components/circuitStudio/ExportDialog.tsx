@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { ask, save } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
 import { renderExportSvg, subsetLayout } from '../../lib/circuit/exportImage';
@@ -18,7 +18,7 @@ interface Props {
   projectName: string;
   settings?: ExportSettings;
   onClose(): void;
-  onSaved(s: ExportSettings, titleTop: string, titleBottom: string): void;
+  onSaved(s: ExportSettings, titleTop: string, titleBottom: string): Promise<void>;
   onError(msg: string): void;
 }
 
@@ -35,22 +35,41 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
   const [bgs, setBgs] = useState<BackgroundEntry[]>([]);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { listBackgrounds().then(setBgs).catch((e) => onError(`Không đọc được ảnh nền: ${e}`)); }, []);
+  const [bgsLoaded, setBgsLoaded] = useState(false);
+  useEffect(() => {
+    listBackgrounds()
+      .then((list) => setBgs((prev) => [...list.filter((b) => !prev.some((p) => p.id === b.id)), ...prev]))
+      .catch((e) => onError(`Không đọc được ảnh nền: ${e}`))
+      .finally(() => setBgsLoaded(true));
+  }, []);
+  // Ảnh nền đã lưu bị mất (xoá ngoài app…): quay về nền gỗ
+  useEffect(() => {
+    if (bgsLoaded && background.kind === 'image' && !bgs.some((b) => b.id === background.id)) setBackground({ kind: 'wood' });
+  }, [bgsLoaded, bgs, background]);
+  // Esc đóng cửa sổ (trừ khi đang xuất)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [busy, onClose]);
+  const dTop = useDeferredValue(titleTop);
+  const dBottom = useDeferredValue(titleBottom);
 
   const bgDataUrl = background.kind === 'image' ? bgs.find((b) => b.id === background.id)?.dataUrl : undefined;
   const ids = scope === 'selected' ? selectedIds : undefined;
   const result = useMemo(
-    () => renderExportSvg(layout, routed, { aspect, background, backgroundDataUrl: bgDataUrl, titleTop, titleBottom, ids }),
-    [layout, routed, aspect, background, bgDataUrl, titleTop, titleBottom, scope, selectedIds],
+    () => renderExportSvg(layout, routed, { aspect, background, backgroundDataUrl: bgDataUrl, titleTop: dTop, titleBottom: dBottom, ids }),
+    [layout, routed, aspect, background, bgDataUrl, dTop, dBottom, scope, selectedIds],
   );
   const preview = result ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(result.svg) : '';
 
   const upload = async (f: File | undefined) => {
     if (!f) return;
     try {
-      const url = await resizeImageDataUrl(await fileToDataUrl(f), 2160);
-      const entry = await addBackground(dataUrlToBytes(url), 'jpg');
-      setBgs([...bgs, entry]);
+      const png = f.type === 'image/png'; // giữ kênh trong suốt của PNG
+      const url = await resizeImageDataUrl(await fileToDataUrl(f), 2160, png ? 'image/png' : 'image/jpeg');
+      const entry = await addBackground(dataUrlToBytes(url), png ? 'png' : 'jpg');
+      setBgs((prev) => [...prev, entry]);
       setBackground({ kind: 'image', id: entry.id });
     } catch (e) {
       onError(`Không tải được ảnh nền: ${(e as Error).message ?? e}`);
@@ -59,9 +78,14 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
 
   const removeBg = async (id: string) => {
     if (!(await ask('Xoá ảnh nền này khỏi thư viện?', { title: 'Xoá ảnh nền', kind: 'warning' }))) return;
-    await deleteBackground(id);
-    setBgs(bgs.filter((b) => b.id !== id));
-    if (background.kind === 'image' && background.id === id) setBackground({ kind: 'wood' });
+    try {
+      await deleteBackground(id);
+    } catch (e) {
+      onError(`Không xoá được ảnh nền: ${(e as Error).message ?? e}`);
+      return;
+    }
+    setBgs((prev) => prev.filter((b) => b.id !== id));
+    setBackground((cur) => (cur.kind === 'image' && cur.id === id ? { kind: 'wood' } : cur));
   };
 
   const doExport = async () => {
@@ -76,7 +100,7 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
       const path = await save({ defaultPath: `${fileSlug(projectName)}${ids ? '_phan' : ''}.png`, filters: [{ name: 'PNG', extensions: ['png'] }] });
       if (!path) return;
       await writeFile(path, base64ToBytes(b64));
-      onSaved({ aspect, background }, titleTop, titleBottom);
+      await onSaved({ aspect, background }, titleTop, titleBottom);
     } catch (e) {
       onError(`Lỗi xuất ảnh: ${(e as Error).message ?? e}`);
     } finally {
@@ -154,7 +178,7 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
           )}
 
           <div className="mt-auto flex justify-end gap-2">
-            <button className="rounded-md border border-white/10 bg-white/5 px-4 py-1.5 hover:bg-white/10" onClick={onClose}>Đóng</button>
+            <button className="rounded-md border border-white/10 bg-white/5 px-4 py-1.5 hover:bg-white/10 disabled:opacity-30" disabled={busy} onClick={onClose}>Đóng</button>
             <button className="rounded-md bg-[#F1641E] px-4 py-1.5 font-semibold hover:bg-[#F1641E]/90 disabled:opacity-30" disabled={!result || busy} onClick={doExport}>
               {busy ? 'Đang xuất…' : 'Lưu PNG'}
             </button>

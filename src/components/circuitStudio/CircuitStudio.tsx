@@ -147,6 +147,7 @@ export default function CircuitStudio({ onClose }: Props) {
   // ─── Phím tắt (bắt ở pha capture để canvas node phía sau không nhận phím Delete…) ───
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (exporting) return; // cửa sổ Xuất ảnh đang mở: không bắt phím của bàn vẽ
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
       if (typing) return;
       const cmd = e.metaKey || e.ctrlKey;
@@ -180,7 +181,7 @@ export default function CircuitStudio({ onClose }: Props) {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [layout, selection, commit, flash]);
+  }, [layout, selection, commit, flash, exporting]);
 
   /** Bấm 1 cảnh báo → chọn và đưa chỗ lỗi ra giữa màn hình. */
   const pickWarning = (msg: string) => {
@@ -286,9 +287,14 @@ export default function CircuitStudio({ onClose }: Props) {
             const nextLayout = titleTop !== (layout.titleTop ?? '') || titleBottom !== (layout.titleBottom ?? '') ? { ...layout, titleTop, titleBottom } : layout;
             if (nextLayout !== layout) commit(nextLayout);
             const next = { ...project, layout: nextLayout, exportSettings: s, updatedAt: new Date().toISOString() };
-            await saveProject(next);
-            setProject(next);
-            flash('Đã xuất ảnh.');
+            try {
+              await saveProject(next);
+              setProject(next);
+              await refreshList();
+              flash('Đã xuất ảnh.');
+            } catch (e) {
+              flash(`Lỗi lưu: ${(e as Error).message ?? e}`, true);
+            }
           }}
         />
       )}
