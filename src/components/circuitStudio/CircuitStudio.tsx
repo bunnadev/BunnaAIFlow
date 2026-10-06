@@ -3,6 +3,7 @@ import { ask } from '@tauri-apps/plugin-dialog';
 import StudioCanvas, { type CanvasApi, type Selection } from './StudioCanvas';
 import FloatingPanel from './FloatingPanel';
 import PartLibraryPanel from './PartLibraryPanel';
+import ExportDialog from './ExportDialog';
 import InspectorPanel from './InspectorPanel';
 import WarningsBar from './WarningsBar';
 import ProjectPicker from './ProjectPicker';
@@ -32,6 +33,7 @@ export default function CircuitStudio({ onClose }: Props) {
   const [selection, setSelection] = useState<Selection>({ parts: [], wire: null });
   const [partsVersion] = useState(0);
   const [showLibrary, setShowLibrary] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [placing, setPlacing] = useState<{ item: LibraryItem; x: number; y: number } | null>(null);
   const apiRef = useRef<CanvasApi | null>(null);
@@ -245,6 +247,8 @@ export default function CircuitStudio({ onClose }: Props) {
         )}
         <div className="flex-1" />
         {toast && <span className={`text-xs ${toast.error ? 'text-red-400' : 'text-emerald-400'}`}>{toast.msg}</span>}
+        <button className="flex h-8 items-center gap-1 rounded-md bg-[#F1641E] px-3 text-xs font-semibold text-white hover:bg-[#F1641E]/90 disabled:opacity-30"
+          disabled={!layout.parts.length} onClick={() => setExporting(true)}>{icon('download')} Xuất ảnh</button>
         <button className={btn} title="Đóng" onClick={close}>{icon('close')}</button>
       </div>
 
@@ -267,6 +271,26 @@ export default function CircuitStudio({ onClose }: Props) {
         <img alt="" className="pointer-events-none fixed z-[110] h-16 w-16 -translate-x-1/2 -translate-y-1/2 opacity-80"
           style={{ left: placing.x, top: placing.y }}
           src={'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(partPreviewSvg(placing.item.type, 64))} />
+      )}
+      {exporting && project && (
+        <ExportDialog
+          layout={layout}
+          routed={routed}
+          selectedIds={selection.parts}
+          projectName={project.name}
+          settings={project.exportSettings}
+          onClose={() => setExporting(false)}
+          onError={(m) => flash(m, true)}
+          onSaved={async (s, titleTop, titleBottom) => {
+            setExporting(false);
+            const nextLayout = titleTop !== (layout.titleTop ?? '') || titleBottom !== (layout.titleBottom ?? '') ? { ...layout, titleTop, titleBottom } : layout;
+            if (nextLayout !== layout) commit(nextLayout);
+            const next = { ...project, layout: nextLayout, exportSettings: s, updatedAt: new Date().toISOString() };
+            await saveProject(next);
+            setProject(next);
+            flash('Đã xuất ảnh.');
+          }}
+        />
       )}
     </div>
   );
