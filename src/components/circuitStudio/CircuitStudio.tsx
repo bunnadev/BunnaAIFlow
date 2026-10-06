@@ -38,6 +38,8 @@ export default function CircuitStudio({ onClose }: Props) {
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const projectRef = useRef<CircuitProject | null>(null);
   projectRef.current = project;
+  const layoutRef = useRef<CircuitLayout>(state.layout);
+  layoutRef.current = state.layout;
 
   const layout = state.layout;
   const routed = useMemo(() => routeWorld(layout), [layout, partsVersion]);
@@ -60,14 +62,21 @@ export default function CircuitStudio({ onClose }: Props) {
   /** Ghi ngay bản đang mở (khi đổi mạch / đóng màn hình). */
   const flush = useCallback(async () => {
     const p = projectRef.current;
-    if (!p || p.layout === state.layout) return;
-    const next = { ...p, layout: state.layout, updatedAt: new Date().toISOString() };
+    const cur = layoutRef.current;
+    if (!p || p.layout === cur) return;
+    const next = { ...p, layout: cur, updatedAt: new Date().toISOString() };
     await saveProject(next);
+    projectRef.current = next;
     setProject(next);
-  }, [state.layout]);
+  }, []);
+
+  /** Ghi bản đang mở; lỗi thì báo và trả false để không đổi mạch / không đóng. */
+  const safeFlush = useCallback(async () => {
+    try { await flush(); return true; } catch (e) { flash(`Lỗi lưu: ${(e as Error).message ?? e}`, true); return false; }
+  }, [flush, flash]);
 
   const openProject = useCallback(async (id: string) => {
-    await flush();
+    if (!(await safeFlush())) return;
     try {
       const p = await loadProject(id);
       setProject(p);
@@ -77,10 +86,10 @@ export default function CircuitStudio({ onClose }: Props) {
     } catch (e) {
       flash(`Không mở được mạch: ${(e as Error).message}`, true);
     }
-  }, [flush, flash]);
+  }, [safeFlush, flash]);
 
   const createProject = useCallback(async () => {
-    await flush();
+    if (!(await safeFlush())) return;
     const p = newProject(`Mạch ${new Date().toLocaleDateString('vi-VN')}`);
     await saveProject(p);
     setProject(p);
@@ -88,7 +97,7 @@ export default function CircuitStudio({ onClose }: Props) {
     setSelection({ parts: [], wire: null });
     setTimeout(() => apiRef.current?.fit(), 0);
     await refreshList();
-  }, [flush, refreshList]);
+  }, [safeFlush, refreshList]);
 
   useEffect(() => {
     (async () => {
@@ -108,7 +117,7 @@ export default function CircuitStudio({ onClose }: Props) {
     return () => clearTimeout(t);
   }, [layout, project]);
 
-  const close = async () => { await flush().catch(() => {}); onClose(); };
+  const close = async () => { if (!(await safeFlush())) return; onClose(); };
 
   // ─── Kéo linh kiện từ thư viện vào bàn vẽ ───
   useEffect(() => {
@@ -126,9 +135,11 @@ export default function CircuitStudio({ onClose }: Props) {
       commit(res.layout);
       setSelection({ parts: [res.id], wire: null });
     };
+    const cancel = () => setPlacing(null);
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up, { once: true });
-    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointercancel', cancel, { once: true });
+    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); };
   }, [placing?.item, layout]);
 
   // ─── Phím tắt (bắt ở pha capture để canvas node phía sau không nhận phím Delete…) ───
@@ -136,8 +147,12 @@ export default function CircuitStudio({ onClose }: Props) {
     const onKey = (e: KeyboardEvent) => {
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
       if (typing) return;
-      e.stopPropagation();
       const cmd = e.metaKey || e.ctrlKey;
+      const k = e.key.toLowerCase();
+      const handled = (cmd && (k === 'z' || (k === 'd' && selection.parts.length > 0))) || e.key === 'Delete' || e.key === 'Backspace'
+        || (k === 'r' && !cmd && selection.parts.length > 0) || e.key === '0' || e.key === 'Escape';
+      if (!handled) return;
+      e.stopPropagation();
       if (cmd && e.key.toLowerCase() === 'z') { e.preventDefault(); dispatch({ type: e.shiftKey ? 'redo' : 'undo' }); return; }
       if (cmd && e.key.toLowerCase() === 'd' && selection.parts.length) {
         e.preventDefault();
@@ -205,7 +220,7 @@ export default function CircuitStudio({ onClose }: Props) {
           onOpen={openProject}
           onNew={createProject}
           onRename={async (name) => { if (!project) return; const next = { ...project, name, layout, updatedAt: new Date().toISOString() }; await saveProject(next); setProject(next); refreshList(); }}
-          onDuplicate={async () => { if (!project) return; await flush(); const d = duplicateProject({ ...project, layout }); await saveProject(d); await refreshList(); await openProject(d.id); }}
+          onDuplicate={async () => { if (!project) return; if (!(await safeFlush())) return; const d = duplicateProject({ ...project, layout }); await saveProject(d); await refreshList(); await openProject(d.id); }}
           onDelete={async () => {
             if (!project || !(await ask(`Xoá mạch "${project.name}"? Không khôi phục được.`, { title: 'Xoá mạch', kind: 'warning' }))) return;
             await deleteProject(project.id);
@@ -242,7 +257,7 @@ export default function CircuitStudio({ onClose }: Props) {
       {hasSelection && (
         <FloatingPanel id="inspector" title={selection.wire !== null ? `Dây ${selection.wire + 1}` : selParts === 1 ? `Linh kiện ${selection.parts[0]}` : `${selParts} linh kiện`}
           defaultPos={{ x: window.innerWidth - 264, y: 72 }} width={252}>
-          <InspectorPanel layout={layout} selection={selection} onCommit={commit} onSelect={setSelection} onError={(m) => flash(m, true)} />
+          <InspectorPanel key={selection.wire !== null ? `w${selection.wire}` : selection.parts.join(',')} layout={layout} selection={selection} onCommit={commit} onSelect={setSelection} onError={(m) => flash(m, true)} />
         </FloatingPanel>
       )}
 
