@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { autoCrop, removeBackground } from '../../lib/circuit/bgRemove';
 import { makePartCode, type CustomPartFile } from '../../lib/circuit/imagePart';
 import { saveCustomPart } from '../../lib/circuit/customPartsStore';
@@ -49,7 +49,7 @@ export default function AddPartWizard({ existing, onClose, onSaved }: Props) {
 
   const drawH = natural ? Math.round((drawW * natural.h) / natural.w) : drawW;
   const disp = natural ? (natural.w >= natural.h ? { w: BOX, h: (BOX * natural.h) / natural.w } : { w: (BOX * natural.w) / natural.h, h: BOX }) : { w: BOX, h: BOX };
-  const resistorThumb = useMemo(() => PARTS.resistor, []);
+  const resistorThumb = PARTS.resistor;
 
   const applyImage = async (url: string, removeBg: boolean) => {
     setBusy(true); setError(null);
@@ -57,6 +57,8 @@ export default function AddPartWizard({ existing, onClose, onSaved }: Props) {
       let rgba = await dataUrlToRGBA(url);
       if (removeBg) rgba = autoCrop(removeBackground(rgba, tolerance, true));
       setImg(rgbaToDataUrl(rgba));
+      // Cắt/đổi ảnh làm lệch toạ độ chân: nếu kích thước đổi thì bỏ chân đã chấm
+      if (!natural || natural.w !== rgba.width || natural.h !== rgba.height) setPins([]);
       setNatural({ w: rgba.width, h: rgba.height });
     } catch (e) {
       setError((e as Error).message);
@@ -67,9 +69,14 @@ export default function AddPartWizard({ existing, onClose, onSaved }: Props) {
 
   const onPickFile = async (f: File | undefined) => {
     if (!f) return;
-    const url = await fileToDataUrl(f);
-    setRaw(url);
-    await applyImage(url, false);
+    try {
+      const url = await fileToDataUrl(f);
+      setRaw(url);
+      setPins([]); // ảnh mới: chân cũ không còn đúng chỗ
+      await applyImage(url, false);
+    } catch (e) {
+      setError((e as Error).message ?? String(e));
+    }
   };
 
   const addPin = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -104,6 +111,13 @@ export default function AddPartWizard({ existing, onClose, onSaved }: Props) {
       setBusy(false);
     }
   };
+
+  // Esc đóng cửa sổ (không khi đang xử lý)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [busy, onClose]);
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60" onPointerDown={(e) => e.stopPropagation()}>
@@ -192,7 +206,7 @@ export default function AddPartWizard({ existing, onClose, onSaved }: Props) {
         <div className="mt-5 flex justify-between">
           <button className={btn} onClick={onClose}>Huỷ</button>
           <div className="flex gap-2">
-            {step !== 'source' && !(existing && step === 'pins') && <button className={btn} onClick={() => setStep(step === 'save' ? 'pins' : 'source')}>← Quay lại</button>}
+            {step !== 'source' && <button className={btn} onClick={() => setStep(step === 'save' ? 'pins' : 'source')}>← Quay lại</button>}
             {step === 'source' && <button className={primary} disabled={!img || busy} onClick={() => setStep('pins')}>Tiếp →</button>}
             {step === 'pins' && <button className={primary} disabled={!!pinError} onClick={() => setStep('save')}>Tiếp →</button>}
             {step === 'save' && <button className={primary} disabled={busy || !name.trim()} onClick={doSave}>Lưu vào thư viện</button>}

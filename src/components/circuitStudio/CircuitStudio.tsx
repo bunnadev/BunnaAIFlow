@@ -119,6 +119,16 @@ export default function CircuitStudio({ onClose }: Props) {
     })().catch((e) => flash(String(e), true));
   }, []);
 
+  // Menu chuột phải linh kiện: đóng khi bấm ra ngoài hoặc nhấn Esc
+  useEffect(() => {
+    if (!itemMenu) return;
+    const close = () => setItemMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', onKey); };
+  }, [itemMenu]);
+
   // Tự lưu sau ~1 giây kể từ lần thay đổi cuối
   useEffect(() => {
     if (!project || project.layout === layout) return;
@@ -314,29 +324,28 @@ export default function CircuitStudio({ onClose }: Props) {
           }}
         />
       )}
-{itemMenu && (
-  <div className="fixed z-[115] rounded-lg border border-white/10 bg-[#1f1f1f] py-1 text-sm shadow-xl" style={{ left: itemMenu.x, top: itemMenu.y }} onPointerLeave={() => setItemMenu(null)}>
-    <button className="block w-full px-4 py-1.5 text-left hover:bg-white/10" onClick={() => { setWizard({ existing: listCustomParts().find((c) => c.file.code === itemMenu.code) }); setItemMenu(null); }}>Sửa chân / đổi ảnh</button>
-    <button className="block w-full px-4 py-1.5 text-left text-red-400 hover:bg-white/10" onClick={async () => {
-      const code = itemMenu.code;
-      setItemMenu(null);
-      if (!(await safeFlush())) return;
-      const using = await projectsUsingPart(code);
-      if (using.length) { flash(`Không xoá được — đang dùng trong: ${using.join(', ')}`, true); return; }
-      if (!(await ask('Xoá linh kiện này khỏi thư viện?', { title: 'Xoá linh kiện', kind: 'warning' }))) return;
-      await deleteCustomPart(code);
-      setPartsVersion((v) => v + 1);
-    }}>Xoá khỏi thư viện</button>
-  </div>
-)}
-{wizard && (
-  <AddPartWizard
-    existing={wizard.existing}
-    onClose={() => setWizard(null)}
-    onSaved={() => { setWizard(null); setPartsVersion((v) => v + 1); flash('Đã lưu linh kiện vào thư viện.'); }}
-  />
-)}
-```
+      {itemMenu && (
+        <div className="fixed z-[115] rounded-lg border border-white/10 bg-[#1f1f1f] py-1 text-sm shadow-xl" style={{ left: Math.min(itemMenu.x + 4, window.innerWidth - 220), top: Math.min(itemMenu.y + 4, window.innerHeight - 90) }} onPointerDown={(e) => e.stopPropagation()}>
+          <button className="block w-full px-4 py-1.5 text-left hover:bg-white/10" onClick={() => { setWizard({ existing: listCustomParts().find((c) => c.file.code === itemMenu.code) }); setItemMenu(null); }}>Sửa chân / đổi ảnh</button>
+          <button className="block w-full px-4 py-1.5 text-left text-red-400 hover:bg-white/10" onClick={async () => {
+            const code = itemMenu.code;
+            setItemMenu(null);
+            if (!(await safeFlush())) return;
+            const using = await projectsUsingPart(code);
+            if (using.length) { flash(`Không xoá được — đang dùng trong: ${using.join(', ')}`, true); return; }
+            if (!(await ask('Xoá linh kiện này khỏi thư viện?', { title: 'Xoá linh kiện', kind: 'warning' }))) return;
+            await deleteCustomPart(code);
+            setPartsVersion((v) => v + 1);
+          }}>Xoá khỏi thư viện</button>
+        </div>
+      )}
+      {wizard && (
+        <AddPartWizard
+          existing={wizard.existing}
+          onClose={() => setWizard(null)}
+          onSaved={() => { setWizard(null); setPartsVersion((v) => v + 1); flash('Đã lưu linh kiện vào thư viện.'); }}
+        />
+      )}
     </div>
   );
 }
