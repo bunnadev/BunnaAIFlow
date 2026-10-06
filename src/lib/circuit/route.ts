@@ -13,7 +13,7 @@ const MARGIN = 14; // khoảng chừa quanh thân linh kiện
 const TOP = 130; // dưới dòng tiêu đề trên
 const BOTTOM_PAD = 100; // trên dòng tiêu đề dưới
 
-type Dir = 0 | 1 | 2 | 3; // phải, xuống, trái, lên
+export type Dir = 0 | 1 | 2 | 3; // phải, xuống, trái, lên
 const DX = [1, 0, -1, 0];
 const DY = [0, 1, 0, -1];
 
@@ -35,18 +35,26 @@ function box(p: PlacedPart) {
   return { x1: p.x - w / 2, y1: p.y - h / 2, x2: p.x + w / 2, y2: p.y + h / 2 };
 }
 
-/** Hướng chân chĩa ra ngoài thân (theo cạnh gần nhất), đã tính xoay. */
-function pinDir(p: PlacedPart, local: Point, H: number): Dir {
+/** Hướng chân chĩa ra ngoài thân (theo pinDirs nếu có, không thì theo cạnh gần nhất), đã tính xoay. */
+function pinDir(p: PlacedPart, local: Point, H: number, pinName?: string): Dir {
   if (p.type === 'lead') return p.y < H / 2 ? 1 : 3;
   const def = PARTS[p.type];
+  const steps = ((p.rotation ?? 0) / 90) | 0;
+  const fixed = pinName !== undefined ? def.pinDirs?.[pinName] : undefined;
+  if (fixed !== undefined) return ((fixed + steps) % 4) as Dir;
   const d = [def.w / 2 - local.x, def.h / 2 - local.y, local.x + def.w / 2, local.y + def.h / 2]; // phải, dưới, trái, trên
   let best: Dir = 1;
   for (let i = 0; i < 4; i++) if (d[i] < d[best]) best = i as Dir;
-  const steps = ((p.rotation ?? 0) / 90) | 0;
   return ((best + steps) % 4) as Dir;
 }
 
-interface End {
+/** Hướng dây đi ra ở 1 chân của linh kiện đã đặt (null nếu không có chân đó). */
+export function pinDirection(part: PlacedPart, pin: string, H = 1350): Dir | null {
+  const local = PARTS[part.type]?.pins[pin];
+  return local ? pinDir(part, local, H, pin) : null;
+}
+
+export interface End {
   point: Point;
   dir: Dir;
   part: PlacedPart;
@@ -69,12 +77,13 @@ function parseEnd(layout: CircuitLayout, ref: string, H: number): End | null {
   if (dot <= 0) return null;
   const part = layout.parts.find((p) => p.id === ref.slice(0, dot).trim());
   if (!part || !PARTS[part.type]) return null;
-  const local = PARTS[part.type].pins[ref.slice(dot + 1).trim()];
+  const pinName = ref.slice(dot + 1).trim();
+  const local = PARTS[part.type].pins[pinName];
   if (!local) return null;
   const r = rotate(local, part.rotation ?? 0);
   const def = PARTS[part.type];
   const interior = part.type !== 'lead' && Math.abs(local.x) < def.w / 2 - 30 && Math.abs(local.y) < def.h / 2 - 30;
-  return { point: { x: part.x + r.x, y: part.y + r.y }, dir: pinDir(part, local, H), part, isLead: part.type === 'lead', interior };
+  return { point: { x: part.x + r.x, y: part.y + r.y }, dir: pinDir(part, local, H, pinName), part, isLead: part.type === 'lead', interior };
 }
 
 class Heap {

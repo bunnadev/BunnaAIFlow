@@ -28,6 +28,12 @@ export interface PlacedPart {
   heatsink?: boolean;
   /** Chỉ cho "bus" (thanh mass đồng): chiều dài. */
   length?: number;
+  /** Tên chân thật do người dùng gõ (VD C1815: {"1":"E","2":"C","3":"B"}). */
+  pinNames?: Record<string, string>;
+  /** In tên chân (pinNames) lên ảnh. */
+  showPinNames?: boolean;
+  /** Nhãn đã kéo tay: tâm nhãn = tâm linh kiện + (dx, dy). Không có = tự đặt. */
+  labelPos?: { dx: number; dy: number };
 }
 
 export interface Wire {
@@ -39,6 +45,8 @@ export interface Wire {
   color: string;
   /** Các điểm gấp khúc ở giữa (toạ độ tuyệt đối). */
   via?: [number, number][];
+  /** Đường dây do người dùng tự chỉnh (giữ nguyên via, không tự đi lại). */
+  manual?: boolean;
 }
 
 export interface CircuitLayout {

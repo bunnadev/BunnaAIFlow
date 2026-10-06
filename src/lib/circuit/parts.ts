@@ -17,6 +17,8 @@ export interface PartDef {
   h: number;
   /** Chân → toạ độ cục bộ (chưa xoay). */
   pins: Record<string, Point>;
+  /** Hướng dây đi ra ở từng chân (0 phải, 1 xuống, 2 trái, 3 lên — khi chưa xoay). Không có = đoán theo cạnh gần nhất. */
+  pinDirs?: Record<string, 0 | 1 | 2 | 3>;
   /** Ghi chú về chân cho AI (VD chiều xoay mặc định). */
   pinNote: string;
   render: (p: PlacedPart) => string;
