@@ -206,3 +206,34 @@ Lưu trong thư mục dữ liệu app (`~/Library/Application Support/dev.bunna.
 2. Màn hình cơ bản: mở/lưu mạch, hiển thị ảnh, kéo thả linh kiện, nối dây, hoàn tác, xuất PNG.
 3. Chỉnh đường dây tay, sắp xếp + đường gióng, nhãn kéo tay, sửa tiêu đề, thanh cảnh báo.
 4. Linh kiện bằng ảnh: nạp ảnh, xoá nền, đánh dấu chân, rồi gen bằng Gemini.
+
+## 12. Cập nhật 2026-10-06 — Mặt bàn vẽ không giới hạn + xuất ảnh theo khung
+
+Huy chốt thêm sau khi duyệt bản trên. **Mục này thay cho các chỗ mâu thuẫn ở mục 1, 4, 5, 8.**
+
+**Mặt bàn vẽ**
+- Vùng vẽ phủ toàn màn hình, là mặt bàn gỗ trải rộng không có mép. Kéo và zoom tự do, toạ độ có thể âm.
+- Không còn khung 1080×1350 trong lúc vẽ. Tiêu đề không nằm trên bàn vẽ.
+- Bộ đi dây tính trong vùng bao quanh các linh kiện, cộng thêm lề 200px. Toạ độ được dời về một vùng dương, đi dây xong thì dời lại. Bộ đi dây cũ (khung cố định, chừa chỗ tiêu đề) giữ nguyên cho node "Vẽ mạch".
+- Kiểm tra bố cục khi vẽ bỏ các cảnh báo "tràn khung" và "đè vùng tiêu đề".
+
+**Bảng nổi**
+- Thanh công cụ, thư viện linh kiện, cột chỉnh sửa và thanh cảnh báo đều nổi trên mặt bàn: bo góc, nền mờ.
+- Thư viện và cột chỉnh sửa kéo sang chỗ khác được (vị trí được nhớ lại) và thu gọn được.
+- Cột chỉnh sửa chỉ hiện khi có thứ đang chọn. Thư viện bật/tắt bằng nút trên thanh công cụ.
+
+**Xuất ảnh** (cửa sổ "Xuất ảnh", có xem trước)
+- **Phạm vi:**
+  - "Tất cả": mọi linh kiện và dây.
+  - "Phần đang chọn": các linh kiện đang chọn, cùng những dây có cả 2 đầu nằm trong phần chọn. Thanh đồng chỉ được tính khi nó cũng được chọn.
+- **Khung:** 4:5 (1080×1350, mặc định), 1:1 (1080×1080), 9:16 (1080×1920).
+- **Cách co:** nội dung (linh kiện, dây, nhãn) được căn giữa phần còn trống sau khi chừa chỗ tiêu đề và lề.
+  - Phóng to tối đa 1,5 lần.
+  - Thu nhỏ dưới 0,6 lần thì báo "chữ sẽ nhỏ".
+  - Dây và nhãn giữ đúng như trên bàn vẽ: không đi lại dây, không đặt lại nhãn.
+- **Tiêu đề trên/dưới:** gõ trong cửa sổ xuất, lưu theo mạch (`layout.titleTop` / `layout.titleBottom`).
+- **Nền:**
+  - Gỗ (mặc định, như hiện tại).
+  - Màu tự chọn.
+  - Ảnh tải lên: được thu về tối đa 2160px rồi lưu vào `circuit-backgrounds/`, để lần sau chọn lại; xoá được.
+- App nhớ lựa chọn khung và nền theo từng mạch (`CircuitProject.exportSettings`).
