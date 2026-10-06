@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CircuitLayout } from '../types';
-import { initialStudioState, studioReducer } from '../studioState';
+import { initialStudioState, pruneSelection, studioReducer } from '../studioState';
 
 const L = (n: number): CircuitLayout => ({ titleTop: String(n), parts: [], wires: [] });
 
@@ -32,5 +32,23 @@ describe('studioReducer', () => {
     expect(s.past).toHaveLength(200);
     s = studioReducer(s, { type: 'load', layout: L(-1) });
     expect(s.past).toHaveLength(0);
+  });
+});
+
+describe('pruneSelection', () => {
+  const layout: CircuitLayout = {
+    parts: [{ id: 'R1', type: 'resistor', x: 0, y: 0 }, { id: 'R2', type: 'resistor', x: 100, y: 0 }],
+    wires: [{ from: 'R1.2', to: 'R2.1', color: 'red' }],
+  };
+  it('bỏ linh kiện không còn và dây vượt chỉ số', () => {
+    expect(pruneSelection(layout, { parts: ['R1', 'X9'], wire: null })).toEqual({ parts: ['R1'], wire: null });
+    expect(pruneSelection(layout, { parts: [], wire: 1 })).toEqual({ parts: [], wire: null });
+    expect(pruneSelection({ ...layout, parts: [] }, { parts: ['R1', 'R2'], wire: null })).toEqual({ parts: [], wire: null });
+  });
+  it('không đổi gì thì trả đúng object cũ', () => {
+    const sel = { parts: ['R1', 'R2'], wire: null };
+    expect(pruneSelection(layout, sel)).toBe(sel);
+    const w = { parts: [], wire: 0 };
+    expect(pruneSelection(layout, w)).toBe(w);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CircuitLayout } from '../types';
-import { contentBounds, routeWorld } from '../world';
-import { validateLayout } from '../render';
+import { contentBounds, routeWorld, routingSignature } from '../world';
+import { renderScene, sceneFilterRegion, validateLayout } from '../render';
 
 const A: CircuitLayout = {
   parts: [
@@ -47,5 +47,40 @@ describe('world', () => {
     const far = shift(A, 3000, -2000);
     const msgs = validateLayout({ ...far, titleTop: 'X' }, undefined, routeWorld(far), { frame: false }).warnings;
     expect(msgs.some((m) => /tràn ra|vùng tiêu đề/.test(m))).toBe(false);
+  });
+
+  it('routingSignature: đổi nhãn/màu/tên chân không đổi, dời/xoay/nối dây thì đổi', () => {
+    const sig = routingSignature(A, 1);
+    const relabel: CircuitLayout = {
+      ...A,
+      parts: A.parts.map((p) => (p.id === 'R1' ? { ...p, label: 'X', marking: 'Y', pinNames: { '1': 'a' }, showPinNames: true } : p)),
+      wires: A.wires.map((w) => ({ ...w, color: 'red' })),
+    };
+    expect(routingSignature(relabel, 1)).toBe(sig);
+    expect(routingSignature(A, 2)).not.toBe(sig);
+    expect(routingSignature(shift(A, 10, 0), 1)).not.toBe(sig);
+    expect(routingSignature({ ...A, parts: A.parts.map((p) => (p.id === 'R1' ? { ...p, rotation: 90 as const } : p)) }, 1)).not.toBe(sig);
+    expect(routingSignature({ ...A, parts: A.parts.map((p) => (p.id === 'GND' ? { ...p, length: 700 } : p)) }, 1)).not.toBe(sig);
+    expect(routingSignature({ ...A, wires: [...A.wires, { from: 'R1.1', to: 'GND', color: 'black' }] }, 1)).not.toBe(sig);
+    expect(routingSignature({ ...A, wires: A.wires.map((w, i) => (i ? w : { ...w, via: [[500, 500]] as [number, number][], manual: true })) }, 1)).not.toBe(sig);
+  });
+
+  it('mặt bàn không giới hạn: vùng lọc bóng phủ mạch ở xa ±3000 (dây không bị cắt)', () => {
+    const far = shift(A, 8000, -6000);
+    const routed = routeWorld(far);
+    const r = sceneFilterRegion(far, routed);
+    const b = contentBounds(far, routed)!;
+    expect(r.x1).toBeLessThanOrEqual(-3000);
+    expect(r.x2).toBeGreaterThanOrEqual(b.x2);
+    expect(r.y1).toBeLessThanOrEqual(b.y1);
+    expect(r.y2).toBeGreaterThanOrEqual(3000);
+    // bố cục gần gốc: vẫn ít nhất ±3000
+    expect(sceneFilterRegion(A, routeWorld(A))).toMatchObject({ x1: -4000, y1: -4000, x2: 4000, y2: 4000 });
+    const svg = renderScene(far, { routed, frame: null });
+    expect(svg).toContain(`width="${r.x2 - r.x1}"`);
+    expect(svg).not.toContain('url(#fWireShadow)');
+    expect(svg).not.toContain('url(#fShadow)');
+    // khung cố định vẫn dùng bộ lọc chung
+    expect(renderScene(A, { routed: routeWorld(A) })).toContain('url(#fWireShadow)');
   });
 });

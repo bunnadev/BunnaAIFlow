@@ -368,7 +368,7 @@ const DEFS = `
   </filter>
 </defs>`;
 
-function renderWire(w: Wire, rw: RoutedWire | null, dashed = false): { body: string; joints: string } {
+function renderWire(w: Wire, rw: RoutedWire | null, dashed = false, shadowId = 'fWireShadow'): { body: string; joints: string } {
   if (!rw) return { body: '', joints: '' };
   const pts = rw.points;
   const colorName = normalizeWireColor(w.color);
@@ -377,7 +377,7 @@ function renderWire(w: Wire, rw: RoutedWire | null, dashed = false): { body: str
   // "silver" = chân linh kiện hàn thẳng vào nhau: vẽ mảnh như chân kim loại, không phải dây bọc nhựa
   if (colorName === 'silver') {
     const legBody =
-      `<g filter="url(#fWireShadow)">` +
+      `<g filter="url(#${shadowId})">` +
       `<path d="${d}" fill="none" stroke="#7d848c" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>` +
       `<path d="${d}" fill="none" stroke="url(#gLeg)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>` +
       `</g>`;
@@ -386,7 +386,7 @@ function renderWire(w: Wire, rw: RoutedWire | null, dashed = false): { body: str
     return { body: legBody, joints };
   }
   const body =
-    `<g filter="url(#fWireShadow)">` +
+    `<g filter="url(#${shadowId})">` +
     `<path d="${d}" fill="none" stroke="${dark}" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"${dashed ? ' stroke-dasharray="20 14"' : ''}/>` +
     `<path d="${d}" fill="none" stroke="${main}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"${dashed ? ' stroke-dasharray="20 14"' : ''}/>` +
     `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="0.38" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" transform="translate(-2 -2.5)"${dashed ? ' stroke-dasharray="20 14"' : ''}/>` +
@@ -553,23 +553,61 @@ export interface SceneOptions extends RenderOptions {
 }
 
 /** Nội dung mạch (linh kiện, dây, tên chân, nhãn) — không nền, không tiêu đề, toạ độ gốc của bố cục. */
+/** Vùng lọc bóng mặc định (khung cố định) — mạch nằm gọn trong ±3000px. */
+const LEGACY_FILTER_REGION: Box = { x1: -3000, y1: -3000, x2: 3000, y2: 3000 };
+
+/**
+ * Vùng lọc bóng cho mặt bàn không giới hạn: phủ cả mạch (linh kiện + dây) và
+ * không nhỏ hơn vùng mặc định ±3000, làm tròn bội số 1000 để kéo nhẹ không
+ * đổi id liên tục. Ngoài vùng lọc, bóng (và cả hình vẽ) bị cắt mất.
+ */
+export function sceneFilterRegion(layout: CircuitLayout, routed: (RoutedWire | null)[]): Box {
+  const b = { ...LEGACY_FILTER_REGION };
+  const add = (x1: number, y1: number, x2: number, y2: number) => {
+    b.x1 = Math.min(b.x1, x1); b.y1 = Math.min(b.y1, y1); b.x2 = Math.max(b.x2, x2); b.y2 = Math.max(b.y2, y2);
+  };
+  for (const p of layout.parts) { const pb = partBox(p, true); if (pb) add(pb.x1, pb.y1, pb.x2, pb.y2); }
+  for (const rw of routed) for (const pt of rw?.points ?? []) add(pt.x, pt.y, pt.x, pt.y);
+  const PAD = 500; // chừa chỗ cho nhãn, đầu dây tuốt vỏ, bóng đổ
+  return {
+    x1: Math.floor((b.x1 - PAD) / 1000) * 1000, y1: Math.floor((b.y1 - PAD) / 1000) * 1000,
+    x2: Math.ceil((b.x2 + PAD) / 1000) * 1000, y2: Math.ceil((b.y2 + PAD) / 1000) * 1000,
+  };
+}
+
+/** Bộ lọc bóng riêng cho mặt bàn không giới hạn; id gắn theo vùng nên trùng id ⇔ trùng nội dung. */
+function studioFilterDefs(r: Box): { defs: string; shadow: string; wireShadow: string } {
+  const tag = `${r.x1}_${r.y1}_${r.x2}_${r.y2}`.replace(/-/g, 'm');
+  const shadow = `fShadowW_${tag}`, wireShadow = `fWireShadowW_${tag}`;
+  const region = `filterUnits="userSpaceOnUse" x="${r.x1}" y="${r.y1}" width="${r.x2 - r.x1}" height="${r.y2 - r.y1}"`;
+  const defs = `<defs>` +
+    `<filter id="${shadow}" ${region}><feDropShadow dx="5" dy="8" stdDeviation="6" flood-color="#000" flood-opacity="0.5"/></filter>` +
+    `<filter id="${wireShadow}" ${region}><feDropShadow dx="3" dy="5" stdDeviation="3" flood-color="#000" flood-opacity="0.45"/></filter>` +
+    `</defs>`;
+  return { defs, shadow, wireShadow };
+}
+
 export function renderScene(layout: CircuitLayout, opts: SceneOptions = {}): string {
   const frame = opts.frame === undefined ? { W: layout.width ?? 1080, H: layout.height ?? 1350 } : opts.frame;
   const tf = (p: PlacedPart) => `translate(${p.x} ${p.y}) rotate(${p.rotation ?? 0})`;
   const known = layout.parts.filter((p) => PARTS[p.type]);
   const buses = known.filter((p) => p.type === 'bus');
   const others = known.filter((p) => p.type !== 'bus' && p.type !== 'lead');
+  const routed = opts.routed ?? routeWires(layout);
+  // Khung cố định: dùng bộ lọc chung trong DEFS (giữ ảnh y hệt cũ); mặt bàn không giới hạn: bộ lọc phủ cả mạch
+  const studio = frame === null ? studioFilterDefs(sceneFilterRegion(layout, routed)) : null;
+  const fShadow = studio ? studio.shadow : 'fShadow';
+  const fWire = studio ? studio.wireShadow : 'fWireShadow';
   const behind = others.map((p) => {
     const s = PARTS[p.type].renderBehind?.(p);
-    return s ? `<g transform="${tf(p)}" filter="url(#fShadow)">${s}</g>` : '';
+    return s ? `<g transform="${tf(p)}" filter="url(#${fShadow})">${s}</g>` : '';
   }).join('');
-  const busSvg = buses.map((p) => `<g transform="${tf(p)}" filter="url(#fWireShadow)">${PARTS.bus.render(p)}</g>`).join('');
-  const partsSvg = others.map((p) => `<g transform="${tf(p)}" filter="url(#fShadow)">${PARTS[p.type].render(p)}</g>`).join('');
-  const routed = opts.routed ?? routeWires(layout);
-  const wires = layout.wires.map((w, i) => renderWire(w, routed[i], opts.dashed?.has(i)));
+  const busSvg = buses.map((p) => `<g transform="${tf(p)}" filter="url(#${fWire})">${PARTS.bus.render(p)}</g>`).join('');
+  const partsSvg = others.map((p) => `<g transform="${tf(p)}" filter="url(#${fShadow})">${PARTS[p.type].render(p)}</g>`).join('');
+  const wires = layout.wires.map((w, i) => renderWire(w, routed[i], opts.dashed?.has(i), fWire));
   const labels = (opts.labels ?? placeLabels(known, frame, wireSegBoxes(routed)))
     .map((l) => labelText(l.x, l.y, l.text, l.size, l.anchor, l.fill)).join('');
-  return behind + busSvg + partsSvg +
+  return (studio?.defs ?? '') + behind + busSvg + partsSvg +
     wires.map((w) => w.body).join('') + wires.map((w) => w.joints).join('') +
     renderPinNames(layout, frame?.H ?? layout.height ?? 1350) + labels;
 }

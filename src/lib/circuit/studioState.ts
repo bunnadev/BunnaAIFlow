@@ -30,3 +30,14 @@ export function studioReducer(s: StudioState, a: StudioAction): StudioState {
       return { layout: s.future[0], past: [...s.past, s.layout], future: s.future.slice(1) };
   }
 }
+
+/**
+ * Bỏ khỏi lựa chọn những linh kiện không còn trong bố cục và dây có chỉ số
+ * vượt quá số dây (sau hoàn tác / làm lại). Không đổi gì thì trả lại đúng object cũ.
+ */
+export function pruneSelection<S extends { parts: string[]; wire: number | null }>(layout: CircuitLayout, sel: S): S {
+  const ids = new Set(layout.parts.map((p) => p.id));
+  const parts = sel.parts.filter((id) => ids.has(id));
+  const wire = sel.wire !== null && sel.wire >= layout.wires.length ? null : sel.wire;
+  return parts.length === sel.parts.length && wire === sel.wire ? sel : { ...sel, parts, wire };
+}

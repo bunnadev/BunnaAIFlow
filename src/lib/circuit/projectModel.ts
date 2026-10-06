@@ -39,6 +39,10 @@ export function parseProject(text: string): CircuitProject {
     || !Array.isArray(p.layout?.parts) || !Array.isArray(p.layout?.wires)) {
     throw new Error('File mạch không đúng định dạng.');
   }
+  // File cũ / sửa tay thiếu mốc thời gian: dùng mốc 0 để danh sách mạch vẫn sắp xếp được
+  const epoch = new Date(0).toISOString();
+  if (typeof p.createdAt !== 'string') p.createdAt = epoch;
+  if (typeof p.updatedAt !== 'string') p.updatedAt = epoch;
   return p as CircuitProject;
 }
 

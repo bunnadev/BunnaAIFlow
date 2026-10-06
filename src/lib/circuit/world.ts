@@ -58,3 +58,16 @@ export function routeWorld(layout: CircuitLayout): (RoutedWire | null)[] {
     to: backEnd(rw.to),
   });
 }
+
+/**
+ * Chữ ký hình học cho bộ đi dây: chỉ gồm những gì làm đổi đường dây (vị trí,
+ * xoay, kích thước linh kiện; 2 đầu + điểm gấp của dây; phiên bản thư viện).
+ * Sửa nhãn / màu dây / tên chân không đổi chữ ký → không phải đi dây lại.
+ */
+export function routingSignature(layout: CircuitLayout, partsVersion = 0): string {
+  return JSON.stringify([
+    partsVersion,
+    layout.parts.map((p) => [p.id, p.type, p.x, p.y, p.rotation ?? 0, p.length ?? null, !!p.heatsink]),
+    layout.wires.map((w) => [w.from, w.to, w.via ?? null, !!w.manual]),
+  ]);
+}

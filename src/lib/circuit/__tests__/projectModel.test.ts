@@ -27,6 +27,16 @@ describe('projectModel', () => {
     expect(() => parseProject(JSON.stringify({ version: 1, id: 'x' }))).toThrow();
   });
 
+  it('parseProject: thiếu createdAt/updatedAt thì dùng mốc 0', () => {
+    const { createdAt: _c, updatedAt: _u, ...raw } = newProject('A', now, 'a');
+    const p = parseProject(JSON.stringify(raw));
+    expect(p.createdAt).toBe(new Date(0).toISOString());
+    expect(p.updatedAt).toBe(new Date(0).toISOString());
+    const q = parseProject(JSON.stringify({ ...raw, createdAt: now.toISOString() }));
+    expect(q.createdAt).toBe(now.toISOString());
+    expect(q.updatedAt).toBe(new Date(0).toISOString());
+  });
+
   it('fileSlug bỏ dấu tiếng Việt', () => {
     expect(fileSlug('Mạch vỗ tay 3 LED!')).toBe('mach_vo_tay_3_led');
     expect(fileSlug('   ')).toBe('mach');
