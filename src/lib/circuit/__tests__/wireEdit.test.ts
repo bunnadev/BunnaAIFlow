@@ -79,4 +79,20 @@ describe('wireEdit', () => {
   it('simplify bỏ điểm trùng và điểm thẳng hàng', () => {
     expect(simplify([P(0, 0), P(0, 0), P(0, 50), P(0, 100), P(100, 100)])).toEqual([P(0, 0), P(0, 100), P(100, 100)]);
   });
+
+  it('followEnd xử lý dây có đoạn dài 0 ở đầu (normalize input)', () => {
+    const pts = [P(0, 0), P(0, 0), P(0, 100)];
+    const out = followEnd(pts, 'start', P(50, 0));
+    expect(out[0]).toEqual(P(50, 0));
+    expect(out[out.length - 1]).toEqual(P(0, 100));
+    orthogonal(out);
+  });
+
+  it('followEnd với end trên dây 2 điểm vẫn vuông góc', () => {
+    const pts = [P(0, 0), P(0, 200)];
+    const out = followEnd(pts, 'end', P(50, 250));
+    expect(out[out.length - 1]).toEqual(P(50, 250));
+    expect(out[0]).toEqual(P(0, 0));
+    orthogonal(out);
+  });
 });

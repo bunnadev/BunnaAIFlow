@@ -1,9 +1,9 @@
 import type { Point } from './types';
 
 /**
- * Sửa đường dây vuông góc. Mọi hàm nhận/trả polyline đầy đủ: điểm đầu và cuối
- * là toạ độ chân (không bao giờ dời), ở giữa là các góc. Kết quả luôn chỉ gồm
- * đoạn ngang/dọc (có thể có đoạn dài 0 — bỏ bằng simplify khi chốt).
+ * Sửa đường dây vuông góc. Mọi hàm nhận/trả polyline đầy đủ gồm đoạn ngang/dọc.
+ * Điểm đầu và cuối là toạ độ chân: followEnd di chuyển 1 chân, các hàm khác
+ * giữ 2 chân đứng yên. Ở giữa là các góc. Kết quả luôn chỉ gồm đoạn ngang/dọc.
  */
 
 export type Orientation = 'h' | 'v' | null;
@@ -51,7 +51,7 @@ export function removeCorner(pts: Point[], i: number): Point[] {
 
 /** Linh kiện ở 1 đầu dây di chuyển: đặt đầu đó vào p, chỉnh góc kề cho vẫn vuông góc. */
 export function followEnd(pts: Point[], which: 'start' | 'end', p: Point): Point[] {
-  let out = pts.map((q) => ({ ...q }));
+  let out = simplify(pts).map((q) => ({ ...q }));
   if (which === 'end') out.reverse();
   const old = out[0];
   if (out.length === 2) {
@@ -62,7 +62,6 @@ export function followEnd(pts: Point[], which: 'start' | 'end', p: Point): Point
     const o = segOrientation(old, out[1]);
     if (o === 'v') out[1].x = p.x;
     else if (o === 'h') out[1].y = p.y;
-    else out[1] = { ...p };
     out[0] = { ...p };
   }
   if (which === 'end') out.reverse();
