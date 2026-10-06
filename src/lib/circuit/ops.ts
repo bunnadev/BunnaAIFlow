@@ -211,9 +211,27 @@ export function resizeBus(layout: CircuitLayout, id: string, side: -1 | 1, endX:
     const v = parseFloat(ref.slice(at + 1));
     return `${id}@${Math.min(Math.max(v, left + 10), right - 10)}`;
   };
-  return {
+
+  let after: CircuitLayout = {
     ...layout,
     parts: layout.parts.map((p) => (p.id === id ? { ...p, x: (left + right) / 2, length: right - left } : p)),
     wires: layout.wires.map((w) => ({ ...w, from: clampRef(w.from), to: clampRef(w.to) })),
   };
+
+  // Recompute via for manual wires whose bus endpoint was clamped
+  after.wires = after.wires.map((w, i) => {
+    if (!w.manual || !w.via) return w;
+    const oldW = layout.wires[i];
+    const fromChanged = oldW.from !== w.from;
+    const toChanged = oldW.to !== w.to;
+    if (!fromChanged && !toChanged) return w;
+
+    const old = wirePoints(layout, i);
+    const nu = resolvePoint(after, fromChanged ? w.from : w.to);
+    if (!old || !nu) return w;
+    const pts = followEnd(old, fromChanged ? 'start' : 'end', nu);
+    return { ...w, via: pts.slice(1, -1).map((p) => [p.x, p.y] as [number, number]) };
+  });
+
+  return after;
 }

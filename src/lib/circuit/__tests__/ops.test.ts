@@ -122,4 +122,23 @@ describe('ops: dây', () => {
     expect(l.wires[2].to).toBe('GND@690');
     expect(resizeBus(base(), 'GND', -1, 900).parts.find((p) => p.id === 'GND')!.length).toBe(100);
   });
+
+  it('resizeBus tính lại via khi dây chỉnh tay có đầu "@" bị kẹp', () => {
+    let l = setWirePoints(base(), 2, [{ x: 714, y: 575 }, { x: 714, y: 800 }, { x: 700, y: 800 }, { x: 700, y: 1100 }]);
+    // Tạo dây chỉnh tay từ LED1.K tới GND@700 với via=[[714,800],[700,800]]
+    expect(l.wires[2]).toMatchObject({ manual: true, to: 'GND@700', via: [[714, 800], [700, 800]] });
+
+    // Kéo cạnh phải thanh từ 840 xuống 600 → GND@700 bị kẹp thành GND@590
+    const l2 = resizeBus(l, 'GND', 1, 603);
+    expect(l2.wires[2].to).toBe('GND@590');
+
+    // Kiểm tra rằng via được tính lại để đường vẫn vuông góc
+    const pts = wirePoints(l2, 2)!;
+    for (let k = 0; k < pts.length - 1; k++) {
+      expect(pts[k].x === pts[k + 1].x || pts[k].y === pts[k + 1].y).toBe(true);
+    }
+    // Điểm cuối nằm trên đầu thanh mới (x clamped, y = bus.y)
+    expect(pts[pts.length - 1].x).toBe(590);
+    expect(pts[pts.length - 1].y).toBe(1100);
+  });
 });
