@@ -11,6 +11,13 @@
     "fs:allow-mkdir",
     "fs:allow-exists",
     "fs:allow-read-file",
+    "fs:allow-read-dir",
+    "fs:allow-rename",
+    "fs:allow-remove",
+    "fs:allow-write-file",
+    "fs:allow-write-text-file",
+    "fs:allow-read-text-file",
+    "dialog:allow-ask",
     "dialog:allow-open",
     "dialog:allow-save",
     {
