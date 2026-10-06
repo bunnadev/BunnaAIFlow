@@ -51,6 +51,7 @@ import ExecutionLogPanel from './components/ExecutionLogPanel';
 import BatchExportPanel from './components/BatchExportPanel';
 import BatchCombinedModal from './components/BatchCombinedModal';
 import SettingsPanel from './components/SettingsPanel';
+import CircuitStudio from './components/circuitStudio/CircuitStudio';
 import LicenseGate from './components/LicenseGate';
 import ImportChoiceModal from './components/ImportChoiceModal';
 import ImportAllChoiceModal from './components/ImportAllChoiceModal';
@@ -148,6 +149,7 @@ const [menuState, setMenuState] = useState<{ x: number, y: number, flowPos: { x:
 const [isNodeLibraryOpen, setIsNodeLibraryOpen] = useState(false);
 const [isLogPanelOpen, setIsLogPanelOpen] = useState(false);
 const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+const [isCircuitStudioOpen, setIsCircuitStudioOpen] = useState(false);
 const [executionLogs, setExecutionLogs] = useState<LogEntry[]>([]);
 
 const [isBatchCombinedModalOpen, setIsBatchCombinedModalOpen] = useState(false);
@@ -1833,6 +1835,9 @@ className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all
 <button onClick={handleExportAll} title="Xuất tất cả workflow (backup)" className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#F1641E]/10 border border-[#F1641E]/20 hover:bg-[#F1641E]/20 transition-all text-[#F1641E]">
 <span className="material-symbols-outlined text-[18px]">download_for_offline</span>
 </button>
+<button onClick={() => setIsCircuitStudioOpen(true)} title="Xưởng vẽ mạch" className="w-9 h-9 rounded-lg flex items-center justify-center bg-white/[0.03] border border-white/10 text-[#94a3b8] hover:text-white hover:bg-white/10 transition-all">
+<span className="material-symbols-outlined text-[18px]">electrical_services</span>
+</button>
 <div className="w-8 h-[1px] bg-white/10 my-1" />
 <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} title="Cài đặt" className="w-9 h-9 rounded-lg flex items-center justify-center bg-white/[0.03] border border-white/10 text-[#94a3b8] hover:text-white hover:bg-white/10 transition-all">
 <span className="material-symbols-outlined text-[18px]">settings</span>
@@ -1866,6 +1871,7 @@ onClose={() => setActiveSceneEdit(null)}
 />}
 {isLogPanelOpen && <ExecutionLogPanel logs={executionLogs} onClear={() => setExecutionLogs([])} onClose={() => setIsLogPanelOpen(false)} />}
 {isSettingsOpen && <SettingsPanel settings={appSettings} onSave={handleSaveSettings} onClose={() => setIsSettingsOpen(false)} filenamePrefix={filenamePrefix} onChangePrefix={setFilenamePrefix} />}
+{isCircuitStudioOpen && <CircuitStudio onClose={() => setIsCircuitStudioOpen(false)} geminiApiKey={appSettings.geminiApiKey} />}
 <HoveredEdgeContext.Provider value={hoveredEdgeId}>
 <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
 onConnect={handleConnect}
