@@ -117,7 +117,10 @@ export interface RoutedWire {
   failed?: boolean;
 }
 
-export function routeWires(layout: CircuitLayout): (RoutedWire | null)[] {
+export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean } = {}): (RoutedWire | null)[] {
+  // Mặt bàn vẽ không giới hạn (Xưởng vẽ mạch) không có tiêu đề → chỉ chừa mép 20px
+  const top = opts.titleZones === false ? 20 : TOP;
+  const bottomPad = opts.titleZones === false ? 20 : BOTTOM_PAD;
   const W = layout.width ?? 1080;
   const H = layout.height ?? 1350;
   const cols = Math.floor(W / G) + 1;
@@ -147,12 +150,12 @@ export function routeWires(layout: CircuitLayout): (RoutedWire | null)[] {
   });
   const softBlocked = (c: number, r: number) => {
     const y = r * G, x = c * G;
-    return !bodyCell[idx(c, r)] && y >= TOP - 30 && y <= H - BOTTOM_PAD + 50 && x >= 10 && x <= W - 10;
+    return !bodyCell[idx(c, r)] && y >= top - 30 && y <= H - bottomPad + 50 && x >= 10 && x <= W - 10;
   };
   // Ngoài vùng tiêu đề / mép ảnh
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
     const y = r * G, x = c * G;
-    if (y < TOP || y > H - BOTTOM_PAD + 30 || x < 16 || x > W - 16) blocked[idx(c, r)] = 1;
+    if (y < top || y > H - bottomPad + 30 || x < 16 || x > W - 16) blocked[idx(c, r)] = 1;
   }
   // Thanh mass: cho phép đi tới (là đích), nhưng không chạy dọc theo nó
   const busCells = new Map<number, PlacedPart>();

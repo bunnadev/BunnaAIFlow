@@ -109,7 +109,7 @@ export function severeIssues(v: ValidationResult): string[] {
   return [...v.errors, ...v.warnings.filter((w) => /đè lên|tràn ra|Không tìm được đường|chạy qua thân/.test(w))];
 }
 
-export function validateLayout(layout: CircuitLayout, expectedWireCount?: number, routed?: (RoutedWire | null)[]): ValidationResult {
+export function validateLayout(layout: CircuitLayout, expectedWireCount?: number, routed?: (RoutedWire | null)[], opts: { frame?: boolean } = {}): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   const W = layout.width ?? 1080;
@@ -143,9 +143,11 @@ export function validateLayout(layout: CircuitLayout, expectedWireCount?: number
     .filter((p) => p.type !== 'lead' && p.type !== 'bus')
     .map((p) => ({ p, b: partBox(p, true) }))
     .filter((x): x is { p: PlacedPart; b: NonNullable<ReturnType<typeof partBox>> } => !!x.b);
-  for (const { p, b } of boxes) {
-    if (b.x1 < 0 || b.y1 < 0 || b.x2 > W || b.y2 > H) warnings.push(`${p.id} tràn ra ngoài khung ảnh.`);
-    else if ((layout.titleTop && b.y1 < 125) || (layout.titleBottom && b.y2 > H - 110)) warnings.push(`${p.id} đè lên vùng tiêu đề (giữ linh kiện trong y 150..1190).`);
+  if (opts.frame !== false) {
+    for (const { p, b } of boxes) {
+      if (b.x1 < 0 || b.y1 < 0 || b.x2 > W || b.y2 > H) warnings.push(`${p.id} tràn ra ngoài khung ảnh.`);
+      else if ((layout.titleTop && b.y1 < 125) || (layout.titleBottom && b.y2 > H - 110)) warnings.push(`${p.id} đè lên vùng tiêu đề (giữ linh kiện trong y 150..1190).`);
+    }
   }
   for (let i = 0; i < boxes.length; i++) {
     for (let j = i + 1; j < boxes.length; j++) {
@@ -272,7 +274,7 @@ function seeded(seed: number) {
   return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 }
 
-function woodBackground(W: number, H: number): string {
+export function woodBackground(W: number, H: number, vignette = true): string {
   const rnd = seeded(1337);
   const lines: string[] = [];
   for (let i = 0; i < 70; i++) {
@@ -290,7 +292,7 @@ function woodBackground(W: number, H: number): string {
     lines.push(`<path d="${d}" fill="none" stroke="${dark ? '#2a1408' : '#c08a55'}" stroke-opacity="${(dark ? 0.18 : 0.12) + rnd() * 0.12}" stroke-width="${(1 + rnd() * 3.5).toFixed(1)}"/>`);
   }
   return `<rect width="${W}" height="${H}" fill="url(#gWood)"/>` + lines.join('') +
-    `<rect width="${W}" height="${H}" fill="url(#gVignette)"/>`;
+    (vignette ? `<rect width="${W}" height="${H}" fill="url(#gVignette)"/>` : '');
 }
 
 const DEFS = `
@@ -442,7 +444,7 @@ export interface LabelPlacement { partId: string; text: string; x: number; y: nu
  * thử 8 vị trí quanh linh kiện (4 cạnh + 4 góc), chấm điểm theo mức đè lên linh
  * kiện khác / nhãn khác / dây / tràn khung, ưu tiên phía AI/người dùng chọn.
  */
-function placeLabels(parts: PlacedPart[], W: number, H: number, wireSegs: Box[]): LabelPlacement[] {
+function placeLabels(parts: PlacedPart[], frame: { W: number; H: number } | null, wireSegs: Box[]): LabelPlacement[] {
   const partBoxes = parts.filter((p) => p.type !== 'lead' && p.type !== 'bus')
     .map((p) => ({ id: p.id, b: partBox(p, true)! })).filter((x) => x.b);
   const taken: Box[] = [];
@@ -478,7 +480,7 @@ function placeLabels(parts: PlacedPart[], W: number, H: number, wireSegs: Box[])
     cands.forEach((c, i) => {
       const bx = c.box;
       let score = i === prefIdx ? 0 : 40 + i * 2;
-      if (bx.x1 < 8 || bx.x2 > W - 8 || bx.y1 < 118 || bx.y2 > H - 105) score += 100000;
+      if (frame && (bx.x1 < 8 || bx.x2 > frame.W - 8 || bx.y1 < 118 || bx.y2 > frame.H - 105)) score += 100000;
       for (const t of taken) score += area(t, bx) * 50;
       for (const pb of partBoxes) if (pb.id !== p.id) score += area(pb.b, bx) * 20;
       for (const ws of wireSegs) score += area(ws, bx) * 3;
@@ -508,10 +510,14 @@ function wireSegBoxes(routed: (RoutedWire | null)[]): Box[] {
   return segs;
 }
 
-/** Vị trí các nhãn — editor dùng để bắt chuột khi kéo nhãn. */
-export function labelPlacements(layout: CircuitLayout, routed: (RoutedWire | null)[] = routeWires(layout)): LabelPlacement[] {
+/** Vị trí các nhãn — editor dùng để bắt chuột khi kéo nhãn. frame = null: mặt bàn không giới hạn. */
+export function labelPlacements(
+  layout: CircuitLayout,
+  routed: (RoutedWire | null)[] = routeWires(layout),
+  frame: { W: number; H: number } | null = { W: layout.width ?? 1080, H: layout.height ?? 1350 },
+): LabelPlacement[] {
   const known = layout.parts.filter((p) => PARTS[p.type]);
-  return placeLabels(known, layout.width ?? 1080, layout.height ?? 1350, wireSegBoxes(routed));
+  return placeLabels(known, frame, wireSegBoxes(routed));
 }
 
 /** Tên chân thật (pinNames) in cạnh chân, khi bật showPinNames. */
@@ -539,15 +545,20 @@ export interface RenderOptions {
   dashed?: Set<number>;
 }
 
-export function renderCircuitSvg(layout: CircuitLayout, opts: RenderOptions = {}): string {
-  const W = layout.width ?? 1080;
-  const H = layout.height ?? 1350;
-  const tf = (p: PlacedPart) => `translate(${p.x} ${p.y}) rotate(${p.rotation ?? 0})`;
+export interface SceneOptions extends RenderOptions {
+  /** Khung ảnh cố định (nhãn không được tràn ra ngoài); null = mặt bàn không giới hạn. Mặc định: khung theo layout.width/height. */
+  frame?: { W: number; H: number } | null;
+  /** Vị trí nhãn tính sẵn (xuất 1 phần mạch giữ đúng chỗ nhãn như trên bàn vẽ). */
+  labels?: LabelPlacement[];
+}
 
+/** Nội dung mạch (linh kiện, dây, tên chân, nhãn) — không nền, không tiêu đề, toạ độ gốc của bố cục. */
+export function renderScene(layout: CircuitLayout, opts: SceneOptions = {}): string {
+  const frame = opts.frame === undefined ? { W: layout.width ?? 1080, H: layout.height ?? 1350 } : opts.frame;
+  const tf = (p: PlacedPart) => `translate(${p.x} ${p.y}) rotate(${p.rotation ?? 0})`;
   const known = layout.parts.filter((p) => PARTS[p.type]);
   const buses = known.filter((p) => p.type === 'bus');
   const others = known.filter((p) => p.type !== 'bus' && p.type !== 'lead');
-
   const behind = others.map((p) => {
     const s = PARTS[p.type].renderBehind?.(p);
     return s ? `<g transform="${tf(p)}" filter="url(#fShadow)">${s}</g>` : '';
@@ -556,18 +567,35 @@ export function renderCircuitSvg(layout: CircuitLayout, opts: RenderOptions = {}
   const partsSvg = others.map((p) => `<g transform="${tf(p)}" filter="url(#fShadow)">${PARTS[p.type].render(p)}</g>`).join('');
   const routed = opts.routed ?? routeWires(layout);
   const wires = layout.wires.map((w, i) => renderWire(w, routed[i], opts.dashed?.has(i)));
-  const labels = placeLabels(known, W, H, wireSegBoxes(routed))
+  const labels = (opts.labels ?? placeLabels(known, frame, wireSegBoxes(routed)))
     .map((l) => labelText(l.x, l.y, l.text, l.size, l.anchor, l.fill)).join('');
-  const pinNames = renderPinNames(layout, H);
+  return behind + busSvg + partsSvg +
+    wires.map((w) => w.body).join('') + wires.map((w) => w.joints).join('') +
+    renderPinNames(layout, frame?.H ?? layout.height ?? 1350) + labels;
+}
 
-  const title = (text: string | undefined, y: number) => text
+export function titleSvg(text: string | undefined, y: number, W: number): string {
+  return text
     ? `<text x="${W / 2}" y="${y}" font-family="${FONT}" font-size="76" font-weight="900" text-anchor="middle" fill="#ffffff" stroke="#000" stroke-opacity="0.85" stroke-width="10" stroke-linejoin="round" paint-order="stroke">${esc(text)}</text>`
     : '';
+}
 
+export function svgDefs(): string {
+  return DEFS;
+}
+
+/** Ô nền gỗ không viền tối — editor lát kín mặt bàn vẽ. */
+export function woodTileSvg(W = 1080, H = 1350): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${DEFS}${woodBackground(W, H, false)}</svg>`;
+}
+
+/** Ảnh mạch khung cố định (node "Vẽ mạch"): nền gỗ + mạch + tiêu đề. */
+export function renderCircuitSvg(layout: CircuitLayout, opts: RenderOptions = {}): string {
+  const W = layout.width ?? 1080;
+  const H = layout.height ?? 1350;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
-    DEFS + woodBackground(W, H) + behind + busSvg + partsSvg +
-    wires.map((w) => w.body).join('') + wires.map((w) => w.joints).join('') +
-    pinNames + labels + title(layout.titleTop, 92) + title(layout.titleBottom, H - 40) +
+    DEFS + woodBackground(W, H) + renderScene(layout, { ...opts, frame: { W, H } }) +
+    titleSvg(layout.titleTop, 92, W) + titleSvg(layout.titleBottom, H - 40, W) +
     `</svg>`;
 }
 
