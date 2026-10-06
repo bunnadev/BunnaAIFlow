@@ -28,7 +28,7 @@ const ALIGN: [AlignMode, string, string][] = [
   ['top', 'align_vertical_top', 'Căn trên'], ['vcenter', 'align_vertical_center', 'Căn giữa (cùng hàng)'], ['bottom', 'align_vertical_bottom', 'Căn dưới'],
 ];
 
-export default function CircuitStudio({ onClose }: Props) {
+export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
   const [projects, setProjects] = useState<ProjectMeta[]>([]);
   const [project, setProject] = useState<CircuitProject | null>(null);
   const [state, dispatch] = useReducer(studioReducer, initialStudioState(emptyLayout()));
@@ -342,6 +342,7 @@ export default function CircuitStudio({ onClose }: Props) {
       {wizard && (
         <AddPartWizard
           existing={wizard.existing}
+          geminiApiKey={geminiApiKey}
           onClose={() => setWizard(null)}
           onSaved={() => { setWizard(null); setPartsVersion((v) => v + 1); flash('Đã lưu linh kiện vào thư viện.'); }}
         />

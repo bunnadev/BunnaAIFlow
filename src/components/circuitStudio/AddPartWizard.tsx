@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { autoCrop, removeBackground } from '../../lib/circuit/bgRemove';
-import { makePartCode, type CustomPartFile } from '../../lib/circuit/imagePart';
+import { makePartCode, partImagePrompt, type CustomPartFile } from '../../lib/circuit/imagePart';
+import { GeminiImageProvider } from '../../lib/providers/geminiImageProvider';
+import { resolveImageModelId } from '../../lib/models';
 import { saveCustomPart } from '../../lib/circuit/customPartsStore';
 import { PARTS } from '../../lib/circuit/parts';
 import { dataUrlToBytes, dataUrlToRGBA, fileToDataUrl, rgbaToDataUrl } from './imageUtils';
@@ -28,7 +30,7 @@ function guessDir(fx: number, fy: number, w: number, h: number): Dir {
   return best as Dir;
 }
 
-export default function AddPartWizard({ existing, onClose, onSaved }: Props) {
+export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved }: Props) {
   const [step, setStep] = useState<'source' | 'pins' | 'save'>(existing ? 'pins' : 'source');
   const [raw, setRaw] = useState<string | null>(existing?.dataUrl ?? null); // ảnh gốc (chưa xoá nền)
   const [img, setImg] = useState<string | null>(existing?.dataUrl ?? null); // ảnh đang dùng
@@ -46,6 +48,45 @@ export default function AddPartWizard({ existing, onClose, onSaved }: Props) {
   const [desc, setDesc] = useState(existing?.file.desc ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [genDesc, setGenDesc] = useState('');
+  const [genImgs, setGenImgs] = useState<string[]>([]);
+  const [genBusy, setGenBusy] = useState(false);
+
+  const generate = async () => {
+    if (!geminiApiKey) { setError('Chưa có Gemini API key — vào Cài đặt để nhập.'); return; }
+    if (!genDesc.trim()) return;
+    setGenBusy(true); setError(null); setGenImgs([]);
+    const provider = new GeminiImageProvider(geminiApiKey);
+    const results = await Promise.allSettled([0, 1, 2].map(() => provider.generateImage({
+      prompt: partImagePrompt(genDesc), aspectRatio: '1:1', model: resolveImageModelId('Nano Banana Pro'),
+    })));
+    const ok = results.flatMap((r) => (r.status === 'fulfilled' ? [`data:${r.value.mimeType};base64,${r.value.base64}`] : []));
+    setGenImgs(ok);
+    if (!ok.length) {
+      const first = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+      setError(`Gemini không vẽ được: ${first?.reason?.message ?? first?.reason ?? 'lỗi không rõ'}`);
+    }
+    setGenBusy(false);
+  };
+
+  const pickGenerated = async (url: string) => {
+    setRaw(url);
+    setPins([]); // ảnh mới: chân cũ không còn đúng chỗ
+    setTolerance(70);
+    // Ảnh Gemini nền xanh #00FF00 → tự xoá nền + khử ám xanh ở viền
+    setBusy(true); setError(null);
+    try {
+      const rgba = autoCrop(removeBackground(await dataUrlToRGBA(url), 70, true));
+      setImg(rgbaToDataUrl(rgba));
+      setNatural({ w: rgba.width, h: rgba.height });
+      if (!name) setName(genDesc.trim().slice(0, 40));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const drawH = natural ? Math.round((drawW * natural.h) / natural.w) : drawW;
   const disp = natural ? (natural.w >= natural.h ? { w: BOX, h: (BOX * natural.h) / natural.w } : { w: (BOX * natural.w) / natural.h, h: BOX }) : { w: BOX, h: BOX };
@@ -129,7 +170,25 @@ export default function AddPartWizard({ existing, onClose, onSaved }: Props) {
 
         {step === 'source' && (
           <div className="space-y-4">
-            <div id="gemini-source" />
+            <div className="rounded-lg border-2 border-[#F1641E]/50 p-3">
+              <div className="mb-2 font-semibold">✨ Nhờ Gemini vẽ (ưu tiên)</div>
+              <div className="flex gap-2">
+                <input value={genDesc} onChange={(e) => setGenDesc(e.target.value)} placeholder="VD Relay 12V SRD-12VDC-SL-C, 5 chân"
+                  onKeyDown={(e) => { if (e.key === 'Enter') generate(); }}
+                  className="flex-1 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-sm outline-none focus:border-[#F1641E]" />
+                <button className={primary} disabled={genBusy || !genDesc.trim()} onClick={generate}>{genBusy ? 'Đang vẽ…' : genImgs.length ? '↻ Vẽ lại' : 'Vẽ 3 ảnh'}</button>
+              </div>
+              <div className="mt-1 text-xs text-white/40">App tự thêm yêu cầu phong cách (nhìn từ trên xuống, chân rõ, nền xanh để tự xoá nền). Mỗi lần vẽ tốn phí 3 ảnh Nano Banana Pro.</div>
+              {genImgs.length > 0 && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {genImgs.map((u, i) => (
+                    <button key={i} onClick={() => pickGenerated(u)} className="overflow-hidden rounded-md border-2 border-transparent hover:border-[#F1641E]">
+                      <img src={u} alt="" className="aspect-square w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="rounded-lg border border-white/10 p-3">
               <div className="mb-2 font-semibold">📁 Nạp ảnh có sẵn</div>
               <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => onPickFile(e.target.files?.[0])} className="text-sm" />
