@@ -33,7 +33,7 @@ type Drag =
   | { kind: 'wire'; from: string; fromPt: Point; cur: Point }
   | { kind: 'segment'; wire: number; seg: number; start: Point; base: Point[]; pts: Point[]; delta: number }
   | { kind: 'label'; id: string; start: Point; base: { dx: number; dy: number }; cur: { dx: number; dy: number } }
-  | { kind: 'busEnd'; id: string; side: -1 | 1; endX: number };
+  | { kind: 'busEnd'; id: string; side: -1 | 1; startX: number; endX: number };
 
 const ORANGE = '#F1641E';
 const FAR = 100000; // đường gióng kéo dài "vô tận"
@@ -74,12 +74,26 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
   // Truyền api mới mỗi lần vẽ (pan/zoom/bố cục thay đổi thì toạ độ đổi theo)
   useEffect(() => { onApi({ clientToLayout: toLayout, fit, focusBox }); });
   useEffect(() => {
-    const isTyping = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
-    const down = (e: KeyboardEvent) => { if (e.code === 'Space' && !isTyping(e)) { setSpace(true); e.preventDefault(); } };
+    const isFormElement = (t: EventTarget | null): t is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement => {
+      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t instanceof HTMLButtonElement) return true;
+      if (t instanceof HTMLElement && t.isContentEditable) return true;
+      return false;
+    };
+    const down = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !isFormElement(e.target)) { setSpace(true); e.preventDefault(); }
+    };
     const up = (e: KeyboardEvent) => { if (e.code === 'Space') setSpace(false); };
+    const resetSpace = () => setSpace(false);
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
-    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+    window.addEventListener('blur', resetSpace);
+    document.addEventListener('visibilitychange', resetSpace);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', resetSpace);
+      document.removeEventListener('visibilitychange', resetSpace);
+    };
   }, []);
 
   // Bản xem trước trong lúc kéo (chưa ghi vào lịch sử)
@@ -135,7 +149,7 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       const half = (selBus.length ?? 800) / 2;
       for (const side of [-1, 1] as const) {
         const ex = selBus.x + side * half;
-        if (Math.hypot(pt.x - ex, pt.y - selBus.y) < 16) { setDrag({ kind: 'busEnd', id: selBus.id, side, endX: ex }); return; }
+        if (Math.hypot(pt.x - ex, pt.y - selBus.y) < 16) { setDrag({ kind: 'busEnd', id: selBus.id, side, startX: ex, endX: ex }); return; }
       }
     }
     // 2. tay cầm đoạn của dây đang chọn
@@ -228,7 +242,7 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
         if (d.cur.dx !== d.base.dx || d.cur.dy !== d.base.dy) onCommit(updatePart(layout, d.id, { labelPos: d.cur }));
         break;
       case 'busEnd':
-        onCommit(resizeBus(layout, d.id, d.side, d.endX));
+        if (d.endX !== d.startX) onCommit(resizeBus(layout, d.id, d.side, d.endX));
         break;
       case 'wire': {
         const to = pt && dropTarget(layout, pt);
@@ -296,6 +310,8 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={() => setDrag(null)}
+      onLostPointerCapture={() => setDrag(null)}
       onPointerLeave={() => setHover(null)}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
