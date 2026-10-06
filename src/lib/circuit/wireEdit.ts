@@ -1,0 +1,83 @@
+import type { Point } from './types';
+
+/**
+ * Sửa đường dây vuông góc. Mọi hàm nhận/trả polyline đầy đủ: điểm đầu và cuối
+ * là toạ độ chân (không bao giờ dời), ở giữa là các góc. Kết quả luôn chỉ gồm
+ * đoạn ngang/dọc (có thể có đoạn dài 0 — bỏ bằng simplify khi chốt).
+ */
+
+export type Orientation = 'h' | 'v' | null;
+
+const snap10 = (v: number) => Math.round(v / 10) * 10;
+
+export function segOrientation(a: Point, b: Point): Orientation {
+  if (a.y === b.y && a.x !== b.x) return 'h';
+  if (a.x === b.x && a.y !== b.y) return 'v';
+  return null;
+}
+
+/** Kéo đoạn k (pts[k]→pts[k+1]) đi delta theo phương vuông góc với nó. */
+export function moveSegment(pts: Point[], k: number, delta: number): Point[] {
+  const o = segOrientation(pts[k], pts[k + 1]);
+  if (!o || delta === 0) return pts.map((p) => ({ ...p }));
+  const out = pts.map((p) => ({ ...p }));
+  let i = k;
+  // Đoạn chạm chân: nhân đôi điểm chân để chân đứng yên, đoạn nối chân thành đoạn vuông góc mới
+  if (i === 0) { out.splice(1, 0, { ...out[0] }); i = 1; }
+  if (i + 1 === out.length - 1) out.splice(out.length - 1, 0, { ...out[out.length - 1] });
+  if (o === 'h') { out[i].y += delta; out[i + 1].y += delta; }
+  else { out[i].x += delta; out[i + 1].x += delta; }
+  return out;
+}
+
+/** Tách đoạn k làm 2 tại điểm gần `at` nhất — mỗi nửa kéo được riêng. */
+export function addBend(pts: Point[], k: number, at: Point): Point[] {
+  const a = pts[k], b = pts[k + 1];
+  const o = segOrientation(a, b);
+  if (!o) return pts.map((p) => ({ ...p }));
+  const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, Math.min(lo, hi)), Math.max(lo, hi));
+  const m = o === 'h' ? { x: clamp(snap10(at.x), a.x, b.x), y: a.y } : { x: a.x, y: clamp(snap10(at.y), a.y, b.y) };
+  return [...pts.slice(0, k + 1).map((p) => ({ ...p })), m, { ...m }, ...pts.slice(k + 1).map((p) => ({ ...p }))];
+}
+
+/** Bỏ góc i: 2 điểm kề thẳng hàng thì gộp; không thì lật góc sang phía đối diện. */
+export function removeCorner(pts: Point[], i: number): Point[] {
+  if (i <= 0 || i >= pts.length - 1) return pts.map((p) => ({ ...p }));
+  const a = pts[i - 1], c = pts[i], b = pts[i + 1];
+  if (a.x === b.x || a.y === b.y) return simplify([...pts.slice(0, i), ...pts.slice(i + 1)]);
+  const flip = c.x === a.x ? { x: b.x, y: a.y } : { x: a.x, y: b.y };
+  return simplify([...pts.slice(0, i), flip, ...pts.slice(i + 1)]);
+}
+
+/** Linh kiện ở 1 đầu dây di chuyển: đặt đầu đó vào p, chỉnh góc kề cho vẫn vuông góc. */
+export function followEnd(pts: Point[], which: 'start' | 'end', p: Point): Point[] {
+  let out = pts.map((q) => ({ ...q }));
+  if (which === 'end') out.reverse();
+  const old = out[0];
+  if (out.length === 2) {
+    const other = out[1];
+    const elbow = old.x === other.x ? { x: p.x, y: other.y } : { x: other.x, y: p.y };
+    out = [{ ...p }, elbow, other];
+  } else {
+    const o = segOrientation(old, out[1]);
+    if (o === 'v') out[1].x = p.x;
+    else if (o === 'h') out[1].y = p.y;
+    else out[1] = { ...p };
+    out[0] = { ...p };
+  }
+  if (which === 'end') out.reverse();
+  return simplify(out);
+}
+
+/** Bỏ điểm trùng liên tiếp và điểm nằm giữa 2 điểm thẳng hàng. */
+export function simplify(pts: Point[]): Point[] {
+  const a = pts.filter((p, i) => i === 0 || p.x !== pts[i - 1].x || p.y !== pts[i - 1].y);
+  const out: Point[] = [{ ...a[0] }];
+  for (let i = 1; i < a.length - 1; i++) {
+    const p0 = out[out.length - 1], p1 = a[i], p2 = a[i + 1];
+    const straight = (p0.x === p1.x && p1.x === p2.x) || (p0.y === p1.y && p1.y === p2.y);
+    if (!straight) out.push({ ...p1 });
+  }
+  if (a.length > 1) out.push({ ...a[a.length - 1] });
+  return out;
+}
