@@ -1,4 +1,5 @@
 import { base64ToBytes } from '../../lib/assets';
+import type { RGBAImage } from '../../lib/circuit/bgRemove';
 
 /** Tiện ích ảnh dùng canvas của webview (chỉ chạy trong app, không có test đơn vị). */
 
@@ -33,4 +34,23 @@ export async function resizeImageDataUrl(url: string, maxSize: number, mime = 'i
   c.height = Math.round(img.naturalHeight * s);
   c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
   return c.toDataURL(mime, quality);
+}
+
+export async function dataUrlToRGBA(url: string, maxSize = 1024): Promise<RGBAImage> {
+  const img = await loadImage(url);
+  const scale = Math.min(1, maxSize / Math.max(img.naturalWidth || maxSize, img.naturalHeight || maxSize));
+  const w = Math.max(1, Math.round((img.naturalWidth || maxSize) * scale));
+  const h = Math.max(1, Math.round((img.naturalHeight || maxSize) * scale));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d')!;
+  ctx.drawImage(img, 0, 0, w, h);
+  return { width: w, height: h, data: ctx.getImageData(0, 0, w, h).data };
+}
+
+export function rgbaToDataUrl(img: RGBAImage): string {
+  const c = document.createElement('canvas');
+  c.width = img.width; c.height = img.height;
+  c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0);
+  return c.toDataURL('image/png');
 }

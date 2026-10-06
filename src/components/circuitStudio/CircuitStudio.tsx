@@ -4,6 +4,8 @@ import StudioCanvas, { type CanvasApi, type Selection } from './StudioCanvas';
 import FloatingPanel from './FloatingPanel';
 import PartLibraryPanel from './PartLibraryPanel';
 import ExportDialog from './ExportDialog';
+import AddPartWizard from './AddPartWizard';
+import { deleteCustomPart, listCustomParts, loadCustomParts, projectsUsingPart, type CustomPartEntry } from '../../lib/circuit/customPartsStore';
 import InspectorPanel from './InspectorPanel';
 import WarningsBar from './WarningsBar';
 import ProjectPicker from './ProjectPicker';
@@ -14,7 +16,7 @@ import { partBox, partPreviewSvg, validateLayout } from '../../lib/circuit/rende
 import { routeWorld } from '../../lib/circuit/world';
 import { addPart, deleteParts, duplicateParts, resetAllWires, rotateParts, deleteWire } from '../../lib/circuit/ops';
 import { alignParts, distributeParts, type AlignMode } from '../../lib/circuit/arrange';
-import { BUILTIN_LIBRARY, type LibraryItem } from '../../lib/circuit/libraryCatalog';
+import { BUILTIN_LIBRARY, LIBRARY_GROUPS, type LibraryItem } from '../../lib/circuit/libraryCatalog';
 import type { CircuitLayout } from '../../lib/circuit/types';
 
 interface Props { onClose(): void; geminiApiKey?: string }
@@ -31,7 +33,9 @@ export default function CircuitStudio({ onClose }: Props) {
   const [project, setProject] = useState<CircuitProject | null>(null);
   const [state, dispatch] = useReducer(studioReducer, initialStudioState(emptyLayout()));
   const [selection, setSelection] = useState<Selection>({ parts: [], wire: null });
-  const [partsVersion] = useState(0);
+  const [partsVersion, setPartsVersion] = useState(0);
+  const [wizard, setWizard] = useState<{ existing?: CustomPartEntry } | null>(null);
+  const [itemMenu, setItemMenu] = useState<{ x: number; y: number; code: string } | null>(null);
   const [showLibrary, setShowLibrary] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
@@ -46,7 +50,10 @@ export default function CircuitStudio({ onClose }: Props) {
   const layout = state.layout;
   const routed = useMemo(() => routeWorld(layout), [layout, partsVersion]);
   const issues = useMemo(() => { const v = validateLayout(layout, undefined, routed, { frame: false }); return [...v.errors, ...v.warnings]; }, [layout, routed]);
-  const library = useMemo<LibraryItem[]>(() => BUILTIN_LIBRARY, [partsVersion]);
+  const library = useMemo<LibraryItem[]>(() => [
+    ...BUILTIN_LIBRARY,
+    ...listCustomParts().map((c) => ({ type: c.file.code, name: c.file.name, group: LIBRARY_GROUPS.includes(c.file.group) ? c.file.group : 'Của tôi' })),
+  ], [partsVersion]);
 
   const flash = useCallback((msg: string, error = false) => {
     setToast({ msg, error });
@@ -103,6 +110,9 @@ export default function CircuitStudio({ onClose }: Props) {
 
   useEffect(() => {
     (async () => {
+      const partErrors = await loadCustomParts();
+      setPartsVersion((v) => v + 1);
+      if (partErrors.length) flash(partErrors.join(' '), true);
       const list = await refreshList();
       if (list[0]) await openProject(list[0].id);
       else await createProject();
@@ -147,7 +157,7 @@ export default function CircuitStudio({ onClose }: Props) {
   // ─── Phím tắt (bắt ở pha capture để canvas node phía sau không nhận phím Delete…) ───
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (exporting) return; // cửa sổ Xuất ảnh đang mở: không bắt phím của bàn vẽ
+      if (exporting || wizard) return; // cửa sổ Xuất ảnh / Thêm linh kiện đang mở: không bắt phím của bàn vẽ
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
       if (typing) return;
       const cmd = e.metaKey || e.ctrlKey;
@@ -181,7 +191,7 @@ export default function CircuitStudio({ onClose }: Props) {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [layout, selection, commit, flash, exporting]);
+  }, [layout, selection, commit, flash, exporting, wizard]);
 
   /** Bấm 1 cảnh báo → chọn và đưa chỗ lỗi ra giữa màn hình. */
   const pickWarning = (msg: string) => {
@@ -255,7 +265,13 @@ export default function CircuitStudio({ onClose }: Props) {
 
       {showLibrary && (
         <FloatingPanel id="library" title="Linh kiện" defaultPos={{ x: 12, y: 72 }} width={230} onClose={() => setShowLibrary(false)}>
-          <PartLibraryPanel items={library} version={partsVersion} onStartPlace={(item, e) => setPlacing({ item, x: e.clientX, y: e.clientY })} />
+          <PartLibraryPanel
+            items={library}
+            version={partsVersion}
+            onStartPlace={(item, e) => setPlacing({ item, x: e.clientX, y: e.clientY })}
+            onAddNew={() => setWizard({})}
+            onItemMenu={(item, e) => { if (listCustomParts().some((c) => c.file.code === item.type)) setItemMenu({ x: e.clientX, y: e.clientY, code: item.type }); }}
+          />
         </FloatingPanel>
       )}
 
@@ -298,6 +314,29 @@ export default function CircuitStudio({ onClose }: Props) {
           }}
         />
       )}
+{itemMenu && (
+  <div className="fixed z-[115] rounded-lg border border-white/10 bg-[#1f1f1f] py-1 text-sm shadow-xl" style={{ left: itemMenu.x, top: itemMenu.y }} onPointerLeave={() => setItemMenu(null)}>
+    <button className="block w-full px-4 py-1.5 text-left hover:bg-white/10" onClick={() => { setWizard({ existing: listCustomParts().find((c) => c.file.code === itemMenu.code) }); setItemMenu(null); }}>Sửa chân / đổi ảnh</button>
+    <button className="block w-full px-4 py-1.5 text-left text-red-400 hover:bg-white/10" onClick={async () => {
+      const code = itemMenu.code;
+      setItemMenu(null);
+      if (!(await safeFlush())) return;
+      const using = await projectsUsingPart(code);
+      if (using.length) { flash(`Không xoá được — đang dùng trong: ${using.join(', ')}`, true); return; }
+      if (!(await ask('Xoá linh kiện này khỏi thư viện?', { title: 'Xoá linh kiện', kind: 'warning' }))) return;
+      await deleteCustomPart(code);
+      setPartsVersion((v) => v + 1);
+    }}>Xoá khỏi thư viện</button>
+  </div>
+)}
+{wizard && (
+  <AddPartWizard
+    existing={wizard.existing}
+    onClose={() => setWizard(null)}
+    onSaved={() => { setWizard(null); setPartsVersion((v) => v + 1); flash('Đã lưu linh kiện vào thư viện.'); }}
+  />
+)}
+```
     </div>
   );
 }
