@@ -366,7 +366,7 @@ const DEFS = `
   </filter>
 </defs>`;
 
-function renderWire(w: Wire, rw: RoutedWire | null): { body: string; joints: string } {
+function renderWire(w: Wire, rw: RoutedWire | null, dashed = false): { body: string; joints: string } {
   if (!rw) return { body: '', joints: '' };
   const pts = rw.points;
   const colorName = normalizeWireColor(w.color);
@@ -385,9 +385,9 @@ function renderWire(w: Wire, rw: RoutedWire | null): { body: string; joints: str
   }
   const body =
     `<g filter="url(#fWireShadow)">` +
-    `<path d="${d}" fill="none" stroke="${dark}" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<path d="${d}" fill="none" stroke="${main}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="0.38" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" transform="translate(-2 -2.5)"/>` +
+    `<path d="${d}" fill="none" stroke="${dark}" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"${dashed ? ' stroke-dasharray="20 14"' : ''}/>` +
+    `<path d="${d}" fill="none" stroke="${main}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"${dashed ? ' stroke-dasharray="20 14"' : ''}/>` +
+    `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="0.38" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" transform="translate(-2 -2.5)"${dashed ? ' stroke-dasharray="20 14"' : ''}/>` +
     `</g>`;
   let joints = '';
   const ends: [Point, Point, boolean][] = [
@@ -413,7 +413,7 @@ function labelText(x: number, y: number, text: string, size: number, anchor: str
   return `<text x="${x.toFixed(0)}" y="${y.toFixed(0)}" font-family="${FONT}" font-size="${size}" font-weight="900" text-anchor="${anchor}" fill="${fill}" stroke="#0a1a05" stroke-width="7" stroke-linejoin="round" paint-order="stroke">${esc(text)}</text>`;
 }
 
-interface Box { x1: number; y1: number; x2: number; y2: number }
+export interface Box { x1: number; y1: number; x2: number; y2: number }
 
 /** Khoảng cách gần nhất giữa 2 khung chữ nhật (0 nếu chạm/đè nhau). */
 function rectGap(a: Box, b: Box) {
@@ -486,7 +486,14 @@ function renderLabels(parts: PlacedPart[], W: number, H: number, wireSegs: Box[]
   return out;
 }
 
-export function renderCircuitSvg(layout: CircuitLayout): string {
+export interface RenderOptions {
+  /** Đường dây đã tính sẵn (editor tính 1 lần rồi dùng chung cho vẽ + bắt chuột). */
+  routed?: (RoutedWire | null)[];
+  /** Chỉ số dây vẽ nét đứt (dây đang tạm nối thẳng khi kéo linh kiện). */
+  dashed?: Set<number>;
+}
+
+export function renderCircuitSvg(layout: CircuitLayout, opts: RenderOptions = {}): string {
   const W = layout.width ?? 1080;
   const H = layout.height ?? 1350;
   const tf = (p: PlacedPart) => `translate(${p.x} ${p.y}) rotate(${p.rotation ?? 0})`;
@@ -501,8 +508,8 @@ export function renderCircuitSvg(layout: CircuitLayout): string {
   }).join('');
   const busSvg = buses.map((p) => `<g transform="${tf(p)}" filter="url(#fWireShadow)">${PARTS.bus.render(p)}</g>`).join('');
   const partsSvg = others.map((p) => `<g transform="${tf(p)}" filter="url(#fShadow)">${PARTS[p.type].render(p)}</g>`).join('');
-  const routed = routeWires(layout);
-  const wires = layout.wires.map((w, i) => renderWire(w, routed[i]));
+  const routed = opts.routed ?? routeWires(layout);
+  const wires = layout.wires.map((w, i) => renderWire(w, routed[i], opts.dashed?.has(i)));
   const wireSegs: Box[] = [];
   for (const rw of routed) {
     if (!rw) continue;
@@ -522,4 +529,16 @@ export function renderCircuitSvg(layout: CircuitLayout): string {
     wires.map((w) => w.body).join('') + wires.map((w) => w.joints).join('') +
     labels + title(layout.titleTop, 92) + title(layout.titleBottom, H - 40) +
     `</svg>`;
+}
+
+/** Ảnh nhỏ 1 linh kiện cho thư viện (SVG độc lập, nền trong suốt). */
+export function partPreviewSvg(type: string, size = 96): string {
+  const def = PARTS[type];
+  if (!def) return '';
+  const p: PlacedPart = { id: 'preview', type, x: 0, y: 0, length: 300, marking: type.startsWith('dip') ? 'IC' : undefined };
+  const w = type === 'bus' ? 300 : def.w;
+  const h = def.h;
+  const pad = 12;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="${-w / 2 - pad} ${-h / 2 - pad} ${w + pad * 2} ${h + pad * 2}">` +
+    DEFS + (def.renderBehind?.(p) ?? '') + def.render(p) + `</svg>`;
 }
