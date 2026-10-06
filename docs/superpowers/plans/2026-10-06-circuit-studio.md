@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Một màn hình toàn cửa sổ trong BunnaAIFlow để tự vẽ ảnh mạch DIY từ ảnh trống: kéo thả linh kiện, nối dây (app tự đi dây vuông góc, chỉnh tay được), sắp xếp, thêm linh kiện bằng ảnh, xuất PNG 1080×1350.
+**Goal:** Một màn hình toàn cửa sổ trong BunnaAIFlow để tự vẽ ảnh mạch DIY trên mặt bàn không giới hạn: kéo thả linh kiện, nối dây (app tự đi dây vuông góc, chỉnh tay được), sắp xếp, thêm linh kiện bằng ảnh; xuất tất cả hoặc phần đang chọn vào khung 4:5 / 1:1 / 9:16 với nền gỗ / màu / ảnh tải lên.
 
-**Architecture:** Lõi thuần TypeScript trong `src/lib/circuit/` (dùng lại thư viện linh kiện SVG, bộ đi dây A*, bộ vẽ hiện có) + các module mới thuần logic, có test vitest. Giao diện React trong `src/components/circuitStudio/`: canvas hiển thị đúng chuỗi SVG sẽ xuất (`renderCircuitSvg`) và một lớp SVG trong suốt phía trên để bắt chuột. Dữ liệu lưu file JSON trong thư mục dữ liệu app qua Tauri fs.
+**Architecture:** Lõi thuần TypeScript trong `src/lib/circuit/` (dùng lại thư viện linh kiện SVG, bộ đi dây A*, bộ vẽ hiện có) + các module mới thuần logic, có test vitest. Giao diện React trong `src/components/circuitStudio/`: mặt bàn gỗ không mép hiển thị cảnh mạch (`renderScene`) cộng một lớp SVG trong suốt để bắt chuột; thư viện / cột chỉnh sửa / cảnh báo là bảng nổi. Ảnh xuất được dựng riêng (`renderExportSvg`): lấy đúng dây và nhãn như trên bàn vẽ, căn giữa và co vào khung. Dữ liệu lưu file JSON trong thư mục dữ liệu app qua Tauri fs.
 
 **Tech Stack:** Tauri 2, React 19, TypeScript 5.8 (strict, noUnusedLocals), Tailwind 4, `@tauri-apps/plugin-fs`, `@tauri-apps/plugin-dialog`, vitest (thêm mới).
 
@@ -12,8 +12,8 @@
 
 ## Global Constraints
 
-- Ảnh xuất: 1080×1350, chính là SVG hiển thị trong editor (thấy sao xuất vậy).
-- Không AI xếp bố cục, không dán bản thiết kế, không đối chiếu mạch điện. AI chỉ dùng để gen ảnh 1 linh kiện (Task 12).
+- Mặt bàn vẽ không giới hạn (toạ độ có thể âm), không khung, không tiêu đề khi vẽ. Ảnh xuất: khung 4:5 (1080×1350, mặc định), 1:1 (1080×1080), 9:16 (1080×1920); phóng to tối đa 1,5 lần; dây/nhãn giữ y như trên bàn vẽ.
+- Không AI xếp bố cục, không dán bản thiết kế, không đối chiếu mạch điện. AI chỉ dùng để gen ảnh 1 linh kiện (Task 14).
 - Kiểu dây: vuông góc, bo góc (bộ vẽ hiện có).
 - Lưới 10px; giữ Alt khi kéo để đặt tự do.
 - Hoàn tác tối đa 200 bước; tự lưu sau ~1 giây kể từ lần thay đổi cuối.
@@ -24,6 +24,8 @@
 - Commit message của repo này: KHÔNG thêm dòng `Co-Authored-By`.
 - Mỗi task kết thúc bằng `npx tsc --noEmit` sạch và `npx vitest run` xanh.
 - Thanh đồng (`bus`) chỉ nằm ngang trong bản này (bộ đi dây chỉ hỗ trợ thanh ngang) — không cho xoay thanh đồng.
+- Ảnh nền tải lên: thu về cạnh dài tối đa 2160px, lưu `circuit-backgrounds/`, dùng lại được, xoá được.
+- Node "Vẽ mạch" (ảnh khung cố định) phải cho ra ảnh y hệt trước khi sửa — kiểm bằng so file SVG (Task 7 Step 5, Task 8 Step 8).
 
 ## File Structure
 
@@ -34,7 +36,10 @@
 | `parts.ts` | thêm `PartDef.pinDirs` | sửa |
 | `registry.ts` | đăng ký/gỡ linh kiện tự thêm vào `PARTS` | mới |
 | `route.ts` | xuất `End`, `Dir`, `pinDirection`; dùng `pinDirs` | sửa |
-| `render.ts` | `renderCircuitSvg(layout, opts)`, `partPreviewSvg`, `labelPlacements`, nhãn kéo tay, in tên chân | sửa |
+| `render.ts` | `renderScene` (chỉ nội dung mạch), `renderCircuitSvg` (khung cố định cho node cũ), `partPreviewSvg`, `labelPlacements`, nhãn kéo tay, in tên chân, `woodTileSvg` | sửa |
+| `world.ts` | mặt bàn không giới hạn: khung bao nội dung, đi dây ở toạ độ bất kỳ (`routeWorld`) | mới |
+| `exportImage.ts` | dựng ảnh xuất theo khung (phạm vi, co giãn, nền, tiêu đề) | mới |
+| `backgroundStore.ts` | thư viện ảnh nền tải lên (Tauri fs) | mới |
 | `geometry.ts` | chân, bắt chuột (chân/linh kiện/dây/đoạn), đích thả dây, dây xem trước | mới |
 | `wireEdit.ts` | kéo đoạn, thêm/bỏ góc, bám chân khi linh kiện di chuyển | mới |
 | `ops.ts` | mọi thao tác sửa bố cục (thêm/xoá/di chuyển/xoay linh kiện, dây, thanh đồng) | mới |
@@ -51,14 +56,16 @@
 **Giao diện `src/components/circuitStudio/`**
 | File | Trách nhiệm |
 | --- | --- |
-| `CircuitStudio.tsx` | khung màn hình, trạng thái, tự lưu, phím tắt, xuất PNG |
-| `StudioCanvas.tsx` | zoom/pan, hiển thị SVG, toàn bộ thao tác chuột trên ảnh |
+| `CircuitStudio.tsx` | khung màn hình (mặt bàn + bảng nổi), trạng thái, tự lưu, phím tắt |
+| `FloatingPanel.tsx` | bảng nổi kéo được, nhớ vị trí, thu gọn |
+| `ExportDialog.tsx` | cửa sổ xuất ảnh có xem trước |
+| `StudioCanvas.tsx` | mặt bàn không mép: zoom/pan, hiển thị cảnh mạch, toàn bộ thao tác chuột |
 | `ProjectPicker.tsx` | danh sách mạch: mở, tạo, đổi tên, nhân bản, xoá |
 | `PartLibraryPanel.tsx` | thư viện linh kiện (cột trái), bắt đầu kéo thả |
 | `InspectorPanel.tsx` | chỉnh linh kiện/dây/tiêu đề (cột phải) |
 | `WarningsBar.tsx` | thanh cảnh báo dưới |
 | `AddPartWizard.tsx` | cửa sổ 3 bước thêm linh kiện bằng ảnh |
-| `imageUtils.ts` | chuyển dataURL ↔ RGBA (dùng canvas trình duyệt) |
+| `imageUtils.ts` | đọc file ảnh, thu nhỏ ảnh, dataURL ↔ RGBA (dùng canvas trình duyệt) |
 
 **Khác:** `src/App.tsx` (nút mở), `src-tauri/capabilities/default.json` (quyền fs/dialog), `package.json` + `vitest.config.ts`.
 
@@ -1223,8 +1230,8 @@ export function resizeBus(layout: CircuitLayout, id: string, side: -1 | 1, endX:
   let left = bus.x - half, right = bus.x + half;
   if (side < 0) left = Math.min(snap10(endX), right - 100);
   else right = Math.max(snap10(endX), left + 100);
-  left = Math.max(20, left);
-  right = Math.min((layout.width ?? 1080) - 20, right);
+  // Ảnh khung cố định (node cũ) thì giữ thanh trong khung; mặt bàn không giới hạn thì thôi
+  if (layout.width) { left = Math.max(20, left); right = Math.min(layout.width - 20, right); }
   const clampRef = (ref: string) => {
     const at = ref.indexOf('@');
     if (at < 0 || ref.slice(0, at) !== id) return ref;
@@ -1445,7 +1452,10 @@ git commit -m "Circuit Studio: align, distribute and snap guides"
   - `type StudioAction = { type: 'load'; layout: CircuitLayout } | { type: 'commit'; layout: CircuitLayout } | { type: 'undo' } | { type: 'redo' }`
   - `initialStudioState(layout: CircuitLayout): StudioState`, `studioReducer(s: StudioState, a: StudioAction): StudioState`
 - Produces (`projectModel.ts`):
-  - `interface CircuitProject { version: 1; id: string; name: string; createdAt: string; updatedAt: string; layout: CircuitLayout }`
+  - `type ExportAspect = '4:5' | '1:1' | '9:16'`
+  - `type ExportBackground = { kind: 'wood' } | { kind: 'color'; color: string } | { kind: 'image'; id: string }`
+  - `interface ExportSettings { aspect: ExportAspect; background: ExportBackground }`
+  - `interface CircuitProject { version: 1; id: string; name: string; createdAt: string; updatedAt: string; layout: CircuitLayout; exportSettings?: ExportSettings }`
   - `interface ProjectMeta { id: string; name: string; updatedAt: string }`
   - `emptyLayout(): CircuitLayout`, `newProject(name: string, now?: Date, id?: string): CircuitProject`, `duplicateProject(p: CircuitProject, now?: Date, id?: string): CircuitProject`, `parseProject(text: string): CircuitProject` (ném lỗi nếu hỏng), `fileSlug(name: string): string`
 - Produces (`circuitStore.ts`, Tauri fs):
@@ -1504,11 +1514,12 @@ import { duplicateProject, emptyLayout, fileSlug, newProject, parseProject } fro
 describe('projectModel', () => {
   const now = new Date('2026-10-06T10:00:00Z');
 
-  it('newProject có bố cục trống 1080×1350', () => {
+  it('newProject có mặt bàn trống, không khung cố định', () => {
     const p = newProject('Mạch vỗ tay', now, 'abc');
     expect(p).toMatchObject({ version: 1, id: 'abc', name: 'Mạch vỗ tay', createdAt: now.toISOString() });
     expect(p.layout).toEqual(emptyLayout());
-    expect(p.layout).toMatchObject({ width: 1080, height: 1350, parts: [], wires: [] });
+    expect(p.layout).toMatchObject({ parts: [], wires: [], titleTop: '', titleBottom: '' });
+    expect(p.layout.width).toBeUndefined();
   });
 
   it('duplicateProject: id mới, tên "(bản sao)", bố cục độc lập', () => {
@@ -1581,6 +1592,11 @@ export function studioReducer(s: StudioState, a: StudioAction): StudioState {
 import { v4 as uuidv4 } from 'uuid';
 import type { CircuitLayout } from './types';
 
+export type ExportAspect = '4:5' | '1:1' | '9:16';
+export type ExportBackground = { kind: 'wood' } | { kind: 'color'; color: string } | { kind: 'image'; id: string };
+/** Lựa chọn xuất ảnh lần trước của mạch (khung + nền). Tiêu đề nằm trong layout.titleTop/titleBottom. */
+export interface ExportSettings { aspect: ExportAspect; background: ExportBackground }
+
 export interface CircuitProject {
   version: 1;
   id: string;
@@ -1588,12 +1604,14 @@ export interface CircuitProject {
   createdAt: string;
   updatedAt: string;
   layout: CircuitLayout;
+  exportSettings?: ExportSettings;
 }
 
 export interface ProjectMeta { id: string; name: string; updatedAt: string }
 
+/** Mặt bàn vẽ không giới hạn: không width/height (khung chỉ có lúc xuất ảnh). */
 export function emptyLayout(): CircuitLayout {
-  return { width: 1080, height: 1350, titleTop: 'MẠCH MỚI', titleBottom: '', parts: [], wires: [] };
+  return { titleTop: '', titleBottom: '', parts: [], wires: [] };
 }
 
 export function newProject(name: string, now = new Date(), id = uuidv4()): CircuitProject {
@@ -1693,7 +1711,7 @@ Trong `src-tauri/capabilities/default.json`, mảng `"permissions"`, sau dòng `
 - [ ] **Step 7: Chạy test + tsc**
 
 Run: `npx vitest run && npx tsc --noEmit`
-Expected: PASS. (`circuitStore.ts` không có test đơn vị — chạy thật ở Task 9.)
+Expected: PASS. (`circuitStore.ts` không có test đơn vị — chạy thật ở Task 10.)
 
 - [ ] **Step 8: Commit**
 
@@ -1924,19 +1942,437 @@ git commit -m "Circuit render: draggable label positions, printed pin names, exp
 
 ---
 
-### Task 8: Canvas editor (`StudioCanvas.tsx`)
+### Task 8: Mặt bàn không giới hạn + dựng ảnh xuất theo khung (lõi)
+
+**Files:**
+- Create: `src/lib/circuit/world.ts`, `src/lib/circuit/exportImage.ts`, `src/lib/circuit/__tests__/world.test.ts`, `src/lib/circuit/__tests__/exportImage.test.ts`
+- Modify: `src/lib/circuit/route.ts` (`routeWires` thêm tuỳ chọn `titleZones`), `src/lib/circuit/render.ts` (tách `renderScene`, `titleSvg`, `svgDefs`, `woodTileSvg`, khung tuỳ chọn cho nhãn, `validateLayout` thêm `{ frame }`)
+
+**Interfaces:**
+- Consumes: Task 2 + 7 (`RenderOptions`, `LabelPlacement`, `labelPlacements`, `Box`), `ExportAspect` / `ExportBackground` (Task 6, `projectModel.ts`)
+- Produces:
+  - `route.ts`: `routeWires(layout: CircuitLayout, opts?: { titleZones?: boolean }): (RoutedWire | null)[]` (mặc định `titleZones: true` = như cũ)
+  - `render.ts`:
+    - `interface SceneOptions extends RenderOptions { frame?: { W: number; H: number } | null; labels?: LabelPlacement[] }`
+    - `renderScene(layout, opts?: SceneOptions): string` (chỉ nội dung: linh kiện, dây, tên chân, nhãn — không nền, không tiêu đề)
+    - `titleSvg(text: string | undefined, y: number, W: number): string`
+    - `svgDefs(): string`, `woodBackground(W: number, H: number, vignette?: boolean): string` (xuất ra), `woodTileSvg(W?: number, H?: number): string`
+    - `labelPlacements(layout, routed?, frame?: { W: number; H: number } | null)`
+    - `validateLayout(layout, expectedWireCount?, routed?, opts?: { frame?: boolean })`
+  - `world.ts`: `contentBounds(layout: CircuitLayout, routed?: (RoutedWire | null)[]): Box | null`, `routeWorld(layout: CircuitLayout): (RoutedWire | null)[]`
+  - `exportImage.ts`:
+    - `ASPECT_SIZE: Record<ExportAspect, [number, number]>`
+    - `subsetLayout(layout, ids: string[]): { layout: CircuitLayout; wireIndex: number[] }`
+    - `interface ExportRenderOptions { aspect: ExportAspect; background: ExportBackground; backgroundDataUrl?: string; titleTop?: string; titleBottom?: string; ids?: string[] }`
+    - `renderExportSvg(layout, routed, opts: ExportRenderOptions): { svg: string; width: number; height: number; scale: number } | null`
+
+- [ ] **Step 1: Viết test thất bại**
+
+`src/lib/circuit/__tests__/world.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import type { CircuitLayout } from '../types';
+import { contentBounds, routeWorld } from '../world';
+import { validateLayout } from '../render';
+
+const A: CircuitLayout = {
+  parts: [
+    { id: 'R1', type: 'resistor', x: 300, y: 400, value: '1k' },
+    { id: 'LED1', type: 'led', x: 700, y: 650 },
+    { id: 'GND', type: 'bus', x: 500, y: 900, length: 600 },
+  ],
+  wires: [
+    { from: 'R1.2', to: 'LED1.A', color: 'yellow' },
+    { from: 'LED1.K', to: 'GND@720', color: 'black' },
+  ],
+};
+const shift = (l: CircuitLayout, dx: number, dy: number): CircuitLayout => ({
+  ...l,
+  parts: l.parts.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy })),
+  wires: l.wires.map((w) => ({ ...w, to: w.to.replace(/@(-?\d+)/, (_, x) => `@${Number(x) + dx}`) })),
+});
+
+describe('world', () => {
+  it('contentBounds bao mọi linh kiện; trống thì null', () => {
+    const b = contentBounds(A)!;
+    expect(b.x1).toBe(200); // thanh đồng 200..800
+    expect(b.y1).toBe(383); // điện trở cao 34
+    expect(contentBounds({ parts: [], wires: [] })).toBeNull();
+  });
+
+  it('routeWorld đi được dây ở toạ độ âm, kết quả dời theo đúng độ dời', () => {
+    const r1 = routeWorld(A);
+    const r2 = routeWorld(shift(A, -1230, -770));
+    expect(r1.every(Boolean)).toBe(true);
+    r1.forEach((rw, i) => {
+      expect(r2[i]!.points).toEqual(rw!.points.map((p) => ({ x: p.x - 1230, y: p.y - 770 })));
+    });
+    expect(r2[0]!.points[0]).toEqual({ x: 375 - 1230, y: 400 - 770 });
+  });
+
+  it('routeWorld không chừa vùng tiêu đề (linh kiện sát y=0 vẫn đi được dây)', () => {
+    const top = shift(A, 0, -380);
+    expect(routeWorld(top).every((rw) => rw && !rw.failed)).toBe(true);
+  });
+
+  it('validateLayout { frame: false } bỏ cảnh báo tràn khung / vùng tiêu đề', () => {
+    const far = shift(A, 3000, -2000);
+    const msgs = validateLayout({ ...far, titleTop: 'X' }, undefined, routeWorld(far), { frame: false }).warnings;
+    expect(msgs.some((m) => /tràn ra|vùng tiêu đề/.test(m))).toBe(false);
+  });
+});
+```
+
+`src/lib/circuit/__tests__/exportImage.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import type { CircuitLayout } from '../types';
+import { routeWorld } from '../world';
+import { renderExportSvg, subsetLayout } from '../exportImage';
+
+const l: CircuitLayout = {
+  parts: [
+    { id: 'R1', type: 'resistor', x: 0, y: 0, value: '1k', label: '1kΩ' },
+    { id: 'LED1', type: 'led', x: 300, y: 150 },
+    { id: 'R2', type: 'resistor', x: 2000, y: 0, value: '220' },
+  ],
+  wires: [
+    { from: 'R1.2', to: 'LED1.A', color: 'yellow' },
+    { from: 'LED1.K', to: 'R2.1', color: 'pink' },
+  ],
+};
+const routed = routeWorld(l);
+const wood = { kind: 'wood' } as const;
+
+describe('exportImage', () => {
+  it('subsetLayout giữ dây có cả 2 đầu trong phần chọn', () => {
+    const s = subsetLayout(l, ['R1', 'LED1']);
+    expect(s.layout.parts.map((p) => p.id)).toEqual(['R1', 'LED1']);
+    expect(s.wireIndex).toEqual([0]);
+  });
+
+  it('kích thước theo khung', () => {
+    expect(renderExportSvg(l, routed, { aspect: '4:5', background: wood })).toMatchObject({ width: 1080, height: 1350 });
+    expect(renderExportSvg(l, routed, { aspect: '1:1', background: wood })!.height).toBe(1080);
+    expect(renderExportSvg(l, routed, { aspect: '9:16', background: wood })!.height).toBe(1920);
+  });
+
+  it('xuất phần đang chọn bỏ dây ra ngoài; mạch nhỏ phóng to tối đa 1,5 lần', () => {
+    const all = renderExportSvg(l, routed, { aspect: '4:5', background: wood })!;
+    expect(all.svg).toContain('#f06aa8'); // dây hồng
+    const sel = renderExportSvg(l, routed, { aspect: '4:5', background: wood, ids: ['R1', 'LED1'] })!;
+    expect(sel.svg).not.toContain('#f06aa8');
+    expect(sel.svg).toContain('#f5cf1d'); // dây vàng
+    expect(renderExportSvg(l, routed, { aspect: '4:5', background: wood, ids: ['R1'] })!.scale).toBe(1.5);
+    expect(all.scale).toBeLessThan(1);
+  });
+
+  it('nền gỗ / màu / ảnh, tiêu đề, phần chọn rỗng', () => {
+    expect(renderExportSvg(l, routed, { aspect: '4:5', background: wood })!.svg).toContain('fill="url(#gWood)"');
+    const color = renderExportSvg(l, routed, { aspect: '4:5', background: { kind: 'color', color: '#ffffff' } })!.svg;
+    expect(color).toContain('fill="#ffffff"');
+    expect(color).not.toContain('fill="url(#gWood)"');
+    const img = renderExportSvg(l, routed, { aspect: '4:5', background: { kind: 'image', id: 'a' }, backgroundDataUrl: 'data:image/png;base64,QQ==' })!.svg;
+    expect(img).toContain('href="data:image/png;base64,QQ=="');
+    expect(renderExportSvg(l, routed, { aspect: '4:5', background: wood, titleTop: 'ABC' })!.svg).toContain('>ABC</text>');
+    expect(renderExportSvg(l, routed, { aspect: '4:5', background: wood, ids: [] })).toBeNull();
+  });
+});
+```
+
+- [ ] **Step 2: Chạy test, xác nhận thất bại**
+
+Run: `npx vitest run src/lib/circuit/__tests__/world.test.ts src/lib/circuit/__tests__/exportImage.test.ts`
+Expected: FAIL — `Cannot find module '../world'`.
+
+- [ ] **Step 3: `route.ts` — tuỳ chọn bỏ vùng tiêu đề**
+
+Đổi `export function routeWires(layout: CircuitLayout): (RoutedWire | null)[] {` thành:
+
+```ts
+export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean } = {}): (RoutedWire | null)[] {
+  // Mặt bàn vẽ không giới hạn (Xưởng vẽ mạch) không có tiêu đề → chỉ chừa mép 20px
+  const top = opts.titleZones === false ? 20 : TOP;
+  const bottomPad = opts.titleZones === false ? 20 : BOTTOM_PAD;
+```
+
+Rồi trong THÂN `routeWires` (không đụng hằng số ở đầu file), thay mọi chỗ dùng `TOP` bằng `top` và `BOTTOM_PAD` bằng `bottomPad` (hiện có ở `softBlocked` và vòng lặp "Ngoài vùng tiêu đề / mép ảnh"). Kiểm tra: `grep -n "TOP\|BOTTOM_PAD" src/lib/circuit/route.ts` chỉ còn 2 dòng khai báo hằng số + 2 dòng `const top/bottomPad`.
+
+- [ ] **Step 4: `render.ts` — tách cảnh / nền / tiêu đề, khung tuỳ chọn**
+
+4a. `woodBackground`: đổi chữ ký thành `export function woodBackground(W: number, H: number, vignette = true): string {` và dòng `return` cuối thành:
+
+```ts
+  return `<rect width="${W}" height="${H}" fill="url(#gWood)"/>` + lines.join('') +
+    (vignette ? `<rect width="${W}" height="${H}" fill="url(#gVignette)"/>` : '');
+```
+
+4b. Trong `placeLabels`, đổi tham số `W: number, H: number` thành `frame: { W: number; H: number } | null`, và dòng phạt tràn khung thành:
+
+```ts
+      if (frame && (bx.x1 < 8 || bx.x2 > frame.W - 8 || bx.y1 < 118 || bx.y2 > frame.H - 105)) score += 100000;
+```
+
+4c. Thay `labelPlacements` bằng:
+
+```ts
+/** Vị trí các nhãn — editor dùng để bắt chuột khi kéo nhãn. frame = null: mặt bàn không giới hạn. */
+export function labelPlacements(
+  layout: CircuitLayout,
+  routed: (RoutedWire | null)[] = routeWires(layout),
+  frame: { W: number; H: number } | null = { W: layout.width ?? 1080, H: layout.height ?? 1350 },
+): LabelPlacement[] {
+  const known = layout.parts.filter((p) => PARTS[p.type]);
+  return placeLabels(known, frame, wireSegBoxes(routed));
+}
+```
+
+4d. Thay TOÀN BỘ hàm `renderCircuitSvg` (giữ `interface RenderOptions` phía trên nó) bằng:
+
+```ts
+export interface SceneOptions extends RenderOptions {
+  /** Khung ảnh cố định (nhãn không được tràn ra ngoài); null = mặt bàn không giới hạn. Mặc định: khung theo layout.width/height. */
+  frame?: { W: number; H: number } | null;
+  /** Vị trí nhãn tính sẵn (xuất 1 phần mạch giữ đúng chỗ nhãn như trên bàn vẽ). */
+  labels?: LabelPlacement[];
+}
+
+/** Nội dung mạch (linh kiện, dây, tên chân, nhãn) — không nền, không tiêu đề, toạ độ gốc của bố cục. */
+export function renderScene(layout: CircuitLayout, opts: SceneOptions = {}): string {
+  const frame = opts.frame === undefined ? { W: layout.width ?? 1080, H: layout.height ?? 1350 } : opts.frame;
+  const tf = (p: PlacedPart) => `translate(${p.x} ${p.y}) rotate(${p.rotation ?? 0})`;
+  const known = layout.parts.filter((p) => PARTS[p.type]);
+  const buses = known.filter((p) => p.type === 'bus');
+  const others = known.filter((p) => p.type !== 'bus' && p.type !== 'lead');
+  const behind = others.map((p) => {
+    const s = PARTS[p.type].renderBehind?.(p);
+    return s ? `<g transform="${tf(p)}" filter="url(#fShadow)">${s}</g>` : '';
+  }).join('');
+  const busSvg = buses.map((p) => `<g transform="${tf(p)}" filter="url(#fWireShadow)">${PARTS.bus.render(p)}</g>`).join('');
+  const partsSvg = others.map((p) => `<g transform="${tf(p)}" filter="url(#fShadow)">${PARTS[p.type].render(p)}</g>`).join('');
+  const routed = opts.routed ?? routeWires(layout);
+  const wires = layout.wires.map((w, i) => renderWire(w, routed[i], opts.dashed?.has(i)));
+  const labels = (opts.labels ?? placeLabels(known, frame, wireSegBoxes(routed)))
+    .map((l) => labelText(l.x, l.y, l.text, l.size, l.anchor, l.fill)).join('');
+  return behind + busSvg + partsSvg +
+    wires.map((w) => w.body).join('') + wires.map((w) => w.joints).join('') +
+    renderPinNames(layout, frame?.H ?? layout.height ?? 1350) + labels;
+}
+
+export function titleSvg(text: string | undefined, y: number, W: number): string {
+  return text
+    ? `<text x="${W / 2}" y="${y}" font-family="${FONT}" font-size="76" font-weight="900" text-anchor="middle" fill="#ffffff" stroke="#000" stroke-opacity="0.85" stroke-width="10" stroke-linejoin="round" paint-order="stroke">${esc(text)}</text>`
+    : '';
+}
+
+export function svgDefs(): string {
+  return DEFS;
+}
+
+/** Ô nền gỗ không viền tối — editor lát kín mặt bàn vẽ. */
+export function woodTileSvg(W = 1080, H = 1350): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${DEFS}${woodBackground(W, H, false)}</svg>`;
+}
+
+/** Ảnh mạch khung cố định (node "Vẽ mạch"): nền gỗ + mạch + tiêu đề. */
+export function renderCircuitSvg(layout: CircuitLayout, opts: RenderOptions = {}): string {
+  const W = layout.width ?? 1080;
+  const H = layout.height ?? 1350;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
+    DEFS + woodBackground(W, H) + renderScene(layout, { ...opts, frame: { W, H } }) +
+    titleSvg(layout.titleTop, 92, W) + titleSvg(layout.titleBottom, H - 40, W) +
+    `</svg>`;
+}
+```
+
+4e. `validateLayout`: đổi chữ ký thành
+
+```ts
+export function validateLayout(layout: CircuitLayout, expectedWireCount?: number, routed?: (RoutedWire | null)[], opts: { frame?: boolean } = {}): ValidationResult {
+```
+
+và bọc vòng lặp kiểm tra tràn khung / vùng tiêu đề (`for (const { p, b } of boxes) { if (b.x1 < 0 ...` ) trong `if (opts.frame !== false) { ... }`. Đồng thời đổi `const paths = routed ?? (errors.length ? [] : routeWires(layout));` giữ nguyên (editor luôn truyền `routed`).
+
+- [ ] **Step 5: Tạo `world.ts`**
+
+```ts
+import { partBox, type Box } from './render';
+import { routeWires, type End, type RoutedWire } from './route';
+import type { CircuitLayout, Point } from './types';
+
+/**
+ * Mặt bàn vẽ không giới hạn: bộ đi dây cũ làm việc trên lưới từ (0,0) tới
+ * (width,height). Dời cả mạch về vùng dương (bội số 10 để không lệch lưới),
+ * đi dây, rồi dời kết quả về toạ độ gốc.
+ */
+
+const MARGIN = 200;
+
+export function contentBounds(layout: CircuitLayout, routed?: (RoutedWire | null)[]): Box | null {
+  let b: Box | null = null;
+  const add = (x1: number, y1: number, x2: number, y2: number) => {
+    b = b ? { x1: Math.min(b.x1, x1), y1: Math.min(b.y1, y1), x2: Math.max(b.x2, x2), y2: Math.max(b.y2, y2) } : { x1, y1, x2, y2 };
+  };
+  for (const p of layout.parts) {
+    const pb = p.type === 'lead' ? { x1: p.x - 14, y1: p.y - 14, x2: p.x + 14, y2: p.y + 14 } : partBox(p, true);
+    if (pb) add(pb.x1, pb.y1, pb.x2, pb.y2);
+  }
+  for (const rw of routed ?? []) for (const pt of rw?.points ?? []) add(pt.x, pt.y, pt.x, pt.y);
+  return b;
+}
+
+export function routeWorld(layout: CircuitLayout): (RoutedWire | null)[] {
+  const b = contentBounds(layout);
+  if (!b) return layout.wires.map(() => null);
+  const dx = MARGIN - Math.floor(b.x1 / 10) * 10;
+  const dy = MARGIN - Math.floor(b.y1 / 10) * 10;
+  const shiftRef = (ref: string) => {
+    const at = ref.indexOf('@');
+    return at < 0 ? ref : `${ref.slice(0, at)}@${parseFloat(ref.slice(at + 1)) + dx}`;
+  };
+  const shifted: CircuitLayout = {
+    parts: layout.parts.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy })),
+    wires: layout.wires.map((w) => ({
+      ...w,
+      from: shiftRef(w.from),
+      to: shiftRef(w.to),
+      via: w.via?.map(([x, y]) => [x + dx, y + dy] as [number, number]),
+    })),
+    width: Math.ceil((b.x2 + dx + MARGIN) / 10) * 10,
+    height: Math.ceil((b.y2 + dy + MARGIN) / 10) * 10,
+  };
+  const byId = new Map(layout.parts.map((p) => [p.id, p]));
+  const back = (p: Point): Point => ({ x: p.x - dx, y: p.y - dy });
+  const backEnd = (e: End): End => ({
+    ...e,
+    point: back(e.point),
+    part: byId.get(e.part.id) ?? e.part,
+    bus: e.bus ? byId.get(e.bus.id) ?? e.bus : undefined,
+  });
+  return routeWires(shifted, { titleZones: false }).map((rw) => rw && {
+    ...rw,
+    points: rw.points.map(back),
+    from: backEnd(rw.from),
+    to: backEnd(rw.to),
+  });
+}
+```
+
+- [ ] **Step 6: Tạo `exportImage.ts`**
+
+```ts
+import { labelPlacements, renderScene, svgDefs, titleSvg, woodBackground } from './render';
+import type { RoutedWire } from './route';
+import { endPartId } from './geometry';
+import { contentBounds } from './world';
+import type { ExportAspect, ExportBackground } from './projectModel';
+import type { CircuitLayout } from './types';
+
+/** Dựng ảnh xuất: lấy (1 phần) mạch trên bàn vẽ, căn giữa + co vừa khung, thêm nền và tiêu đề. */
+
+export const ASPECT_SIZE: Record<ExportAspect, [number, number]> = { '4:5': [1080, 1350], '1:1': [1080, 1080], '9:16': [1080, 1920] };
+
+const MAX_SCALE = 1.5;
+const SIDE = 50;
+const PAD = 30;
+
+export interface ExportRenderOptions {
+  aspect: ExportAspect;
+  background: ExportBackground;
+  /** dataURL của ảnh nền khi background.kind = 'image'. */
+  backgroundDataUrl?: string;
+  titleTop?: string;
+  titleBottom?: string;
+  /** Chỉ xuất các linh kiện này (không có = tất cả). */
+  ids?: string[];
+}
+
+export function subsetLayout(layout: CircuitLayout, ids: string[]): { layout: CircuitLayout; wireIndex: number[] } {
+  const set = new Set(ids);
+  const wireIndex = layout.wires.map((_, i) => i).filter((i) => set.has(endPartId(layout.wires[i].from)) && set.has(endPartId(layout.wires[i].to)));
+  return {
+    layout: { ...layout, parts: layout.parts.filter((p) => set.has(p.id)), wires: wireIndex.map((i) => layout.wires[i]) },
+    wireIndex,
+  };
+}
+
+export function renderExportSvg(
+  layout: CircuitLayout,
+  routed: (RoutedWire | null)[],
+  opts: ExportRenderOptions,
+): { svg: string; width: number; height: number; scale: number } | null {
+  const [W, H] = ASPECT_SIZE[opts.aspect];
+  const { layout: sub, wireIndex } = opts.ids ? subsetLayout(layout, opts.ids) : { layout, wireIndex: layout.wires.map((_, i) => i) };
+  if (!sub.parts.length) return null;
+  const subRouted = wireIndex.map((i) => routed[i] ?? null);
+  const ids = new Set(sub.parts.map((p) => p.id));
+  // Nhãn giữ đúng chỗ như trên bàn vẽ (tính trên cả mạch rồi lọc)
+  const labels = labelPlacements(layout, routed, null).filter((l) => ids.has(l.partId));
+
+  const b = contentBounds(sub, subRouted)!;
+  for (const l of labels) {
+    b.x1 = Math.min(b.x1, l.box.x1); b.y1 = Math.min(b.y1, l.box.y1);
+    b.x2 = Math.max(b.x2, l.box.x2); b.y2 = Math.max(b.y2, l.box.y2);
+  }
+  const bw = b.x2 - b.x1 + PAD * 2, bh = b.y2 - b.y1 + PAD * 2;
+  const topZone = opts.titleTop?.trim() ? 150 : SIDE;
+  const bottomZone = opts.titleBottom?.trim() ? 130 : SIDE;
+  const availW = W - SIDE * 2, availH = H - topZone - bottomZone;
+  const scale = Math.min(availW / bw, availH / bh, MAX_SCALE);
+  const tx = SIDE + (availW - bw * scale) / 2 - (b.x1 - PAD) * scale;
+  const ty = topZone + (availH - bh * scale) / 2 - (b.y1 - PAD) * scale;
+
+  const bg = opts.background.kind === 'color'
+    ? `<rect width="${W}" height="${H}" fill="${opts.background.color}"/>`
+    : opts.background.kind === 'image' && opts.backgroundDataUrl
+      ? `<image href="${opts.backgroundDataUrl}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
+      : woodBackground(W, H);
+  const scene = renderScene(sub, { routed: subRouted, frame: null, labels });
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
+    svgDefs() + bg +
+    `<g transform="translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${scale.toFixed(4)})">${scene}</g>` +
+    titleSvg(opts.titleTop?.trim(), 92, W) + titleSvg(opts.titleBottom?.trim(), H - 40, W) +
+    `</svg>`;
+  return { svg, width: W, height: H, scale };
+}
+```
+
+Lưu ý: test so `scale` với `1.5` bằng `toBe` — trả `scale` là số gốc (không làm tròn), chỉ làm tròn trong chuỗi SVG.
+
+- [ ] **Step 7: Chạy test, xác nhận qua**
+
+Run: `npx vitest run && npx tsc --noEmit`
+Expected: PASS. Nếu test `contentBounds` lệch `x1`/`y1`: tính lại theo `parts.ts` (thanh đồng cao 16, điện trở cao 34) — sửa test, không sửa code.
+
+- [ ] **Step 8: So ảnh node "Vẽ mạch" trước/sau (không được đổi)**
+
+Chạy lại đúng lệnh ở Task 7 Step 5 (dựng `before.svg` từ commit trước bằng `git stash`, `after.svg` từ code mới, `cmp`).
+Expected: `GIONG_HET`.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/lib/circuit/world.ts src/lib/circuit/exportImage.ts src/lib/circuit/route.ts src/lib/circuit/render.ts src/lib/circuit/__tests__/world.test.ts src/lib/circuit/__tests__/exportImage.test.ts
+git commit -m "Circuit Studio: unbounded-canvas routing and framed export rendering"
+```
+
+---
+
+### Task 9: Mặt bàn vẽ (`StudioCanvas.tsx`)
 
 **Files:**
 - Create: `src/components/circuitStudio/StudioCanvas.tsx`
 
 **Interfaces:**
-- Consumes: Task 2–7 (`renderCircuitSvg`, `partBox`, `labelPlacements`, geometry, ops, wireEdit, arrange)
+- Consumes: Task 2–8 (`renderScene`, `svgDefs`, `woodTileSvg`, `partBox`, `labelPlacements`, `contentBounds`, geometry, ops, wireEdit, arrange)
 - Produces:
   - `interface Selection { parts: string[]; wire: number | null }`
   - `interface CanvasApi { clientToLayout(x: number, y: number): Point | null; fit(): void; focusBox(b: Box): void }`
-  - `default function StudioCanvas(props: { layout: CircuitLayout; routed: (RoutedWire | null)[]; selection: Selection; onSelect(s: Selection): void; onCommit(l: CircuitLayout): void; onEditTitle(which: 'top' | 'bottom'): void; onApi(api: CanvasApi): void })`
+  - `default function StudioCanvas(props: { layout: CircuitLayout; routed: (RoutedWire | null)[]; selection: Selection; onSelect(s: Selection): void; onCommit(l: CircuitLayout): void; onApi(api: CanvasApi): void })`
 
-Thao tác trong canvas (theo thứ tự ưu tiên khi bấm chuột trái): Space/chuột giữa → kéo ảnh; tay cầm 2 đầu thanh đồng đang chọn; tay cầm đoạn của dây đang chọn; chân linh kiện → kéo dây mới; nhãn → kéo nhãn; linh kiện → chọn/kéo (Shift = thêm/bớt chọn, Alt = không bắt lưới/không gióng); dây → chọn; chỗ trống → kéo khung chọn. Bấm đúp: vùng tiêu đề → sửa tiêu đề; góc của dây đang chọn → bỏ góc; thân dây đang chọn → thêm góc. Chuột phải lên dây → menu "Tự đi lại dây này" / "Xoá dây". Cuộn chuột → zoom quanh con trỏ.
+Mặt bàn không có mép: nền gỗ lát kín theo zoom/pan, toạ độ có thể âm. Thao tác (thứ tự ưu tiên khi bấm chuột trái): Space/chuột giữa → kéo bàn; tay cầm 2 đầu thanh đồng đang chọn; tay cầm đoạn của dây đang chọn; chân linh kiện → kéo dây mới; nhãn → kéo nhãn; linh kiện → chọn/kéo (Shift = thêm/bớt chọn, Alt = không bắt lưới/không gióng); dây → chọn; chỗ trống → kéo khung chọn. Bấm đúp: góc của dây đang chọn → bỏ góc; thân dây đang chọn → thêm góc. Chuột phải lên dây → menu "Tự đi lại dây này" / "Xoá dây". Cuộn chuột → zoom quanh con trỏ.
 
 - [ ] **Step 1: Tạo `StudioCanvas.tsx`**
 
@@ -1944,13 +2380,14 @@ Thao tác trong canvas (theo thứ tự ưu tiên khi bấm chuột trái): Spac
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CircuitLayout, Point } from '../../lib/circuit/types';
 import type { RoutedWire } from '../../lib/circuit/route';
-import { labelPlacements, partBox, renderCircuitSvg, type Box } from '../../lib/circuit/render';
+import { labelPlacements, partBox, renderScene, svgDefs, woodTileSvg, type Box } from '../../lib/circuit/render';
 import {
   allPins, dropTarget, hitPart, hitPin, hitWire, nearestSegment, previewRouted, segmentHandles, wiresOfPart,
 } from '../../lib/circuit/geometry';
 import { addWire, deleteWire, movePartsBy, resetWire, resizeBus, setWirePoints, updatePart } from '../../lib/circuit/ops';
 import { addBend, moveSegment, removeCorner, segOrientation, simplify } from '../../lib/circuit/wireEdit';
 import { snapDelta, type Guide } from '../../lib/circuit/arrange';
+import { contentBounds } from '../../lib/circuit/world';
 
 export interface Selection { parts: string[]; wire: number | null }
 export interface CanvasApi {
@@ -1965,7 +2402,6 @@ interface Props {
   selection: Selection;
   onSelect(s: Selection): void;
   onCommit(l: CircuitLayout): void;
-  onEditTitle(which: 'top' | 'bottom'): void;
   onApi(api: CanvasApi): void;
 }
 
@@ -1978,14 +2414,15 @@ type Drag =
   | { kind: 'label'; id: string; start: Point; base: { dx: number; dy: number }; cur: { dx: number; dy: number } }
   | { kind: 'busEnd'; id: string; side: -1 | 1; endX: number };
 
-const W = 1080, H = 1350;
 const ORANGE = '#F1641E';
+const FAR = 100000; // đường gióng kéo dài "vô tận"
+const WOOD_TILE = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(woodTileSvg()) + '")';
 const snap10 = (v: number) => Math.round(v / 10) * 10;
 const rectOf = (a: Point, b: Point): Box => ({ x1: Math.min(a.x, b.x), y1: Math.min(a.y, b.y), x2: Math.max(a.x, b.x), y2: Math.max(a.y, b.y) });
 
-export default function StudioCanvas({ layout, routed, selection, onSelect, onCommit, onEditTitle, onApi }: Props) {
+export default function StudioCanvas({ layout, routed, selection, onSelect, onCommit, onApi }: Props) {
   const viewRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(0.5);
+  const [zoom, setZoom] = useState(0.6);
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [drag, setDrag] = useState<Drag | null>(null);
   const [hover, setHover] = useState<Point | null>(null);
@@ -1997,12 +2434,15 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
     if (!r) return null;
     return { x: (cx - r.left - pan.x) / zoom, y: (cy - r.top - pan.y) / zoom };
   };
+  /** Vừa màn hình: co cả mạch vào giữa; bàn trống thì hiện vùng 0..1080 × 0..1350. */
   const fit = () => {
     const r = viewRef.current?.getBoundingClientRect();
     if (!r) return;
-    const z = Math.min(r.width / W, r.height / H) * 0.94;
+    const b = contentBounds(layout, routed) ?? { x1: 0, y1: 0, x2: 1080, y2: 1350 };
+    const pad = 120;
+    const z = Math.min(2, Math.max(0.1, Math.min(r.width / (b.x2 - b.x1 + pad * 2), r.height / (b.y2 - b.y1 + pad * 2))));
     setZoom(z);
-    setPan({ x: (r.width - W * z) / 2, y: (r.height - H * z) / 2 });
+    setPan({ x: r.width / 2 - ((b.x1 + b.x2) / 2) * z, y: r.height / 2 - ((b.y1 + b.y2) / 2) * z });
   };
   const focusBox = (b: Box) => {
     const r = viewRef.current?.getBoundingClientRect();
@@ -2010,9 +2450,8 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
     setPan({ x: r.width / 2 - ((b.x1 + b.x2) / 2) * zoom, y: r.height / 2 - ((b.y1 + b.y2) / 2) * zoom });
   };
 
-  // Truyền api mới mỗi lần vẽ (pan/zoom thay đổi thì toạ độ đổi theo)
+  // Truyền api mới mỗi lần vẽ (pan/zoom/bố cục thay đổi thì toạ độ đổi theo)
   useEffect(() => { onApi({ clientToLayout: toLayout, fit, focusBox }); });
-  useEffect(() => { fit(); }, []);
   useEffect(() => {
     const isTyping = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
     const down = (e: KeyboardEvent) => { if (e.code === 'Space' && !isTyping(e)) { setSpace(true); e.preventDefault(); } };
@@ -2040,8 +2479,7 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
     }
     if (drag.kind === 'busEnd') {
       const l = resizeBus(layout, drag.id, drag.side, drag.endX);
-      const bus = l.parts.find((p) => p.id === drag.id);
-      const affected = new Set(bus ? wiresOfPart(l, bus.id) : []);
+      const affected = new Set(wiresOfPart(l, drag.id));
       return { layout: l, routed: previewRouted(routed, l, affected), dashed: affected };
     }
     return null;
@@ -2049,13 +2487,16 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
 
   const shown = preview?.layout ?? layout;
   const shownRouted = preview?.routed ?? routed;
-  const svg = useMemo(() => renderCircuitSvg(shown, { routed: shownRouted, dashed: preview?.dashed }), [shown, shownRouted, preview]);
+  const scene = useMemo(
+    () => svgDefs() + renderScene(shown, { routed: shownRouted, dashed: preview?.dashed, frame: null }),
+    [shown, shownRouted, preview],
+  );
 
   const onWheel = (e: React.WheelEvent) => {
     const p = toLayout(e.clientX, e.clientY);
     const r = viewRef.current?.getBoundingClientRect();
     if (!p || !r) return;
-    const nz = Math.min(3, Math.max(0.15, zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)));
+    const nz = Math.min(4, Math.max(0.1, zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)));
     setZoom(nz);
     setPan({ x: e.clientX - r.left - p.x * nz, y: e.clientY - r.top - p.y * nz });
   };
@@ -2086,7 +2527,7 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
     const pin = hitPin(layout, pt);
     if (pin) { setDrag({ kind: 'wire', from: `${pin.partId}.${pin.pin}`, fromPt: { x: pin.x, y: pin.y }, cur: pt }); return; }
     // 4. nhãn
-    const lab = labelPlacements(layout, routed).find((l) => pt.x >= l.box.x1 && pt.x <= l.box.x2 && pt.y >= l.box.y1 - 6 && pt.y <= l.box.y2 + 6);
+    const lab = labelPlacements(layout, routed, null).find((l) => pt.x >= l.box.x1 && pt.x <= l.box.x2 && pt.y >= l.box.y1 - 6 && pt.y <= l.box.y2 + 6);
     const labPart = lab && layout.parts.find((p) => p.id === lab.partId);
     if (lab && labPart) {
       const base = { dx: (lab.box.x1 + lab.box.x2) / 2 - labPart.x, dy: (lab.box.y1 + lab.box.y2) / 2 - labPart.y };
@@ -2190,10 +2631,7 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
 
   const onDoubleClick = (e: React.MouseEvent) => {
     const pt = toLayout(e.clientX, e.clientY);
-    if (!pt) return;
-    if (pt.y < 130) { onEditTitle('top'); return; }
-    if (pt.y > H - 110) { onEditTitle('bottom'); return; }
-    if (selection.wire === null) return;
+    if (!pt || selection.wire === null) return;
     const pts = routed[selection.wire]?.points;
     if (!pts) return;
     const ci = pts.findIndex((p, i) => i > 0 && i < pts.length - 1 && Math.hypot(p.x - pt.x, p.y - pt.y) < 12);
@@ -2220,12 +2658,19 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
   const hoverPinPart = hoverPin && shown.parts.find((p) => p.id === hoverPin.partId);
   const selWirePts = selection.wire !== null ? shownRouted[selection.wire]?.points : undefined;
   const selBusPart = selection.parts.length === 1 ? shown.parts.find((p) => p.id === selection.parts[0] && p.type === 'bus') : undefined;
+  const overflowSvg: React.CSSProperties = { position: 'absolute', left: 0, top: 0, overflow: 'visible' };
 
   return (
     <div
       ref={viewRef}
-      className="relative flex-1 overflow-hidden bg-[#2b2b2b] select-none"
-      style={{ cursor: space ? (drag?.kind === 'pan' ? 'grabbing' : 'grab') : 'default' }}
+      className="absolute inset-0 overflow-hidden select-none"
+      style={{
+        cursor: space ? (drag?.kind === 'pan' ? 'grabbing' : 'grab') : 'default',
+        backgroundColor: '#4a2814',
+        backgroundImage: WOOD_TILE,
+        backgroundSize: `${1080 * zoom}px ${1350 * zoom}px`,
+        backgroundPosition: `${pan.x}px ${pan.y}px`,
+      }}
       onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -2234,9 +2679,9 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
     >
-      <div style={{ position: 'absolute', left: 0, top: 0, width: W, height: H, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' }}>
-        <div style={{ width: W, height: H, boxShadow: '0 10px 40px rgba(0,0,0,.5)' }} dangerouslySetInnerHTML={{ __html: svg }} />
-        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' }}>
+        <svg width={1} height={1} style={overflowSvg} dangerouslySetInnerHTML={{ __html: scene }} />
+        <svg width={1} height={1} style={{ ...overflowSvg, pointerEvents: 'none' }}>
           {selection.parts.map((id) => {
             const p = shown.parts.find((q) => q.id === id);
             const b = p && partBox(p, true);
@@ -2261,8 +2706,8 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
           {drag?.kind === 'wire' && <line x1={drag.fromPt.x} y1={drag.fromPt.y} x2={drag.cur.x} y2={drag.cur.y} stroke="#22d3ee" strokeWidth={6} strokeDasharray="14 10" />}
           {drag?.kind === 'marquee' && (() => { const b = rectOf(drag.start, drag.cur); return <rect x={b.x1} y={b.y1} width={b.x2 - b.x1} height={b.y2 - b.y1} fill={ORANGE} fillOpacity={0.08} stroke={ORANGE} strokeWidth={2} />; })()}
           {drag?.kind === 'parts' && drag.guides.map((g, i) => g.axis === 'x'
-            ? <line key={i} x1={g.at} y1={0} x2={g.at} y2={H} stroke="#ff2bd6" strokeWidth={2} />
-            : <line key={i} x1={0} y1={g.at} x2={W} y2={g.at} stroke="#ff2bd6" strokeWidth={2} />)}
+            ? <line key={i} x1={g.at} y1={-FAR} x2={g.at} y2={FAR} stroke="#ff2bd6" strokeWidth={2 / zoom} />
+            : <line key={i} x1={-FAR} y1={g.at} x2={FAR} y2={g.at} stroke="#ff2bd6" strokeWidth={2 / zoom} />)}
         </svg>
       </div>
       {menu && (
@@ -2271,7 +2716,6 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
           <button className="block w-full px-4 py-1.5 text-left text-red-400 hover:bg-white/10" onClick={() => { onCommit(deleteWire(layout, menu.wire)); onSelect({ parts: [], wire: null }); setMenu(null); }}>Xoá dây</button>
         </div>
       )}
-      <div className="pointer-events-none absolute bottom-2 right-3 text-xs text-white/50">{Math.round(zoom * 100)}% · cuộn để zoom · Space + kéo để di chuyển · phím 0: vừa màn hình</div>
     </div>
   );
 }
@@ -2280,30 +2724,31 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
 - [ ] **Step 2: Kiểm tra kiểu**
 
 Run: `npx tsc --noEmit && npx vitest run`
-Expected: sạch. (Chạy thử trên app ở cuối Task 9, khi đã có màn hình bao ngoài.)
+Expected: sạch. (Chạy thử trên app ở cuối Task 10, khi đã có màn hình bao ngoài.)
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add src/components/circuitStudio/StudioCanvas.tsx
-git commit -m "Circuit Studio: canvas with zoom/pan, selection, part/label/bus dragging, wire drawing and editing"
+git commit -m "Circuit Studio: unbounded canvas with zoom/pan, selection, dragging, wire drawing and editing"
 ```
 
 ---
 
-### Task 9: Màn hình Xưởng vẽ mạch (khung, thư viện, bảng chỉnh, cảnh báo, lưu, xuất PNG)
+### Task 10: Màn hình Xưởng vẽ mạch với bảng nổi (thư viện, chỉnh sửa, cảnh báo, danh sách mạch, tự lưu)
 
 **Files:**
-- Create: `src/lib/circuit/libraryCatalog.ts`, `src/lib/circuit/__tests__/libraryCatalog.test.ts`, `src/components/circuitStudio/CircuitStudio.tsx`, `src/components/circuitStudio/ProjectPicker.tsx`, `src/components/circuitStudio/PartLibraryPanel.tsx`, `src/components/circuitStudio/InspectorPanel.tsx`, `src/components/circuitStudio/WarningsBar.tsx`
+- Create: `src/lib/circuit/libraryCatalog.ts`, `src/lib/circuit/__tests__/libraryCatalog.test.ts`, `src/components/circuitStudio/FloatingPanel.tsx`, `src/components/circuitStudio/CircuitStudio.tsx`, `src/components/circuitStudio/ProjectPicker.tsx`, `src/components/circuitStudio/PartLibraryPanel.tsx`, `src/components/circuitStudio/InspectorPanel.tsx`, `src/components/circuitStudio/WarningsBar.tsx`
 - Modify: `src/App.tsx` (import, state, nút ở thanh bên trái ngay trên nút Cài đặt, render overlay)
 
 **Interfaces:**
-- Consumes: mọi thứ ở Task 1–8
+- Consumes: mọi thứ ở Task 1–9
 - Produces:
   - `libraryCatalog.ts`: `interface LibraryItem { type: string; name: string; group: string; idBase?: string }`, `BUILTIN_LIBRARY: LibraryItem[]`, `LIBRARY_GROUPS: string[]`
+  - `FloatingPanel`: `default function FloatingPanel(props: { id: string; title: string; defaultPos: { x: number; y: number }; width: number; children: React.ReactNode; onClose?(): void })` (kéo bằng thanh tiêu đề, nhớ vị trí trong localStorage, thu gọn được)
   - `CircuitStudio`: `default function CircuitStudio(props: { onClose(): void; geminiApiKey?: string })`
   - `PartLibraryPanel`: `default function PartLibraryPanel(props: { items: LibraryItem[]; version: number; onStartPlace(item: LibraryItem, e: React.PointerEvent): void; onAddNew?(): void; onItemMenu?(item: LibraryItem, e: React.MouseEvent): void })`
-  - `InspectorPanel`: `default function InspectorPanel(props: { layout: CircuitLayout; selection: Selection; titleFocus: 'top' | 'bottom' | null; onCommit(l: CircuitLayout): void; onSelect(s: Selection): void; onError(msg: string): void })`
+  - `InspectorPanel`: `default function InspectorPanel(props: { layout: CircuitLayout; selection: Selection; onCommit(l: CircuitLayout): void; onSelect(s: Selection): void; onError(msg: string): void })`
   - `WarningsBar`: `default function WarningsBar(props: { messages: string[]; onPick(msg: string): void })`
   - `ProjectPicker`: `default function ProjectPicker(props: { projects: ProjectMeta[]; current: CircuitProject | null; onOpen(id: string): void; onNew(): void; onRename(name: string): void; onDuplicate(): void; onDelete(): void })`
 
@@ -2368,7 +2813,68 @@ export const BUILTIN_LIBRARY: LibraryItem[] = [
 
 Run: `npx vitest run` → Expected: PASS.
 
-- [ ] **Step 3: Tạo `PartLibraryPanel.tsx`**
+- [ ] **Step 3: Tạo `FloatingPanel.tsx`**
+
+```tsx
+import React, { useRef, useState } from 'react';
+
+interface Props {
+  id: string;
+  title: string;
+  defaultPos: { x: number; y: number };
+  width: number;
+  children: React.ReactNode;
+  onClose?(): void;
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+
+/** Bảng nổi trên mặt bàn vẽ: kéo bằng thanh tiêu đề (nhớ vị trí), thu gọn được. */
+export default function FloatingPanel({ id, title, defaultPos, width, children, onClose }: Props) {
+  const key = `circuitStudio.panel.${id}`;
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+    try {
+      const s = localStorage.getItem(key);
+      if (s) {
+        const p = JSON.parse(s);
+        return { x: clamp(p.x, 0, window.innerWidth - 80), y: clamp(p.y, 0, window.innerHeight - 40) };
+      }
+    } catch { /* bỏ qua: localStorage có thể bị chặn */ }
+    return defaultPos;
+  });
+  const [min, setMin] = useState(false);
+  const grab = useRef<{ dx: number; dy: number } | null>(null);
+
+  const onDown = (e: React.PointerEvent) => {
+    grab.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (!grab.current) return;
+    setPos({ x: clamp(e.clientX - grab.current.dx, 0, window.innerWidth - 80), y: clamp(e.clientY - grab.current.dy, 0, window.innerHeight - 40) });
+  };
+  const onUp = () => {
+    if (!grab.current) return;
+    grab.current = null;
+    try { localStorage.setItem(key, JSON.stringify(pos)); } catch { /* bỏ qua */ }
+  };
+
+  return (
+    <div className="absolute z-20 flex flex-col overflow-hidden rounded-xl border border-white/10 bg-[#1b1b1b]/90 text-white shadow-2xl backdrop-blur"
+      style={{ left: pos.x, top: pos.y, width, maxHeight: `calc(100vh - ${pos.y + 12}px)` }}>
+      <div className="flex cursor-move items-center gap-1 border-b border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white/60"
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}>
+        <span className="flex-1 truncate">{title}</span>
+        <button className="rounded px-1 hover:bg-white/10" title={min ? 'Mở rộng' : 'Thu gọn'} onPointerDown={(e) => e.stopPropagation()} onClick={() => setMin(!min)}>{min ? '▸' : '▾'}</button>
+        {onClose && <button className="rounded px-1 hover:bg-white/10" title="Đóng" onPointerDown={(e) => e.stopPropagation()} onClick={onClose}>✕</button>}
+      </div>
+      {!min && <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>}
+    </div>
+  );
+}
+```
+
+- [ ] **Step 4: Tạo `PartLibraryPanel.tsx`**
 
 ```tsx
 import React, { useMemo, useState } from 'react';
@@ -2394,43 +2900,41 @@ export default function PartLibraryPanel({ items, version, onStartPlace, onAddNe
   const shown = items.filter((it) => it.name.toLowerCase().includes(q.trim().toLowerCase()));
 
   return (
-    <div className="flex w-[220px] shrink-0 flex-col border-r border-white/10 bg-[#181818] p-2 text-xs text-white/80">
+    <div className="flex flex-col p-2 text-xs text-white/80">
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm linh kiện"
         className="mb-2 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-white outline-none focus:border-[#F1641E]" />
-      <div className="flex-1 overflow-y-auto pr-1">
-        {LIBRARY_GROUPS.map((g) => {
-          const list = shown.filter((it) => it.group === g);
-          if (!list.length && g !== 'Của tôi') return null;
-          return (
-            <div key={g} className="mb-3">
-              <div className="mb-1 font-semibold uppercase tracking-wide text-white/40">{g}</div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {list.map((it) => (
-                  <div key={`${it.type}-${it.idBase ?? ''}`} title={`Kéo vào ảnh: ${it.name}`}
-                    onPointerDown={(e) => { if (e.button === 0) onStartPlace(it, e); }}
-                    onContextMenu={(e) => { e.preventDefault(); onItemMenu?.(it, e); }}
-                    className="flex cursor-grab flex-col items-center rounded-md border border-white/10 bg-white/[0.03] p-1 hover:border-[#F1641E]/60 hover:bg-white/[0.07]">
-                    <img src={thumbs[it.type]} alt="" draggable={false} className="h-[56px] w-[56px] object-contain" />
-                    <span className="mt-0.5 text-center leading-tight">{it.name}</span>
-                  </div>
-                ))}
-              </div>
+      {LIBRARY_GROUPS.map((g) => {
+        const list = shown.filter((it) => it.group === g);
+        if (!list.length) return null;
+        return (
+          <div key={g} className="mb-3">
+            <div className="mb-1 font-semibold uppercase tracking-wide text-white/40">{g}</div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {list.map((it) => (
+                <div key={`${it.type}-${it.idBase ?? ''}`} title={`Kéo vào bàn vẽ: ${it.name}`}
+                  onPointerDown={(e) => { if (e.button === 0) onStartPlace(it, e); }}
+                  onContextMenu={(e) => { e.preventDefault(); onItemMenu?.(it, e); }}
+                  className="flex cursor-grab flex-col items-center rounded-md border border-white/10 bg-white/[0.03] p-1 hover:border-[#F1641E]/60 hover:bg-white/[0.07]">
+                  <img src={thumbs[it.type]} alt="" draggable={false} className="h-[56px] w-[56px] object-contain" />
+                  <span className="mt-0.5 text-center leading-tight">{it.name}</span>
+                </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
       {onAddNew && (
-        <button onClick={onAddNew} className="mt-2 rounded-md bg-[#F1641E]/15 px-2 py-2 font-semibold text-[#F1641E] hover:bg-[#F1641E]/25">＋ Thêm linh kiện mới</button>
+        <button onClick={onAddNew} className="mt-1 rounded-md bg-[#F1641E]/15 px-2 py-2 font-semibold text-[#F1641E] hover:bg-[#F1641E]/25">＋ Thêm linh kiện mới</button>
       )}
     </div>
   );
 }
 ```
 
-- [ ] **Step 4: Tạo `InspectorPanel.tsx`**
+- [ ] **Step 5: Tạo `InspectorPanel.tsx`**
 
 ```tsx
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PARTS } from '../../lib/circuit/parts';
 import { WIRE_COLORS } from '../../lib/circuit/render';
 import { deleteWire, resetWire, rotateParts, updatePart, updateWire } from '../../lib/circuit/ops';
@@ -2440,22 +2944,19 @@ import type { Selection } from './StudioCanvas';
 interface Props {
   layout: CircuitLayout;
   selection: Selection;
-  titleFocus: 'top' | 'bottom' | null;
   onCommit(l: CircuitLayout): void;
   onSelect(s: Selection): void;
   onError(msg: string): void;
 }
 
 /** Ô nhập chỉ ghi khi rời ô / Enter — gõ từng chữ không làm đầy lịch sử hoàn tác. */
-function Field({ label, value, onCommit, autoFocus }: { label: string; value: string; onCommit(v: string): void; autoFocus?: boolean }) {
+function Field({ label, value, onCommit }: { label: string; value: string; onCommit(v: string): void }) {
   const [v, setV] = useState(value);
-  const ref = useRef<HTMLInputElement>(null);
   useEffect(() => setV(value), [value]);
-  useEffect(() => { if (autoFocus) { ref.current?.focus(); ref.current?.select(); } }, [autoFocus]);
   return (
     <label className="mb-2 block">
       <span className="mb-0.5 block text-white/50">{label}</span>
-      <input ref={ref} value={v} onChange={(e) => setV(e.target.value)}
+      <input value={v} onChange={(e) => setV(e.target.value)}
         onBlur={() => { if (v !== value) onCommit(v); }}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
         className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-white outline-none focus:border-[#F1641E]" />
@@ -2463,9 +2964,9 @@ function Field({ label, value, onCommit, autoFocus }: { label: string; value: st
   );
 }
 
-const btn = 'rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10';
+const btn = 'rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-30';
 
-export default function InspectorPanel({ layout, selection, titleFocus, onCommit, onSelect, onError }: Props) {
+export default function InspectorPanel({ layout, selection, onCommit, onSelect, onError }: Props) {
   const part = selection.parts.length === 1 ? layout.parts.find((p) => p.id === selection.parts[0]) : undefined;
   const wireIdx = selection.wire;
   const wire = wireIdx !== null ? layout.wires[wireIdx] : undefined;
@@ -2481,10 +2982,9 @@ export default function InspectorPanel({ layout, selection, titleFocus, onCommit
   };
 
   return (
-    <div className="w-[240px] shrink-0 overflow-y-auto border-l border-white/10 bg-[#181818] p-3 text-xs text-white/80">
+    <div className="p-3 text-xs text-white/80">
       {part && (
         <>
-          <div className="mb-2 font-semibold uppercase tracking-wide text-white/40">Linh kiện: {part.id}</div>
           <div className="mb-2 text-white/50">{PARTS[part.type]?.desc ?? part.type}</div>
           <Field label="Ký hiệu" value={part.id} onCommit={(v) => set({ id: v })} />
           {part.type !== 'bus' && part.type !== 'lead' && <Field label="Chữ in trên thân" value={part.marking ?? ''} onCommit={(v) => set({ marking: v })} />}
@@ -2520,7 +3020,6 @@ export default function InspectorPanel({ layout, selection, titleFocus, onCommit
 
       {wire && wireIdx !== null && (
         <>
-          <div className="mb-2 font-semibold uppercase tracking-wide text-white/40">Dây {wireIdx + 1}</div>
           <div className="mb-2 break-all text-white">{wire.from} → {wire.to}</div>
           <div className="mb-1 text-white/50">Màu</div>
           <div className="mb-3 flex flex-wrap gap-1.5">
@@ -2540,29 +3039,21 @@ export default function InspectorPanel({ layout, selection, titleFocus, onCommit
       {!part && !wire && selection.parts.length > 1 && (
         <div className="text-white/60">Đã chọn {selection.parts.length} linh kiện — dùng các nút căn hàng / chia đều ở thanh trên.</div>
       )}
-
-      {!part && !wire && selection.parts.length === 0 && (
-        <>
-          <div className="mb-2 font-semibold uppercase tracking-wide text-white/40">Ảnh</div>
-          <Field label="Tiêu đề trên" value={layout.titleTop ?? ''} autoFocus={titleFocus === 'top'} onCommit={(v) => onCommit({ ...layout, titleTop: v })} />
-          <Field label="Tiêu đề dưới" value={layout.titleBottom ?? ''} autoFocus={titleFocus === 'bottom'} onCommit={(v) => onCommit({ ...layout, titleBottom: v })} />
-          <div className="mt-3 text-white/40">Kéo linh kiện từ thư viện vào ảnh. Kéo từ chân này sang chân khác để nối dây. Bấm đúp lên tiêu đề trên ảnh để sửa.</div>
-        </>
-      )}
     </div>
   );
 }
 ```
 
-- [ ] **Step 5: Tạo `WarningsBar.tsx`**
+- [ ] **Step 6: Tạo `WarningsBar.tsx`**
 
 ```tsx
 interface Props { messages: string[]; onPick(msg: string): void }
 
+/** Cảnh báo bố cục, nổi ở giữa đáy màn hình. */
 export default function WarningsBar({ messages, onPick }: Props) {
   if (!messages.length) return null;
   return (
-    <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-t border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">
+    <div className="absolute bottom-3 left-1/2 z-20 flex max-w-[60vw] -translate-x-1/2 items-center gap-2 overflow-x-auto rounded-full border border-amber-500/30 bg-[#2a2010]/90 px-4 py-1.5 text-xs text-amber-200 shadow-xl backdrop-blur">
       <span className="shrink-0 font-semibold">⚠ {messages.length} cảnh báo:</span>
       {messages.map((m, i) => (
         <button key={i} onClick={() => onPick(m)} className="shrink-0 rounded px-1.5 py-0.5 underline decoration-dotted hover:bg-amber-500/20">{m}</button>
@@ -2572,7 +3063,7 @@ export default function WarningsBar({ messages, onPick }: Props) {
 }
 ```
 
-- [ ] **Step 6: Tạo `ProjectPicker.tsx`**
+- [ ] **Step 7: Tạo `ProjectPicker.tsx`**
 
 ```tsx
 import { useEffect, useState } from 'react';
@@ -2624,24 +3115,22 @@ export default function ProjectPicker({ projects, current, onOpen, onNew, onRena
 }
 ```
 
-- [ ] **Step 7: Tạo `CircuitStudio.tsx`**
+- [ ] **Step 8: Tạo `CircuitStudio.tsx`**
 
 ```tsx
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { ask, save } from '@tauri-apps/plugin-dialog';
-import { writeFile } from '@tauri-apps/plugin-fs';
+import { ask } from '@tauri-apps/plugin-dialog';
 import StudioCanvas, { type CanvasApi, type Selection } from './StudioCanvas';
+import FloatingPanel from './FloatingPanel';
 import PartLibraryPanel from './PartLibraryPanel';
 import InspectorPanel from './InspectorPanel';
 import WarningsBar from './WarningsBar';
 import ProjectPicker from './ProjectPicker';
 import { initialStudioState, studioReducer } from '../../lib/circuit/studioState';
-import { duplicateProject, emptyLayout, fileSlug, newProject, type CircuitProject, type ProjectMeta } from '../../lib/circuit/projectModel';
+import { duplicateProject, emptyLayout, newProject, type CircuitProject, type ProjectMeta } from '../../lib/circuit/projectModel';
 import { deleteProject, listProjects, loadProject, saveProject } from '../../lib/circuit/circuitStore';
-import { routeWires } from '../../lib/circuit/route';
-import { partBox, partPreviewSvg, renderCircuitSvg, validateLayout } from '../../lib/circuit/render';
-import { svgToPngBase64 } from '../../lib/circuit/rasterize';
-import { base64ToBytes } from '../../lib/assets';
+import { partBox, partPreviewSvg, validateLayout } from '../../lib/circuit/render';
+import { routeWorld } from '../../lib/circuit/world';
 import { addPart, deleteParts, duplicateParts, resetAllWires, rotateParts, deleteWire } from '../../lib/circuit/ops';
 import { alignParts, distributeParts, type AlignMode } from '../../lib/circuit/arrange';
 import { BUILTIN_LIBRARY, type LibraryItem } from '../../lib/circuit/libraryCatalog';
@@ -2662,7 +3151,7 @@ export default function CircuitStudio({ onClose }: Props) {
   const [state, dispatch] = useReducer(studioReducer, initialStudioState(emptyLayout()));
   const [selection, setSelection] = useState<Selection>({ parts: [], wire: null });
   const [partsVersion] = useState(0);
-  const [titleFocus, setTitleFocus] = useState<'top' | 'bottom' | null>(null);
+  const [showLibrary, setShowLibrary] = useState(true);
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
   const [placing, setPlacing] = useState<{ item: LibraryItem; x: number; y: number } | null>(null);
   const apiRef = useRef<CanvasApi | null>(null);
@@ -2671,8 +3160,8 @@ export default function CircuitStudio({ onClose }: Props) {
   projectRef.current = project;
 
   const layout = state.layout;
-  const routed = useMemo(() => routeWires(layout), [layout, partsVersion]);
-  const issues = useMemo(() => { const v = validateLayout(layout, undefined, routed); return [...v.errors, ...v.warnings]; }, [layout, routed]);
+  const routed = useMemo(() => routeWorld(layout), [layout, partsVersion]);
+  const issues = useMemo(() => { const v = validateLayout(layout, undefined, routed, { frame: false }); return [...v.errors, ...v.warnings]; }, [layout, routed]);
   const library = useMemo<LibraryItem[]>(() => BUILTIN_LIBRARY, [partsVersion]);
 
   const flash = useCallback((msg: string, error = false) => {
@@ -2717,6 +3206,7 @@ export default function CircuitStudio({ onClose }: Props) {
     setProject(p);
     dispatch({ type: 'load', layout: p.layout });
     setSelection({ parts: [], wire: null });
+    setTimeout(() => apiRef.current?.fit(), 0);
     await refreshList();
   }, [flush, refreshList]);
 
@@ -2740,17 +3230,18 @@ export default function CircuitStudio({ onClose }: Props) {
 
   const close = async () => { await flush().catch(() => {}); onClose(); };
 
-  // ─── Kéo linh kiện từ thư viện vào ảnh ───
+  // ─── Kéo linh kiện từ thư viện vào bàn vẽ ───
   useEffect(() => {
     if (!placing) return;
     const move = (e: PointerEvent) => setPlacing((p) => p && { ...p, x: e.clientX, y: e.clientY });
     const up = (e: PointerEvent) => {
       const item = placing.item;
       setPlacing(null);
-      const r = canvasWrapRef.current?.getBoundingClientRect();
+      // Thả lên bảng nổi (thư viện, cột chỉnh sửa…) thì không đặt linh kiện
+      const target = document.elementFromPoint(e.clientX, e.clientY);
+      if (!target || !canvasWrapRef.current?.contains(target)) return;
       const pt = apiRef.current?.clientToLayout(e.clientX, e.clientY);
-      if (!r || !pt || e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
-      if (pt.x < 0 || pt.x > 1080 || pt.y < 0 || pt.y > 1350) return;
+      if (!pt) return;
       const res = addPart(layout, item.type, pt.x, pt.y, item.idBase);
       commit(res.layout);
       setSelection({ parts: [res.id], wire: null });
@@ -2788,26 +3279,11 @@ export default function CircuitStudio({ onClose }: Props) {
       }
       if (e.key.toLowerCase() === 'r' && !cmd && selection.parts.length) { commit(rotateParts(layout, selection.parts, e.shiftKey ? -1 : 1)); return; }
       if (e.key === '0') { apiRef.current?.fit(); return; }
-      if (e.key === 'Escape') { setSelection({ parts: [], wire: null }); setTitleFocus(null); }
+      if (e.key === 'Escape') setSelection({ parts: [], wire: null });
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [layout, selection, commit, flash]);
-
-  const exportPng = async () => {
-    try {
-      const v = validateLayout(layout, undefined, routed);
-      const bad = [...v.errors, ...v.warnings.filter((w) => w.startsWith('Không tìm được đường'))];
-      if (bad.length && !(await ask(`Ảnh còn lỗi:\n${bad.join('\n')}\n\nVẫn xuất?`, { title: 'Xuất PNG', kind: 'warning' }))) return;
-      const b64 = await svgToPngBase64(renderCircuitSvg(layout, { routed }), 1080, 1350);
-      const path = await save({ defaultPath: `${fileSlug(project?.name ?? 'mach')}.png`, filters: [{ name: 'PNG', extensions: ['png'] }] });
-      if (!path) return;
-      await writeFile(path, base64ToBytes(b64));
-      flash('Đã xuất PNG.');
-    } catch (e) {
-      flash(`Lỗi xuất PNG: ${(e as Error).message ?? e}`, true);
-    }
-  };
 
   /** Bấm 1 cảnh báo → chọn và đưa chỗ lỗi ra giữa màn hình. */
   const pickWarning = (msg: string) => {
@@ -2826,10 +3302,23 @@ export default function CircuitStudio({ onClose }: Props) {
   };
 
   const selParts = selection.parts.length;
+  const hasSelection = selParts > 0 || selection.wire !== null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-[#141414] text-white">
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-white/10 px-3">
+    <div className="fixed inset-0 z-[100] overflow-hidden bg-[#141414] text-white">
+      <div ref={canvasWrapRef} className="absolute inset-0">
+        <StudioCanvas
+          layout={layout}
+          routed={routed}
+          selection={selection}
+          onSelect={setSelection}
+          onCommit={commit}
+          onApi={(api) => { apiRef.current = api; }}
+        />
+      </div>
+
+      {/* Thanh công cụ nổi */}
+      <div className="absolute left-3 right-3 top-3 z-30 flex h-12 items-center gap-2 rounded-xl border border-white/10 bg-[#1b1b1b]/90 px-3 shadow-2xl backdrop-blur">
         <ProjectPicker
           projects={projects}
           current={project}
@@ -2846,9 +3335,11 @@ export default function CircuitStudio({ onClose }: Props) {
           }}
         />
         <div className="mx-1 h-6 w-px bg-white/10" />
+        <button className={btn} title="Thư viện linh kiện" onClick={() => setShowLibrary(!showLibrary)}>{icon('widgets')} Linh kiện</button>
         <button className={btn} title="Hoàn tác (Cmd+Z)" disabled={!state.past.length} onClick={() => dispatch({ type: 'undo' })}>{icon('undo')}</button>
         <button className={btn} title="Làm lại (Cmd+Shift+Z)" disabled={!state.future.length} onClick={() => dispatch({ type: 'redo' })}>{icon('redo')}</button>
-        <button className={btn} title="Tự đi lại tất cả dây (bỏ mọi chỉnh tay)" onClick={() => commit(resetAllWires(layout))}>{icon('route')} Tự đi lại tất cả</button>
+        <button className={btn} title="Vừa màn hình (phím 0)" onClick={() => apiRef.current?.fit()}>{icon('fit_screen')}</button>
+        <button className={btn} title="Tự đi lại tất cả dây (bỏ mọi chỉnh tay)" onClick={() => commit(resetAllWires(layout))}>{icon('route')}</button>
         {selParts >= 2 && (
           <>
             <div className="mx-1 h-6 w-px bg-white/10" />
@@ -2859,25 +3350,21 @@ export default function CircuitStudio({ onClose }: Props) {
         )}
         <div className="flex-1" />
         {toast && <span className={`text-xs ${toast.error ? 'text-red-400' : 'text-emerald-400'}`}>{toast.msg}</span>}
-        <button className="flex h-8 items-center gap-1 rounded-md bg-[#F1641E] px-3 text-xs font-semibold text-white hover:bg-[#F1641E]/90" onClick={exportPng}>{icon('download')} Xuất PNG</button>
         <button className={btn} title="Đóng" onClick={close}>{icon('close')}</button>
       </div>
 
-      <div className="flex min-h-0 flex-1">
-        <PartLibraryPanel items={library} version={partsVersion} onStartPlace={(item, e) => setPlacing({ item, x: e.clientX, y: e.clientY })} />
-        <div ref={canvasWrapRef} className="flex min-w-0 flex-1">
-          <StudioCanvas
-            layout={layout}
-            routed={routed}
-            selection={selection}
-            onSelect={(s) => { setSelection(s); setTitleFocus(null); }}
-            onCommit={commit}
-            onEditTitle={(which) => { setSelection({ parts: [], wire: null }); setTitleFocus(which); }}
-            onApi={(api) => { apiRef.current = api; }}
-          />
-        </div>
-        <InspectorPanel layout={layout} selection={selection} titleFocus={titleFocus} onCommit={commit} onSelect={setSelection} onError={(m) => flash(m, true)} />
-      </div>
+      {showLibrary && (
+        <FloatingPanel id="library" title="Linh kiện" defaultPos={{ x: 12, y: 72 }} width={230} onClose={() => setShowLibrary(false)}>
+          <PartLibraryPanel items={library} version={partsVersion} onStartPlace={(item, e) => setPlacing({ item, x: e.clientX, y: e.clientY })} />
+        </FloatingPanel>
+      )}
+
+      {hasSelection && (
+        <FloatingPanel id="inspector" title={selection.wire !== null ? `Dây ${selection.wire + 1}` : selParts === 1 ? `Linh kiện ${selection.parts[0]}` : `${selParts} linh kiện`}
+          defaultPos={{ x: window.innerWidth - 264, y: 72 }} width={252}>
+          <InspectorPanel layout={layout} selection={selection} onCommit={commit} onSelect={setSelection} onError={(m) => flash(m, true)} />
+        </FloatingPanel>
+      )}
 
       <WarningsBar messages={issues} onPick={pickWarning} />
 
@@ -2891,7 +3378,7 @@ export default function CircuitStudio({ onClose }: Props) {
 }
 ```
 
-- [ ] **Step 8: Gắn nút mở vào `App.tsx`**
+- [ ] **Step 9: Gắn nút mở vào `App.tsx`**
 
 Thêm import cạnh các import component khác (gần dòng `import SettingsPanel from './components/SettingsPanel';`):
 
@@ -2919,47 +3406,393 @@ Ngay SAU dòng `{isSettingsOpen && <SettingsPanel ... />}` thêm:
 {isCircuitStudioOpen && <CircuitStudio onClose={() => setIsCircuitStudioOpen(false)} geminiApiKey={appSettings.geminiApiKey} />}
 ```
 
-(Biến `appSettings` là biến đang truyền vào `SettingsPanel settings={appSettings}`.) `geminiApiKey` chưa dùng trong Task 9 nên `CircuitStudio` chưa destructure nó (tránh lỗi noUnusedLocals); Task 12 mới dùng.
+(Biến `appSettings` là biến đang truyền vào `SettingsPanel settings={appSettings}`.) `geminiApiKey` chưa dùng nên `CircuitStudio` chưa destructure nó (tránh lỗi noUnusedLocals); Task 14 mới dùng. `partsVersion` chưa có setter — Task 13 thêm.
 
-- [ ] **Step 9: Kiểm tra kiểu + test**
+- [ ] **Step 10: Kiểm tra kiểu + test**
 
 Run: `npx tsc --noEmit && npx vitest run`
-Expected: sạch. Nếu `partsVersion` báo không dùng setter: đúng như dự kiến (`const [partsVersion] = useState(0)`) — Task 11 đổi thành có setter.
+Expected: sạch.
 
-- [ ] **Step 10: Build và chạy thử thật**
+- [ ] **Step 11: Build và chạy thử thật**
 
 ```bash
 npm run tauri build
 ```
 
-Mở `src-tauri/target/release/bundle/macos/BUNNA AI FLOW.app` (thoát bản đang chạy trước). Kiểm tra bằng computer-use (chụp màn hình sau mỗi bước), và ghi kết quả từng mục:
-1. Bấm nút "Xưởng vẽ mạch" → màn hình phủ toàn bộ, có ảnh gỗ trống, tiêu đề "MẠCH MỚI".
-2. Kéo "Cọc nguồn", "Điện trở", "LED", "Thanh mass" vào ảnh → linh kiện xuất hiện đúng chỗ thả, ký hiệu PWR1/R1/LED1/GND.
-3. Kéo từ chân + của cọc nguồn sang chân 1 điện trở → dây đỏ tự đi; R1.2 → LED1.A dây vàng; LED1.K → thanh mass dây đen.
-4. Kéo điện trở → dây nét đứt khi kéo, thả ra dây tự đi lại; có đường gióng hồng khi thẳng hàng LED.
-5. Chọn dây vàng, kéo chấm tròn giữa đoạn → dây đổi đường, vẫn vuông góc; bấm đúp thêm góc, kéo nửa sau; bấm đúp lên góc vuông để bỏ; chuột phải → "Tự đi lại dây này".
-6. Cmd+Z / Cmd+Shift+Z hoạt động; phím R xoay; Delete xoá (báo số dây xoá kèm); Cmd+D nhân bản.
-7. Chọn 3 linh kiện → căn trên, chia đều.
-8. Kéo nhãn "1kΩ" sang chỗ khác → giữ chỗ; "Nhãn tự đặt lại" đưa về tự đặt.
-9. Chọn thanh mass, kéo chấm 2 đầu → dài/ngắn lại.
-10. Bấm đúp vùng tiêu đề trên → ô "Tiêu đề trên" ở cột phải được focus; sửa → ảnh đổi.
-11. Đặt 2 linh kiện đè nhau → thanh cảnh báo vàng hiện; bấm → chọn đúng 2 linh kiện.
-12. Đóng rồi mở lại Xưởng → mạch vẫn còn (tự lưu); Danh sách mạch: tạo mới, đổi tên, nhân bản, xoá.
-13. Xuất PNG → mở file PNG, so với ảnh trong editor: giống nhau.
+Mở `src-tauri/target/release/bundle/macos/BUNNA AI FLOW.app` (thoát bản đang chạy trước). Kiểm tra bằng computer-use (chụp màn hình sau mỗi bước), ghi kết quả từng mục:
+1. Bấm nút "Xưởng vẽ mạch" → mặt bàn gỗ phủ kín màn hình; thanh công cụ, bảng "Linh kiện" nổi bên trên; không có khung ảnh.
+2. Kéo "Cọc nguồn", "Điện trở", "LED", "Thanh mass" vào bàn → linh kiện xuất hiện đúng chỗ thả, ký hiệu PWR1/R1/LED1/GND. Thả lên bảng Linh kiện → không đặt gì.
+3. Kéo từ chân + cọc nguồn sang chân 1 điện trở → dây đỏ tự đi; R1.2 → LED1.A dây vàng; LED1.K → thanh mass dây đen.
+4. Kéo bàn ra xa (Space + kéo) rồi đặt linh kiện ở vùng toạ độ âm, nối dây → dây vẫn tự đi bình thường.
+5. Kéo điện trở → dây nét đứt khi kéo, thả ra dây tự đi lại; có đường gióng hồng khi thẳng hàng LED.
+6. Chọn dây vàng, kéo chấm tròn giữa đoạn → đổi đường, vẫn vuông góc; bấm đúp thêm góc, kéo nửa sau; bấm đúp lên góc để bỏ; chuột phải → "Tự đi lại dây này".
+7. Cmd+Z / Cmd+Shift+Z; phím R xoay; Delete xoá (báo số dây xoá kèm); Cmd+D nhân bản; phím 0 vừa màn hình.
+8. Chọn 3 linh kiện → căn trên, chia đều.
+9. Kéo nhãn "1kΩ" sang chỗ khác → giữ chỗ; "Nhãn tự đặt lại" đưa về tự đặt.
+10. Chọn thanh mass, kéo chấm 2 đầu → dài/ngắn lại.
+11. Cột chỉnh sửa chỉ hiện khi có thứ đang chọn; kéo thanh tiêu đề của bảng sang chỗ khác → đóng/mở lại Xưởng vẫn ở chỗ mới; nút ▾ thu gọn bảng.
+12. Đặt 2 linh kiện đè nhau → thanh cảnh báo nổi ở đáy; bấm → chọn đúng 2 linh kiện và đưa ra giữa màn hình.
+13. Đóng rồi mở lại Xưởng → mạch vẫn còn (tự lưu); Danh sách mạch: tạo mới, đổi tên, nhân bản, xoá.
 14. Khi Xưởng đang mở, phím Delete không xoá node nào của canvas workflow phía sau.
 
 Mục nào sai: sửa code, build lại, kiểm tra lại mục đó trước khi commit.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add src/lib/circuit/libraryCatalog.ts src/lib/circuit/__tests__/libraryCatalog.test.ts src/components/circuitStudio src/App.tsx
-git commit -m "Circuit Studio: full-screen editor with part library, inspector, warnings, autosave and PNG export"
+git commit -m "Circuit Studio: full-screen editor with floating library/inspector/warnings and autosave"
 ```
 
 ---
 
-### Task 10: Xoá nền ảnh + linh kiện bằng ảnh (lõi)
+### Task 11: Cửa sổ "Xuất ảnh" (phạm vi, khung, nền gỗ/màu/ảnh, tiêu đề, xem trước) + thư viện ảnh nền
+
+**Files:**
+- Create: `src/lib/circuit/backgroundStore.ts`, `src/components/circuitStudio/imageUtils.ts`, `src/components/circuitStudio/ExportDialog.tsx`
+- Modify: `src/components/circuitStudio/CircuitStudio.tsx` (nút "Xuất ảnh", mở cửa sổ, lưu `exportSettings` + tiêu đề)
+
+**Interfaces:**
+- Consumes: `renderExportSvg`, `ASPECT_SIZE` (Task 8), `ExportAspect`, `ExportBackground`, `ExportSettings`, `CircuitProject.exportSettings` (Task 6), `svgToPngBase64` (`rasterize.ts`), `validateLayout`, `subsetLayout`
+- Produces:
+  - `backgroundStore.ts`: `interface BackgroundEntry { id: string; dataUrl: string }`, `listBackgrounds(): Promise<BackgroundEntry[]>`, `addBackground(bytes: Uint8Array, ext: 'jpg' | 'png'): Promise<BackgroundEntry>`, `deleteBackground(id: string): Promise<void>`
+  - `imageUtils.ts`: `fileToDataUrl(f: File): Promise<string>`, `dataUrlToBytes(url: string): Uint8Array`, `resizeImageDataUrl(url: string, maxSize: number, mime?: string, quality?: number): Promise<string>`
+  - `ExportDialog`: `default function ExportDialog(props: { layout: CircuitLayout; routed: (RoutedWire | null)[]; selectedIds: string[]; projectName: string; settings?: ExportSettings; onClose(): void; onSaved(s: ExportSettings, titleTop: string, titleBottom: string): void; onError(msg: string): void })`
+
+- [ ] **Step 1: Tạo `imageUtils.ts`**
+
+```ts
+import { base64ToBytes } from '../../lib/assets';
+
+/** Tiện ích ảnh dùng canvas của webview (chỉ chạy trong app, không có test đơn vị). */
+
+export function fileToDataUrl(f: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error('Không đọc được file.'));
+    r.readAsDataURL(f);
+  });
+}
+
+export function dataUrlToBytes(url: string): Uint8Array {
+  return base64ToBytes(url.split(',')[1]);
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Không đọc được ảnh.'));
+    img.src = url;
+  });
+}
+
+/** Thu ảnh về cạnh dài tối đa maxSize (ảnh nền tải lên: giữ nhẹ, xuất vẫn nét ở 1080×1920). */
+export async function resizeImageDataUrl(url: string, maxSize: number, mime = 'image/jpeg', quality = 0.9): Promise<string> {
+  const img = await loadImage(url);
+  const s = Math.min(1, maxSize / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.naturalWidth * s);
+  c.height = Math.round(img.naturalHeight * s);
+  c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL(mime, quality);
+}
+```
+
+- [ ] **Step 2: Tạo `backgroundStore.ts`**
+
+```ts
+import { exists, mkdir, readDir, readFile, remove, writeFile } from '@tauri-apps/plugin-fs';
+import { appDataDir, join } from '@tauri-apps/api/path';
+import { v4 as uuidv4 } from 'uuid';
+import { bytesToBase64 } from '../assets';
+
+/** Ảnh nền tự tải lên cho ảnh xuất: circuit-backgrounds/<id>.jpg|png, dùng lại cho mọi mạch. */
+
+export interface BackgroundEntry { id: string; dataUrl: string }
+
+const DIR = 'circuit-backgrounds';
+
+async function bgDir(): Promise<string> {
+  const d = await join(await appDataDir(), DIR);
+  if (!(await exists(d))) await mkdir(d, { recursive: true });
+  return d;
+}
+
+export async function listBackgrounds(): Promise<BackgroundEntry[]> {
+  const d = await bgDir();
+  const out: BackgroundEntry[] = [];
+  for (const e of await readDir(d)) {
+    const m = e.isFile ? e.name.match(/^(.+)\.(jpg|png)$/) : null;
+    if (!m) continue;
+    const mime = m[2] === 'png' ? 'image/png' : 'image/jpeg';
+    out.push({ id: m[1], dataUrl: `data:${mime};base64,${bytesToBase64(await readFile(await join(d, e.name)))}` });
+  }
+  return out;
+}
+
+export async function addBackground(bytes: Uint8Array, ext: 'jpg' | 'png'): Promise<BackgroundEntry> {
+  const id = uuidv4();
+  await writeFile(await join(await bgDir(), `${id}.${ext}`), bytes);
+  return { id, dataUrl: `data:${ext === 'png' ? 'image/png' : 'image/jpeg'};base64,${bytesToBase64(bytes)}` };
+}
+
+export async function deleteBackground(id: string): Promise<void> {
+  const d = await bgDir();
+  for (const ext of ['jpg', 'png']) {
+    const p = await join(d, `${id}.${ext}`);
+    if (await exists(p)) await remove(p);
+  }
+}
+```
+
+- [ ] **Step 3: Tạo `ExportDialog.tsx`**
+
+```tsx
+import { useEffect, useMemo, useState } from 'react';
+import { ask, save } from '@tauri-apps/plugin-dialog';
+import { writeFile } from '@tauri-apps/plugin-fs';
+import { renderExportSvg, subsetLayout } from '../../lib/circuit/exportImage';
+import { validateLayout } from '../../lib/circuit/render';
+import { svgToPngBase64 } from '../../lib/circuit/rasterize';
+import { fileSlug, type ExportAspect, type ExportBackground, type ExportSettings } from '../../lib/circuit/projectModel';
+import { addBackground, deleteBackground, listBackgrounds, type BackgroundEntry } from '../../lib/circuit/backgroundStore';
+import { base64ToBytes } from '../../lib/assets';
+import type { RoutedWire } from '../../lib/circuit/route';
+import type { CircuitLayout } from '../../lib/circuit/types';
+import { dataUrlToBytes, fileToDataUrl, resizeImageDataUrl } from './imageUtils';
+
+interface Props {
+  layout: CircuitLayout;
+  routed: (RoutedWire | null)[];
+  selectedIds: string[];
+  projectName: string;
+  settings?: ExportSettings;
+  onClose(): void;
+  onSaved(s: ExportSettings, titleTop: string, titleBottom: string): void;
+  onError(msg: string): void;
+}
+
+const ASPECTS: [ExportAspect, string][] = [['4:5', '4:5 — 1080×1350 (bài đăng)'], ['1:1', '1:1 — 1080×1080'], ['9:16', '9:16 — 1080×1920 (Reels/Story)']];
+const seg = (on: boolean) => `rounded-md px-3 py-1.5 text-sm ${on ? 'bg-[#F1641E] text-white' : 'bg-white/5 text-white/70 hover:bg-white/10'}`;
+
+export default function ExportDialog({ layout, routed, selectedIds, projectName, settings, onClose, onSaved, onError }: Props) {
+  const [scope, setScope] = useState<'all' | 'selected'>(selectedIds.length ? 'selected' : 'all');
+  const [aspect, setAspect] = useState<ExportAspect>(settings?.aspect ?? '4:5');
+  const [background, setBackground] = useState<ExportBackground>(settings?.background ?? { kind: 'wood' });
+  const [color, setColor] = useState(settings?.background.kind === 'color' ? settings.background.color : '#f5f1e8');
+  const [titleTop, setTitleTop] = useState(layout.titleTop ?? '');
+  const [titleBottom, setTitleBottom] = useState(layout.titleBottom ?? '');
+  const [bgs, setBgs] = useState<BackgroundEntry[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { listBackgrounds().then(setBgs).catch((e) => onError(`Không đọc được ảnh nền: ${e}`)); }, []);
+
+  const bgDataUrl = background.kind === 'image' ? bgs.find((b) => b.id === background.id)?.dataUrl : undefined;
+  const ids = scope === 'selected' ? selectedIds : undefined;
+  const result = useMemo(
+    () => renderExportSvg(layout, routed, { aspect, background, backgroundDataUrl: bgDataUrl, titleTop, titleBottom, ids }),
+    [layout, routed, aspect, background, bgDataUrl, titleTop, titleBottom, scope, selectedIds],
+  );
+  const preview = result ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(result.svg) : '';
+
+  const upload = async (f: File | undefined) => {
+    if (!f) return;
+    try {
+      const url = await resizeImageDataUrl(await fileToDataUrl(f), 2160);
+      const entry = await addBackground(dataUrlToBytes(url), 'jpg');
+      setBgs([...bgs, entry]);
+      setBackground({ kind: 'image', id: entry.id });
+    } catch (e) {
+      onError(`Không tải được ảnh nền: ${(e as Error).message ?? e}`);
+    }
+  };
+
+  const removeBg = async (id: string) => {
+    if (!(await ask('Xoá ảnh nền này khỏi thư viện?', { title: 'Xoá ảnh nền', kind: 'warning' }))) return;
+    await deleteBackground(id);
+    setBgs(bgs.filter((b) => b.id !== id));
+    if (background.kind === 'image' && background.id === id) setBackground({ kind: 'wood' });
+  };
+
+  const doExport = async () => {
+    if (!result) return;
+    setBusy(true);
+    try {
+      const target = ids ? subsetLayout(layout, ids) : { layout, wireIndex: layout.wires.map((_, i) => i) };
+      const v = validateLayout(target.layout, undefined, target.wireIndex.map((i) => routed[i] ?? null), { frame: false });
+      const bad = [...v.errors, ...v.warnings.filter((w) => w.startsWith('Không tìm được đường'))];
+      if (bad.length && !(await ask(`Ảnh còn lỗi:\n${bad.join('\n')}\n\nVẫn xuất?`, { title: 'Xuất ảnh', kind: 'warning' }))) return;
+      const b64 = await svgToPngBase64(result.svg, result.width, result.height);
+      const path = await save({ defaultPath: `${fileSlug(projectName)}${ids ? '_phan' : ''}.png`, filters: [{ name: 'PNG', extensions: ['png'] }] });
+      if (!path) return;
+      await writeFile(path, base64ToBytes(b64));
+      onSaved({ aspect, background }, titleTop, titleBottom);
+    } catch (e) {
+      onError(`Lỗi xuất ảnh: ${(e as Error).message ?? e}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[94vh] w-[980px] gap-5 rounded-xl border border-white/10 bg-[#1b1b1b] p-5 text-white shadow-2xl">
+        <div className="flex w-[380px] shrink-0 items-center justify-center rounded-lg bg-black/40 p-2">
+          {preview ? <img src={preview} alt="Xem trước" className="max-h-[80vh] max-w-full object-contain shadow-xl" /> : <div className="text-sm text-white/50">Chưa có gì để xuất.</div>}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto text-sm">
+          <div className="text-base font-semibold">Xuất ảnh</div>
+
+          <div>
+            <div className="mb-1 text-white/60">Phạm vi</div>
+            <div className="flex gap-1">
+              <button className={seg(scope === 'all')} onClick={() => setScope('all')}>Tất cả</button>
+              <button className={seg(scope === 'selected')} disabled={!selectedIds.length} onClick={() => setScope('selected')}>
+                Phần đang chọn ({selectedIds.length})
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-white/60">Khung</div>
+            <div className="flex flex-wrap gap-1">
+              {ASPECTS.map(([a, label]) => <button key={a} className={seg(aspect === a)} onClick={() => setAspect(a)}>{label}</button>)}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-white/60">Nền</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button className={seg(background.kind === 'wood')} onClick={() => setBackground({ kind: 'wood' })}>Gỗ</button>
+              <button className={seg(background.kind === 'color')} onClick={() => setBackground({ kind: 'color', color })}>Màu</button>
+              {background.kind === 'color' && (
+                <input type="color" value={color} onChange={(e) => { setColor(e.target.value); setBackground({ kind: 'color', color: e.target.value }); }} className="h-8 w-12 cursor-pointer rounded border border-white/10 bg-transparent" />
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {bgs.map((b) => (
+                <div key={b.id} className="group relative">
+                  <button onClick={() => setBackground({ kind: 'image', id: b.id })}
+                    className={`h-16 w-16 overflow-hidden rounded-md border-2 ${background.kind === 'image' && background.id === b.id ? 'border-[#F1641E]' : 'border-transparent'}`}>
+                    <img src={b.dataUrl} alt="" className="h-full w-full object-cover" />
+                  </button>
+                  <button onClick={() => removeBg(b.id)} title="Xoá ảnh nền" className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 rounded-full bg-black/80 text-xs text-red-400 group-hover:block">✕</button>
+                </div>
+              ))}
+              <label className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-md border border-dashed border-white/20 text-xs text-white/60 hover:bg-white/5">
+                ＋ Ảnh
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => upload(e.target.files?.[0])} />
+              </label>
+            </div>
+          </div>
+
+          <label className="block">
+            <span className="mb-1 block text-white/60">Tiêu đề trên (để trống = không có)</span>
+            <input value={titleTop} onChange={(e) => setTitleTop(e.target.value)} placeholder="VD CLAP LED SWITCH"
+              className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1.5 outline-none focus:border-[#F1641E]" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-white/60">Tiêu đề dưới</span>
+            <input value={titleBottom} onChange={(e) => setTitleBottom(e.target.value)} placeholder="VD 12V · NE555 + CD4017"
+              className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1.5 outline-none focus:border-[#F1641E]" />
+          </label>
+
+          {result && result.scale < 0.6 && (
+            <div className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              Mạch rộng nên ảnh phải thu nhỏ còn {Math.round(result.scale * 100)}% — chữ và chi tiết sẽ nhỏ. Nên dồn linh kiện lại gần nhau, hoặc xuất từng phần.
+            </div>
+          )}
+
+          <div className="mt-auto flex justify-end gap-2">
+            <button className="rounded-md border border-white/10 bg-white/5 px-4 py-1.5 hover:bg-white/10" onClick={onClose}>Đóng</button>
+            <button className="rounded-md bg-[#F1641E] px-4 py-1.5 font-semibold hover:bg-[#F1641E]/90 disabled:opacity-30" disabled={!result || busy} onClick={doExport}>
+              {busy ? 'Đang xuất…' : 'Lưu PNG'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 4: Nối vào `CircuitStudio.tsx`**
+
+4a. Thêm import:
+
+```ts
+import ExportDialog from './ExportDialog';
+```
+
+4b. Thêm state sau `const [showLibrary, setShowLibrary] = useState(true);`:
+
+```ts
+const [exporting, setExporting] = useState(false);
+```
+
+4c. Trong thanh công cụ nổi, ngay TRƯỚC `<button className={btn} title="Đóng" onClick={close}>`, thêm:
+
+```tsx
+<button className="flex h-8 items-center gap-1 rounded-md bg-[#F1641E] px-3 text-xs font-semibold text-white hover:bg-[#F1641E]/90 disabled:opacity-30"
+  disabled={!layout.parts.length} onClick={() => setExporting(true)}>{icon('download')} Xuất ảnh</button>
+```
+
+4d. Trước thẻ đóng `</div>` cuối cùng của component, thêm:
+
+```tsx
+{exporting && project && (
+  <ExportDialog
+    layout={layout}
+    routed={routed}
+    selectedIds={selection.parts}
+    projectName={project.name}
+    settings={project.exportSettings}
+    onClose={() => setExporting(false)}
+    onError={(m) => flash(m, true)}
+    onSaved={async (s, titleTop, titleBottom) => {
+      setExporting(false);
+      const nextLayout = titleTop !== (layout.titleTop ?? '') || titleBottom !== (layout.titleBottom ?? '') ? { ...layout, titleTop, titleBottom } : layout;
+      if (nextLayout !== layout) commit(nextLayout);
+      const next = { ...project, layout: nextLayout, exportSettings: s, updatedAt: new Date().toISOString() };
+      await saveProject(next);
+      setProject(next);
+      flash('Đã xuất ảnh.');
+    }}
+  />
+)}
+```
+
+Lưu ý thứ tự: `setProject(next)` có `layout === nextLayout` (cùng tham chiếu với bản vừa commit) nên vòng tự lưu không ghi lại lần nữa.
+
+- [ ] **Step 5: Kiểm tra kiểu + test**
+
+Run: `npx tsc --noEmit && npx vitest run`
+Expected: sạch.
+
+- [ ] **Step 6: Build và chạy thử thật**
+
+`npm run tauri build`, mở app, dùng lại mạch đã vẽ ở Task 10, kiểm tra bằng computer-use:
+1. "Xuất ảnh" → cửa sổ có xem trước: mạch nằm giữa khung 4:5, nền gỗ.
+2. Gõ tiêu đề trên/dưới → xem trước cập nhật, mạch tự co lại chừa chỗ tiêu đề.
+3. Đổi khung 1:1, 9:16 → xem trước đổi tỉ lệ.
+4. Nền "Màu" + chọn màu kem → nền trơn; "＋ Ảnh" tải 1 ảnh JPG lớn → xuất hiện trong thư viện nền, chọn → nền là ảnh đó (cắt vừa khung).
+5. Chọn 2 linh kiện trên bàn → mở lại Xuất ảnh → "Phần đang chọn" chỉ có 2 linh kiện đó và dây giữa chúng.
+6. Kéo 1 linh kiện ra rất xa (mạch rất rộng) → hiện cảnh báo "thu nhỏ còn x%".
+7. "Lưu PNG" → mở file PNG: đúng như xem trước, đúng 1080×1350 (kiểm tra bằng `sips -g pixelWidth -g pixelHeight <file>`).
+8. Đóng/mở lại Xưởng và mở Xuất ảnh → khung, nền và tiêu đề lần trước được giữ; ảnh nền đã tải vẫn còn; xoá ảnh nền (nút ✕) → mất khỏi thư viện.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/lib/circuit/backgroundStore.ts src/components/circuitStudio/imageUtils.ts src/components/circuitStudio/ExportDialog.tsx src/components/circuitStudio/CircuitStudio.tsx
+git commit -m "Circuit Studio: export dialog (scope, aspect, wood/colour/uploaded background, titles, preview)"
+```
+
+---
+
+### Task 12: Xoá nền ảnh + linh kiện bằng ảnh (lõi)
 
 **Files:**
 - Create: `src/lib/circuit/bgRemove.ts`, `src/lib/circuit/imagePart.ts`, `src/lib/circuit/customPartsStore.ts`, `src/lib/circuit/__tests__/bgRemove.test.ts`, `src/lib/circuit/__tests__/imagePart.test.ts`
@@ -3324,33 +4157,32 @@ git commit -m "Circuit Studio: background removal, image-based custom parts and 
 
 ---
 
-### Task 11: Cửa sổ "Thêm linh kiện mới" (nạp ảnh, chấm chân, lưu, sửa, xoá)
+### Task 13: Cửa sổ "Thêm linh kiện mới" (nạp ảnh, chấm chân, lưu, sửa, xoá)
 
 **Files:**
-- Create: `src/components/circuitStudio/imageUtils.ts`, `src/components/circuitStudio/AddPartWizard.tsx`
+- Create: `src/components/circuitStudio/AddPartWizard.tsx`
+- Modify: `src/components/circuitStudio/imageUtils.ts` (thêm `dataUrlToRGBA`, `rgbaToDataUrl`)
 - Modify: `src/components/circuitStudio/CircuitStudio.tsx` (nạp linh kiện tự thêm khi mở, nhóm "Của tôi", mở wizard, menu sửa/xoá)
 
 **Interfaces:**
-- Consumes: Task 10 (`removeBackground`, `autoCrop`, `CustomPartFile`, `makePartCode`, `saveCustomPart`, …), `PARTS`
+- Consumes: Task 12 (`removeBackground`, `autoCrop`, `CustomPartFile`, `makePartCode`, `saveCustomPart`, …), `PARTS`
 - Produces:
-  - `imageUtils.ts`: `dataUrlToRGBA(url: string, maxSize?: number): Promise<RGBAImage>`, `rgbaToDataUrl(img: RGBAImage): string`, `dataUrlToBytes(url: string): Uint8Array`, `fileToDataUrl(f: File): Promise<string>`
+  - `imageUtils.ts` (thêm vào file có từ Task 11): `dataUrlToRGBA(url: string, maxSize?: number): Promise<RGBAImage>`, `rgbaToDataUrl(img: RGBAImage): string`
   - `AddPartWizard`: `default function AddPartWizard(props: { existing?: { file: CustomPartFile; dataUrl: string }; geminiApiKey?: string; onClose(): void; onSaved(code: string): void })`
 
-- [ ] **Step 1: Tạo `imageUtils.ts`**
+- [ ] **Step 1: Thêm hàm RGBA vào `imageUtils.ts`**
+
+Thêm import ở đầu file:
 
 ```ts
 import type { RGBAImage } from '../../lib/circuit/bgRemove';
-import { base64ToBytes } from '../../lib/assets';
+```
 
-/** Chuyển ảnh qua lại giữa dataURL và mảng điểm RGBA, dùng canvas của webview. */
+Thêm vào cuối file:
 
+```ts
 export async function dataUrlToRGBA(url: string, maxSize = 1024): Promise<RGBAImage> {
-  const img = new Image();
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error('Không đọc được ảnh.'));
-    img.src = url;
-  });
+  const img = await loadImage(url);
   const scale = Math.min(1, maxSize / Math.max(img.naturalWidth || maxSize, img.naturalHeight || maxSize));
   const w = Math.max(1, Math.round((img.naturalWidth || maxSize) * scale));
   const h = Math.max(1, Math.round((img.naturalHeight || maxSize) * scale));
@@ -3358,8 +4190,7 @@ export async function dataUrlToRGBA(url: string, maxSize = 1024): Promise<RGBAIm
   c.width = w; c.height = h;
   const ctx = c.getContext('2d')!;
   ctx.drawImage(img, 0, 0, w, h);
-  const d = ctx.getImageData(0, 0, w, h);
-  return { width: w, height: h, data: d.data };
+  return { width: w, height: h, data: ctx.getImageData(0, 0, w, h).data };
 }
 
 export function rgbaToDataUrl(img: RGBAImage): string {
@@ -3367,19 +4198,6 @@ export function rgbaToDataUrl(img: RGBAImage): string {
   c.width = img.width; c.height = img.height;
   c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0);
   return c.toDataURL('image/png');
-}
-
-export function dataUrlToBytes(url: string): Uint8Array {
-  return base64ToBytes(url.split(',')[1]);
-}
-
-export function fileToDataUrl(f: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(new Error('Không đọc được file.'));
-    r.readAsDataURL(f);
-  });
 }
 ```
 
@@ -3592,7 +4410,7 @@ export default function AddPartWizard({ existing, onClose, onSaved }: Props) {
 }
 ```
 
-Ghi chú: `<div id="gemini-source" />` là chỗ Task 12 thay bằng khối "Nhờ Gemini vẽ".
+Ghi chú: `<div id="gemini-source" />` là chỗ Task 14 thay bằng khối "Nhờ Gemini vẽ".
 
 - [ ] **Step 3: Nối vào `CircuitStudio.tsx`**
 
@@ -3649,7 +4467,7 @@ và thêm `LIBRARY_GROUPS` vào import từ `libraryCatalog`.
 />
 ```
 
-3f. Trước thẻ đóng `</div>` cuối cùng của component, thêm menu sửa/xoá và wizard:
+3f. Trước thẻ đóng `</div>` cuối cùng của component (sau khối `ExportDialog` của Task 11), thêm menu sửa/xoá và wizard:
 
 ```tsx
 {itemMenu && (
@@ -3692,7 +4510,7 @@ Expected: sạch.
 4. Kéo nó vào ảnh, nối dây vào chân COM → dây gắn đúng đầu chân đã chấm.
 5. Đóng app, mở lại → linh kiện vẫn trong thư viện và trong mạch.
 6. Chuột phải → "Xoá khỏi thư viện" khi đang dùng → báo tên mạch đang dùng, không xoá.
-7. Xuất PNG → ảnh linh kiện tự thêm có trong PNG.
+7. Xuất ảnh → ảnh linh kiện tự thêm có trong PNG.
 
 - [ ] **Step 6: Commit**
 
@@ -3703,13 +4521,13 @@ git commit -m "Circuit Studio: add-part wizard (import image, remove background,
 
 ---
 
-### Task 12: Nhờ Gemini vẽ linh kiện
+### Task 14: Nhờ Gemini vẽ linh kiện
 
 **Files:**
 - Modify: `src/components/circuitStudio/AddPartWizard.tsx`, `src/components/circuitStudio/CircuitStudio.tsx`
 
 **Interfaces:**
-- Consumes: `GeminiImageProvider` (`src/lib/providers/geminiImageProvider.ts`, `generateImage({ prompt, aspectRatio, model }) → { base64, mimeType }`), `resolveImageModelId('Nano Banana Pro')` (`src/lib/models.ts`), `partImagePrompt` (Task 10)
+- Consumes: `GeminiImageProvider` (`src/lib/providers/geminiImageProvider.ts`, `generateImage({ prompt, aspectRatio, model }) → { base64, mimeType }`), `resolveImageModelId('Nano Banana Pro')` (`src/lib/models.ts`), `partImagePrompt` (Task 12)
 
 - [ ] **Step 1: Truyền key Gemini xuống wizard**
 
@@ -3803,7 +4621,7 @@ Expected: sạch.
 `npm run tauri build`, mở app (key Gemini đã có trong Cài đặt):
 1. "＋ Thêm linh kiện mới" → gõ "Relay 12V SRD-12VDC-SL-C, 5 chân" → "Vẽ 3 ảnh" → 3 ảnh nền xanh hiện ra (mất khoảng 20–60 giây).
 2. Chọn 1 ảnh → ảnh đã xoá nền, viền không còn ám xanh rõ; nếu còn nền sót: kéo "Độ nhạy xoá nền" rồi "✂ Xoá nền" lại.
-3. Chấm chân, lưu, kéo vào mạch, nối dây, xuất PNG → linh kiện nhìn hợp với nền gỗ.
+3. Chấm chân, lưu, kéo vào mạch, nối dây, xuất ảnh → linh kiện nhìn hợp với nền gỗ.
 4. Xoá key khỏi Cài đặt (hoặc mở với key sai) → báo lỗi rõ ràng, vẫn dùng được "Nạp ảnh có sẵn".
 
 Ghi nhận cho Huy: chất lượng ảnh Gemini và mức hợp phong cách — đây là phần duy nhất có AI, kết quả thay đổi mỗi lần.
@@ -3817,7 +4635,7 @@ git commit -m "Circuit Studio: generate custom part images with Gemini (auto bac
 
 ---
 
-### Task 13: Kiểm tra tổng thể trên mạch thật + cập nhật ghi chú
+### Task 15: Kiểm tra tổng thể trên mạch thật + cập nhật ghi chú
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-10-06-circuit-studio-design.md` (chỉ khi có chỗ làm khác thiết kế), bộ nhớ dự án của Claude (`project_circuit_editor_direction.md`)
@@ -3831,13 +4649,12 @@ Expected: tất cả PASS, tsc sạch.
 
 Bằng computer-use trên bản `.app` đã build:
 1. **LED flasher (16 dây)** từ ảnh trống: cọc nguồn 9V, 2× điện trở 470Ω, 2× 22kΩ, 2× tụ 47µF, 2× BC547 (đặt tên chân C/B/E, bật in tên chân), 2× LED. Dùng căn hàng + chia đều cho 4 điện trở. Ghi lại thời gian vẽ và chỗ nào thao tác khó.
-2. **Một phần mạch vỗ tay**: NE555 (dip8) + CD4017 (dip16) + thanh mass + thanh +12V + 3 LED. Đo thời gian đi lại dây khi thả linh kiện (mở DevTools không được trong bản build — đo cảm nhận: có giật > 0,3 giây không). Nếu giật: theo spec mục 8 "Hiệu năng" — đổi `routed` trong `CircuitStudio` sang chỉ đi lại dây nối vào linh kiện vừa thả (giữ đường cũ cho dây khác), rồi đo lại.
-3. Xuất PNG cả 2 mạch, mở PNG xem lại.
+2. **Một phần mạch vỗ tay**: NE555 (dip8) + CD4017 (dip16) + thanh mass + thanh +12V + 3 LED. Đo thời gian đi lại dây khi thả linh kiện (mở DevTools không được trong bản build — đo cảm nhận: có giật > 0,3 giây không). Nếu giật: theo spec mục 8 "Hiệu năng" — đổi `routed` trong `CircuitStudio` (đang `routeWorld(layout)`) sang chỉ đi lại dây nối vào linh kiện vừa thả (giữ đường cũ cho dây khác), rồi đo lại.
+3. Xuất ảnh cả 2 mạch (thử cả 3 khung và 3 loại nền, và xuất phần đang chọn), mở PNG xem lại.
 
 - [ ] **Step 3: Ghi chênh lệch so với spec**
 
 Nếu có chỗ làm khác spec, ghi vào cuối spec mục "Ghi chú triển khai". Đã biết trước:
-- Sửa tiêu đề: bấm đúp vùng tiêu đề trên ảnh → focus ô tiêu đề ở cột phải (không phải ô nhập nổi ngay trên ảnh).
 - "Thêm góc" = bấm đúp tách đoạn thành 2 nửa kéo riêng (chưa có kéo trực tiếp 1 góc).
 - Thanh đồng chỉ nằm ngang.
 
