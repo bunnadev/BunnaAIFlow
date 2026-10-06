@@ -41,7 +41,8 @@ Thiết kế:
   Hạng mục nào không đạt thì sửa thiết kế cho đạt rồi mới trả lời.
 - CHỈ dùng các loại linh kiện app vẽ được:
 ${partCatalogShort()}
-  Nếu ý tưởng cần linh kiện khác, chọn phương án dùng được các loại trên hoặc nói rõ là chưa vẽ được.
+- GIỮ ĐÚNG CHỨC NĂNG của ý tưởng / mạch trong ảnh tham khảo (VD mạch bật đèn bằng tiếng vỗ tay thì kết quả vẫn phải là mạch vỗ tay: vẫn dùng micro, vẫn đếm/nhận tiếng vỗ). Sửa lỗi thì thêm/đổi linh kiện bên trong mạch (thêm tầng khuếch đại, chống dội, đổi giá trị…), TUYỆT ĐỐI KHÔNG thay bằng một mạch có chức năng khác chỉ vì dễ vẽ hơn.
+  Nếu mạch cần linh kiện không có trong danh sách trên thì vẫn thiết kế đúng chức năng, ghi "CHƯA CÓ" ở cột Loại vẽ và thêm mục "## ⚠️ CHƯA VẼ ĐƯỢC" (ngay đầu câu trả lời) liệt kê linh kiện thiếu — để người dùng bổ sung thư viện, không tự đổi mạch.
 
 Dây nối (QUAN TRỌNG — danh sách này dùng để vẽ ảnh và để lắp mạch thật):
 - Liệt kê TỪNG SỢI DÂY riêng, mỗi dây có đúng 2 đầu: "từ X tới Y". Không gom nhiều chân vào 1 "điểm nối".
@@ -51,6 +52,9 @@ Dây nối (QUAN TRỌNG — danh sách này dùng để vẽ ảnh và để l�
 - Mỗi dây 1 màu, quy ước: đỏ = dương nguồn, đen hoặc xanh dương = mass/âm, dây tín hiệu dùng màu khác nhau (vàng, xanh lá, cam, xanh ngọc…).
 
 Trả lời bằng tiếng Việt, ĐÚNG cấu trúc sau, không thêm lời chào:
+
+## ⚠️ CHƯA VẼ ĐƯỢC
+(CHỈ có mục này khi mạch cần linh kiện app chưa vẽ được — liệt kê linh kiện đó. Đủ linh kiện thì bỏ hẳn mục này.)
 
 ## ⚠️ CẢNH BÁO NGUỒN
 (CHỈ có mục này khi mạch vượt giới hạn máy nguồn / dùng điện áp nguy hiểm — xem quy tắc ở trên.)
@@ -100,6 +104,7 @@ Việc cần làm — đừng tin các con số trong bản gốc, tự tính l�
 ${partCatalogShort()}
 7. Nguồn: mạch có vượt {{NGUON_V}}V / {{NGUON_A}}A, dùng điện áp trên 36V hay điện lưới không — nếu có phải có mục "## ⚠️ CẢNH BÁO NGUỒN" rõ ràng.
 8. Nếu có ảnh tham khảo: phần phân tích ảnh có đúng với ảnh không, có bỏ sót lỗi quan trọng nào trong ảnh không.
+9. Bản thiết kế có GIỮ ĐÚNG CHỨC NĂNG của ý tưởng / mạch trong ảnh tham khảo không. Nếu bản gốc đổi sang mạch có chức năng khác (VD ảnh là mạch vỗ tay bằng micro mà bản gốc thành mạch nháy theo nhạc qua jack 3.5mm) thì đây là lỗi NGHIÊM TRỌNG: thiết kế lại đúng chức năng ban đầu (giữ nguyên định dạng), không giữ mạch thay thế.
 
 Trả lời bằng tiếng Việt, không chào hỏi, đúng thứ tự:
 
@@ -108,7 +113,7 @@ KẾT LUẬN: ĐẠT  hoặc  ĐÃ SỬA
 - Liệt kê từng vấn đề tìm thấy: mức độ (NGHIÊM TRỌNG / NÊN SỬA / GÓP Ý), giải thích ngắn dễ hiểu cho người mới, và đã sửa thế nào. Không có vấn đề thì ghi "Không tìm thấy lỗi."
 - Chỗ nào bạn không chắc chắn thì nói rõ là không chắc, đừng sửa bừa.
 
-Sau đó chép lại TOÀN BỘ bản thiết kế cuối cùng (đã áp dụng các sửa đổi, phần nào đúng thì giữ nguyên câu chữ) với đúng các mục như bản gốc: ⚠️ CẢNH BÁO NGUỒN (nếu cần), PHÂN TÍCH ẢNH THAM KHẢO (nếu bản gốc có), TÊN MẠCH, NGUYÊN LÝ, LINH KIỆN, DANH SÁCH DÂY (kèm dòng "Tổng: N dây"), ĐẾM CHÂN, THÔNG SỐ, LƯU Ý AN TOÀN, ĐÃ KIỂM TRA / ĐÃ SỬA.`;
+Sau đó chép lại TOÀN BỘ bản thiết kế cuối cùng (đã áp dụng các sửa đổi, phần nào đúng thì giữ nguyên câu chữ) với đúng các mục như bản gốc: ⚠️ CHƯA VẼ ĐƯỢC (nếu cần), ⚠️ CẢNH BÁO NGUỒN (nếu cần), PHÂN TÍCH ẢNH THAM KHẢO (nếu bản gốc có), TÊN MẠCH, NGUYÊN LÝ, LINH KIỆN, DANH SÁCH DÂY (kèm dòng "Tổng: N dây"), ĐẾM CHÂN, THÔNG SỐ, LƯU Ý AN TOÀN, ĐÃ KIỂM TRA / ĐÃ SỬA.`;
 
 const CIRCUIT_CAPTION_PROMPT = `Từ bản thiết kế mạch ở phần NỘI DUNG ĐẦU VÀO, viết caption cho bài đăng ẢNH mạch DIY. Ảnh được đăng trước, video lắp thật sẽ đăng sau. Viết 2 bản, theo đúng thứ tự dưới đây.
 

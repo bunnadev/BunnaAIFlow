@@ -227,13 +227,24 @@ const to3: PartDef = {
   renderBehind: (p) => p.heatsink ? heatsinkSvg(190, -140, 140) : '',
 };
 
+/** Màu bóng LED theo chữ mô tả (tiếng Việt hoặc tiếng Anh). */
+function ledColor(text: string): string {
+  const t = text.toLowerCase();
+  if (/xanh dương|xanh duong|xanh lam|blue/.test(t)) return '#3b7bff';
+  if (/xanh lá|xanh la|green|xanh/.test(t)) return '#36d16a';
+  if (/vàng|vang|yellow/.test(t)) return '#ffd21f';
+  if (/trắng|trang|white/.test(t)) return '#f2f6ff';
+  if (/cam|orange/.test(t)) return '#ff8a1f';
+  return '#ff3b3b';
+}
+
 const led: PartDef = {
   desc: 'Đèn LED 5mm',
   w: 70, h: 150,
   pins: { A: { x: -14, y: 75 }, K: { x: 14, y: 75 } },
-  pinNote: 'bóng ở trên, 2 chân chĩa xuống: A (chân dài, dương) trái, K phải',
+  pinNote: 'bóng ở trên, 2 chân chĩa xuống: A (chân dài, dương) trái, K phải. Màu bóng lấy từ marking/value/label (đỏ, xanh lá, xanh dương, vàng, trắng)',
   render: (p) => {
-    const c = (p.marking || '').toLowerCase().includes('xanh') || (p.value || '').toLowerCase().includes('green') ? '#36d16a' : '#ff3b3b';
+    const c = ledColor(`${p.marking ?? ''} ${p.value ?? ''} ${p.label ?? ''}`);
     return leg(-8, 0, -14, 75, 5) + leg(8, 0, 14, 75, 5) +
       `<rect x="-30" y="-6" width="60" height="12" rx="3" fill="${c}" opacity="0.85"/>` +
       `<path d="M -26 0 L -26 -40 A 26 26 0 0 1 26 -40 L 26 0 Z" fill="${c}" opacity="0.88"/>` +
@@ -282,6 +293,57 @@ const terminal2: PartDef = {
     `<text x="68" y="46" font-size="44" font-weight="900" fill="#7fb2ff">−</text>`,
 };
 
+// ─── IC chân cắm DIP (nhìn từ trên, khấc bên TRÁI) ────────────────────────
+const DIP_PITCH = 40;
+
+function dipPackage(n: number): PartDef {
+  const half = n / 2;
+  const span = (half - 1) * DIP_PITCH;
+  const bodyW = span + 60;
+  const pins: Record<string, Point> = {};
+  const xs: number[] = [];
+  for (let i = 0; i < half; i++) {
+    const x = -span / 2 + i * DIP_PITCH;
+    xs.push(x);
+    pins[String(i + 1)] = { x, y: 80 }; // hàng dưới: 1 → n/2 từ trái sang phải
+    pins[String(n - i)] = { x, y: -80 }; // hàng trên: n → n/2+1 từ trái sang phải
+  }
+  return {
+    desc: `IC chân cắm DIP-${n} (${n} chân) — VD ${n === 8 ? 'NE555, LM358, LM386' : n === 14 ? 'CD4011, LM324, 74HC00' : 'CD4017, CD4060, ULN2003'}`,
+    w: bodyW, h: 160,
+    pins,
+    pinNote: `nằm ngang, khấc chữ U ở cạnh TRÁI. Hàng chân DƯỚI chĩa xuống: chân 1 (trái) → ${half} (phải). Hàng chân TRÊN chĩa lên: chân ${n} (trái) → ${half + 1} (phải). Số chân in sẵn trên thân`,
+    render: (p) => {
+      const legs = xs.map((x) => leg(x, 40, x, 80, 7) + leg(x, -40, x, -80, 7)).join('');
+      const nums = xs.map((x, i) =>
+        upright(p, x, 30, `<text x="${x}" y="36" font-size="13" font-weight="700" fill="#cfd3d8" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif">${i + 1}</text>`) +
+        upright(p, x, -30, `<text x="${x}" y="-24" font-size="13" font-weight="700" fill="#cfd3d8" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif">${n - i}</text>`)).join('');
+      return legs +
+        `<rect x="${-bodyW / 2}" y="-48" width="${bodyW}" height="96" rx="6" fill="url(#gBlack)"/>` +
+        `<rect x="${-bodyW / 2 + 3}" y="-45" width="${bodyW - 6}" height="10" rx="4" fill="#fff" opacity="0.1"/>` +
+        `<path d="M ${-bodyW / 2} -14 A 14 14 0 0 1 ${-bodyW / 2} 14 Z" fill="#111"/>` +
+        `<circle cx="${xs[0]}" cy="14" r="5" fill="#111"/>` +
+        nums +
+        (p.marking ? upright(p, 0, 0, `<text x="0" y="7" font-size="20" font-weight="800" fill="#e6e6e6" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif">${esc(p.marking)}</text>`) : '');
+    },
+  };
+}
+
+const mic: PartDef = {
+  desc: 'Micro điện dung (electret mic) 2 chân — chân − nối với vỏ nhôm',
+  w: 90, h: 160,
+  pins: { '+': { x: -16, y: 80 }, '-': { x: 16, y: 80 } },
+  pinNote: 'nhìn từ trên xuống mặt lưới, 2 chân chĩa XUỐNG: + trái, − phải (chân − là chân nối vỏ)',
+  render: () =>
+    leg(-16, 30, -16, 80, 5) + leg(16, 30, 16, 80, 5) +
+    `<circle cx="0" cy="-10" r="42" fill="url(#gSilver)" stroke="#8d949c" stroke-width="2"/>` +
+    `<circle cx="0" cy="-10" r="32" fill="#1c1c1c"/>` +
+    `<circle cx="0" cy="-10" r="32" fill="none" stroke="#3a3a3a" stroke-width="2" stroke-dasharray="2 4"/>` +
+    `<ellipse cx="-10" cy="-22" rx="10" ry="6" fill="#fff" opacity="0.12"/>` +
+    `<text x="-34" y="66" font-size="20" font-weight="900" fill="#ff5a5a" text-anchor="middle">+</text>` +
+    `<text x="34" y="66" font-size="22" font-weight="900" fill="#7fb2ff" text-anchor="middle">−</text>`,
+};
+
 const lead: PartDef = {
   desc: 'Đầu dây tự do (đầu vào/ra nguồn), vẽ thành đầu dây tuốt vỏ lộ lõi đồng',
   w: 10, h: 10,
@@ -315,6 +377,10 @@ export const PARTS: Record<string, PartDef> = {
   led,
   speaker,
   jack35,
+  dip8: dipPackage(8),
+  dip14: dipPackage(14),
+  dip16: dipPackage(16),
+  mic,
   terminal2,
   lead,
   bus,

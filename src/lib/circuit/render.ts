@@ -415,6 +415,13 @@ function labelText(x: number, y: number, text: string, size: number, anchor: str
 
 interface Box { x1: number; y1: number; x2: number; y2: number }
 
+/** Khoảng cách gần nhất giữa 2 khung chữ nhật (0 nếu chạm/đè nhau). */
+function rectGap(a: Box, b: Box) {
+  const dx = Math.max(0, Math.max(a.x1, b.x1) - Math.min(a.x2, b.x2));
+  const dy = Math.max(0, Math.max(a.y1, b.y1) - Math.min(a.y2, b.y2));
+  return Math.hypot(dx, dy);
+}
+
 /** Khung chữ + vị trí vẽ cho nhãn đặt ở 1 phía của linh kiện. */
 function labelPlacement(p: PlacedPart, side: string, b: Box, size: number) {
   const gap = p.type === 'lead' ? 14 : 18;
@@ -465,8 +472,14 @@ function renderLabels(parts: PlacedPart[], W: number, H: number, wireSegs: Box[]
       for (const t of taken) score += area(t, bx) * 50;
       for (const pb of partBoxes) if (pb.id !== p.id) score += area(pb.b, bx) * 20;
       for (const ws of wireSegs) score += area(ws, bx) * 3;
+      // Nhãn phải nằm gần linh kiện của nó hơn mọi linh kiện khác — nếu không
+      // người xem sẽ gán nhầm (VD chữ "GREEN" nằm dưới bóng LED xanh dương)
+      const own = rectGap(bx, b);
+      for (const pb of partBoxes) if (pb.id !== p.id && rectGap(bx, pb.b) < own) score += 20000;
       if (score < bestScore) { bestScore = score; best = c; }
     });
+    // Chỗ nào cũng gần linh kiện khác hơn → bỏ nhãn còn hơn để người xem gán nhầm
+    if (bestScore >= 20000) continue;
     taken.push(best.box);
     out += labelText(best.x, best.y, p.label, size, best.anchor, fill);
   }

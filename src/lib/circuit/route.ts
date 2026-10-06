@@ -147,11 +147,14 @@ export function routeWires(layout: CircuitLayout): (RoutedWire | null)[] {
   }
   // Thanh mass: cho phép đi tới (là đích), nhưng không chạy dọc theo nó
   const busCells = new Map<number, PlacedPart>();
+  // Ô sát mép thanh: dây chạy ngang ở đây trông như nằm đè lên thanh đồng
+  const busEdge = new Uint8Array(cols * rows);
   for (const p of layout.parts.filter((q) => q.type === 'bus')) {
     const half = (p.length ?? 800) / 2;
     const r = Math.round(p.y / G);
     for (let c = Math.ceil((p.x - half + 10) / G); c <= Math.floor((p.x + half - 10) / G); c++) {
       if (r >= 0 && r < rows && c >= 0 && c < cols) { busCells.set(idx(c, r), p); blocked[idx(c, r)] = 0; }
+      for (const rr of [r - 1, r + 1]) if (rr >= 0 && rr < rows && c >= 0 && c < cols) busEdge[idx(c, rr)] = 1;
     }
   }
 
@@ -186,11 +189,14 @@ export function routeWires(layout: CircuitLayout): (RoutedWire | null)[] {
     if (e.isLead || e.bus || e.interior) return { x, y };
     const b = box(e.part);
     const inOwn = (px: number, py: number) => px >= b.x1 - MARGIN && px <= b.x2 + MARGIN && py >= b.y1 - MARGIN && py <= b.y2 + MARGIN;
+    // Không bao giờ bước lên thanh đồng: chân đặt sát thanh (VD chân LED) mà
+    // đoạn ra chân vượt qua thanh thì dây sẽ vẽ cắt ngang thanh đồng trần
+    const onBus = (px: number, py: number) => busCells.has(idx(Math.round(px / G), Math.round(py / G)));
     let i = 0;
-    while (i < 80 && inOwn(x, y)) { x += DX[e.dir] * G; y += DY[e.dir] * G; i++; }
+    while (i < 80 && inOwn(x, y) && !onBus(x + DX[e.dir] * G, y + DY[e.dir] * G)) { x += DX[e.dir] * G; y += DY[e.dir] * G; i++; }
     for (let k = 0; k < 2; k++) {
       const nc = Math.round((x + DX[e.dir] * G) / G), nr = Math.round((y + DY[e.dir] * G) / G);
-      if (nc < 0 || nc >= cols || nr < 0 || nr >= rows || blocked[idx(nc, nr)]) break;
+      if (nc < 0 || nc >= cols || nr < 0 || nr >= rows || blocked[idx(nc, nr)] || busCells.has(idx(nc, nr))) break;
       x += DX[e.dir] * G; y += DY[e.dir] * G;
     }
     return { x, y };
@@ -265,6 +271,7 @@ export function routeWires(layout: CircuitLayout): (RoutedWire | null)[] {
         if (blocked[ni] && !goalCell && !inOwnInterior(nc, nr) && !(relaxed && softBlocked(nc, nr))) continue;
         // Không cho đi dọc theo thanh mass (chỉ được chạm vào nó)
         if (busCells.has(ni) && !goalCell) continue;
+        if (busEdge[ni] && (nd === 0 || nd === 2)) continue;
         const steps = Math.abs(nc - sc) + Math.abs(nr - sr);
         let cost = 1;
         if (nd !== dir) cost += 8;
