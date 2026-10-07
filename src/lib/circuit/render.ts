@@ -368,11 +368,13 @@ const DEFS = `
   </filter>
 </defs>`;
 
-function renderWire(w: Wire, rw: RoutedWire | null, dashed = false, shadowId = 'fWireShadow'): { body: string; joints: string } {
+function renderWire(w: Wire, rw: RoutedWire | null, dashed = false, shadowId = 'fWireShadow', darkBg = false): { body: string; joints: string } {
   if (!rw) return { body: '', joints: '' };
   const pts = rw.points;
   const colorName = normalizeWireColor(w.color);
-  const [main, dark] = WIRE_COLORS[colorName];
+  const [main, rim] = WIRE_COLORS[colorName];
+  // Nền tối (bàn vẽ lưới chấm): dây đen có viền xám sáng, không thì chìm vào nền
+  const dark = darkBg && colorName === 'black' ? '#6a6a72' : rim;
   const d = roundedPath(pts);
   // "silver" = chân linh kiện hàn thẳng vào nhau: vẽ mảnh như chân kim loại, không phải dây bọc nhựa
   if (colorName === 'silver') {
@@ -543,6 +545,8 @@ export interface RenderOptions {
   routed?: (RoutedWire | null)[];
   /** Chỉ số dây vẽ nét đứt (dây đang tạm nối thẳng khi kéo linh kiện). */
   dashed?: Set<number>;
+  /** Vẽ trên nền tối (bàn vẽ): dây đen có viền sáng. Không ảnh hưởng ảnh xuất. */
+  darkBg?: boolean;
 }
 
 export interface SceneOptions extends RenderOptions {
@@ -604,7 +608,7 @@ export function renderScene(layout: CircuitLayout, opts: SceneOptions = {}): str
   }).join('');
   const busSvg = buses.map((p) => `<g transform="${tf(p)}" filter="url(#${fWire})">${PARTS.bus.render(p)}</g>`).join('');
   const partsSvg = others.map((p) => `<g transform="${tf(p)}" filter="url(#${fShadow})">${PARTS[p.type].render(p)}</g>`).join('');
-  const wires = layout.wires.map((w, i) => renderWire(w, routed[i], opts.dashed?.has(i), fWire));
+  const wires = layout.wires.map((w, i) => renderWire(w, routed[i], opts.dashed?.has(i), fWire, opts.darkBg));
   const labels = (opts.labels ?? placeLabels(known, frame, wireSegBoxes(routed)))
     .map((l) => labelText(l.x, l.y, l.text, l.size, l.anchor, l.fill)).join('');
   return (studio?.defs ?? '') + behind + busSvg + partsSvg +

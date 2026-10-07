@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CircuitLayout, Point } from '../../lib/circuit/types';
 import type { RoutedWire } from '../../lib/circuit/route';
-import { labelPlacements, partBox, renderScene, svgDefs, woodTileSvg, type Box } from '../../lib/circuit/render';
+import { labelPlacements, partBox, renderScene, svgDefs, type Box } from '../../lib/circuit/render';
+import { dotGridTileSvg, gridZoomKey, GRID_BG, GRID_STEP, GRID_TILE } from '../../lib/circuit/dotGrid';
 import {
   allPins, dropTarget, hitPart, hitPin, hitWire, nearestSegment, previewRouted, segmentHandles, wiresOfPart,
 } from '../../lib/circuit/geometry';
@@ -45,7 +46,6 @@ type Drag =
 
 const ORANGE = '#F1641E';
 const FAR = 100000; // đường gióng kéo dài "vô tận"
-const WOOD_TILE = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(woodTileSvg()) + '")';
 const snap10 = (v: number) => Math.round(v / 10) * 10;
 const rectOf = (a: Point, b: Point): Box => ({ x1: Math.min(a.x, b.x), y1: Math.min(a.y, b.y), x2: Math.max(a.x, b.x), y2: Math.max(a.y, b.y) });
 
@@ -166,7 +166,7 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
   const shown = preview?.layout ?? layout;
   const shownRouted = preview?.routed ?? routed;
   const scene = useMemo(
-    () => svgDefs() + renderScene(shown, { routed: shownRouted, dashed: preview?.dashed, frame: null }),
+    () => svgDefs() + renderScene(shown, { routed: shownRouted, dashed: preview?.dashed, frame: null, darkBg: true }),
     [shown, shownRouted, preview],
   );
 
@@ -329,6 +329,9 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
   const hoverPinPart = hoverPin && shown.parts.find((p) => p.id === hoverPin.partId);
   const selWirePts = selection.wire !== null ? shownRouted[selection.wire]?.points : undefined;
   const selBusPart = selection.parts.length === 1 ? shown.parts.find((p) => p.id === selection.parts[0] && p.type === 'bus') : undefined;
+  // Nền lưới chấm (kiểu EveryCircuit) — dựng lại ô lưới theo bậc zoom, không phải mỗi lần lăn
+  const zoomKey = gridZoomKey(zoom);
+  const gridTile = useMemo(() => 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(dotGridTileSvg(2 ** zoomKey)) + '")', [zoomKey]);
   const overflowSvg: React.CSSProperties = { position: 'absolute', left: 0, top: 0, overflow: 'visible' };
 
   return (
@@ -337,10 +340,11 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       className="absolute inset-0 overflow-hidden select-none"
       style={{
         cursor: space ? (drag?.kind === 'pan' ? 'grabbing' : 'grab') : 'default',
-        backgroundColor: '#4a2814',
-        backgroundImage: WOOD_TILE,
-        backgroundSize: `${1080 * zoom}px ${1350 * zoom}px`,
-        backgroundPosition: `${pan.x}px ${pan.y}px`,
+        backgroundColor: GRID_BG,
+        backgroundImage: gridTile,
+        backgroundSize: `${GRID_TILE * zoom}px ${GRID_TILE * zoom}px`,
+        // chấm nằm đúng bội số 40 của toạ độ bố cục (ô lưới vẽ chấm lệch nửa bước)
+        backgroundPosition: `${pan.x - (GRID_STEP / 2) * zoom}px ${pan.y - (GRID_STEP / 2) * zoom}px`,
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
