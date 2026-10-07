@@ -237,3 +237,17 @@ Huy chốt thêm sau khi duyệt bản trên. **Mục này thay cho các chỗ m
   - Màu tự chọn.
   - Ảnh tải lên: được thu về tối đa 2160px rồi lưu vào `circuit-backgrounds/`, để lần sau chọn lại; xoá được.
 - App nhớ lựa chọn khung và nền theo từng mạch (`CircuitProject.exportSettings`).
+
+## 13. Ghi chú triển khai (2026-10-07, sau khi kiểm tra trên bản build)
+
+Những chỗ bản đã làm khác các mục ở trên:
+
+- **Thêm góc:** bấm đúp vào một đoạn dây thì đoạn đó tách thành 2 nửa, mỗi nửa kéo riêng được. Chưa kéo trực tiếp được 1 góc.
+- **Thanh đồng (mass / nguồn +):** chỉ đặt nằm ngang.
+- **Tiêu đề trên / dưới:** gõ trong hộp thoại Xuất ảnh, không gõ trên bàn vẽ. Hộp thoại nhớ tiêu đề đã gõ cho lần xuất sau.
+- **Lăn chuột / vuốt trackpad:** kéo bàn vẽ. Muốn phóng to / thu nhỏ thì giữ Cmd (hoặc Ctrl) khi lăn, chụm 2 ngón trên trackpad, bấm nút −/+ trên thanh công cụ, hoặc bấm phím `-` / `=`. Phím `0` để vừa màn hình.
+- **Nhãn điện trở:** nhãn xanh tự đổi theo giá trị (VD "1k" → "1kΩ") nếu chưa bị sửa tay. Đã gõ nhãn khác thì nhãn đó được giữ nguyên.
+- **Chia đều:** vị trí sau khi chia được làm tròn về lưới 10px. Khoảng cách giữa các linh kiện có thể lệch nhau tối đa 5px.
+- **Hiệu năng:** dây chỉ được tính lại đường đi khi vị trí, góc xoay hoặc cách nối thay đổi. Sửa nhãn, màu hay tên chân không làm tính lại.
+
+Kết quả kiểm tra: vẽ lại mạch LED nhấp nháy từ bàn trống (11 linh kiện, 16 dây), netlist đúng cả 8 nút. Đã xuất ảnh 1:1 nền gỗ, và xuất phần đang chọn ở khung 9:16 nền màu. Dây nằm ở x≈4500 vẫn vẽ đủ, không bị cắt. Backspace và Cmd+Z không ảnh hưởng tới workflow node phía sau.
