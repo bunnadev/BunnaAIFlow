@@ -1,5 +1,6 @@
 import type { PlacedPart, Point } from './types';
 import { POWER_PARTS } from './powerParts';
+import { glow, LED_COLORS, LIGHT_PARTS, litLedBody } from './lightParts';
 
 /**
  * Thư viện linh kiện vẽ bằng SVG. Mỗi linh kiện vẽ ở toạ độ cục bộ (tâm = 0,0,
@@ -25,6 +26,8 @@ export interface PartDef {
   render: (p: PlacedPart) => string;
   /** Chân nằm trong thân (VD jack máy nguồn) nhưng dây phải đi thẳng ra theo pinDirs, không bò trên mặt linh kiện. */
   straightOut?: boolean;
+  /** Quầng sáng (đèn đang sáng): vẽ trên lớp dây, không đổ bóng — tuỳ chọn. */
+  renderGlow?: (p: PlacedPart) => string;
   /** Vẽ phía sau linh kiện (tản nhiệt) — tuỳ chọn. */
   renderBehind?: (p: PlacedPart) => string;
 }
@@ -243,18 +246,26 @@ function ledColor(text: string): string {
   return '#ff3b3b';
 }
 
+/** Màu LED: chọn trong Xưởng vẽ (color) — không có thì đoán theo chữ như trước. */
+export function ledHex(p: PlacedPart): string {
+  const picked = LED_COLORS.find((c) => c.key === p.color);
+  return picked ? picked.hex : ledColor(`${p.marking ?? ''} ${p.value ?? ''} ${p.label ?? ''}`);
+}
+
 const led: PartDef = {
   desc: 'Đèn LED 5mm',
   w: 70, h: 150,
   pins: { A: { x: -14, y: 75 }, K: { x: 14, y: 75 } },
   pinNote: 'bóng ở trên, 2 chân chĩa xuống: A (chân dài, dương) trái, K phải. Màu bóng lấy từ marking/value/label (đỏ, xanh lá, xanh dương, vàng, trắng)',
   render: (p) => {
-    const c = ledColor(`${p.marking ?? ''} ${p.value ?? ''} ${p.label ?? ''}`);
+    const c = ledHex(p);
+    if (p.lit) return litLedBody(c, leg(-8, 0, -14, 75, 5) + leg(8, 0, 14, 75, 5));
     return leg(-8, 0, -14, 75, 5) + leg(8, 0, 14, 75, 5) +
       `<rect x="-30" y="-6" width="60" height="12" rx="3" fill="${c}" opacity="0.85"/>` +
       `<path d="M -26 0 L -26 -40 A 26 26 0 0 1 26 -40 L 26 0 Z" fill="${c}" opacity="0.88"/>` +
       `<ellipse cx="-9" cy="-48" rx="7" ry="12" fill="#fff" opacity="0.5"/>`;
   },
+  renderGlow: (p) => (p.lit ? glow(ledHex(p), 0, -30, 170, 0.9) : ''),
 };
 
 const speaker: PartDef = {
@@ -390,4 +401,5 @@ export const PARTS: Record<string, PartDef> = {
   lead,
   bus,
   ...POWER_PARTS,
+  ...LIGHT_PARTS,
 };

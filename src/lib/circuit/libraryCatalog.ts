@@ -7,6 +7,7 @@ export const LIBRARY_GROUPS = ['Cơ bản', 'Bán dẫn / IC', 'Nguồn & đầu
 export const BUILTIN_LIBRARY: LibraryItem[] = [
   { type: 'resistor', name: 'Điện trở', group: 'Cơ bản' },
   { type: 'led', name: 'LED', group: 'Cơ bản' },
+  { type: 'bulb', name: 'Bóng đèn', group: 'Cơ bản' },
   { type: 'cap_elec', name: 'Tụ hoá', group: 'Cơ bản' },
   { type: 'cap_ceramic', name: 'Tụ gốm', group: 'Cơ bản' },
   { type: 'diode', name: 'Diode', group: 'Cơ bản' },

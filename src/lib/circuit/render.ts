@@ -609,10 +609,15 @@ export function renderScene(layout: CircuitLayout, opts: SceneOptions = {}): str
   const busSvg = buses.map((p) => `<g transform="${tf(p)}" filter="url(#${fWire})">${PARTS.bus.render(p)}</g>`).join('');
   const partsSvg = others.map((p) => `<g transform="${tf(p)}" filter="url(#${fShadow})">${PARTS[p.type].render(p)}</g>`).join('');
   const wires = layout.wires.map((w, i) => renderWire(w, routed[i], opts.dashed?.has(i), fWire, opts.darkBg));
+  // Quầng sáng đèn đang sáng: trên lớp dây (ánh sáng tràn lên dây quanh đèn), dưới nhãn
+  const glows = others.map((p) => {
+    const s = PARTS[p.type].renderGlow?.(p);
+    return s ? `<g transform="${tf(p)}">${s}</g>` : '';
+  }).join('');
   const labels = (opts.labels ?? placeLabels(known, frame, wireSegBoxes(routed)))
     .map((l) => labelText(l.x, l.y, l.text, l.size, l.anchor, l.fill)).join('');
   return (studio?.defs ?? '') + behind + busSvg + partsSvg +
-    wires.map((w) => w.body).join('') + wires.map((w) => w.joints).join('') +
+    wires.map((w) => w.body).join('') + wires.map((w) => w.joints).join('') + glows +
     renderPinNames(layout, frame?.H ?? layout.height ?? 1350) + labels;
 }
 

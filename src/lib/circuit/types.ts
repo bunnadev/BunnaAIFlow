@@ -32,6 +32,10 @@ export interface PlacedPart {
   pinNames?: Record<string, string>;
   /** In tên chân (pinNames) lên ảnh. */
   showPinNames?: boolean;
+  /** Màu LED chọn trong Xưởng vẽ (red / green / blue / yellow / white). */
+  color?: string;
+  /** Đèn đang sáng (LED, bóng đèn): vẽ sáng rực + quầng sáng. */
+  lit?: boolean;
   /** Chỉ cho đế pin 2–3 viên: cách mắc các viên bên trong. Không có = nối tiếp. */
   wiring?: 'series' | 'parallel';
   /** Nhãn đã kéo tay: tâm nhãn = tâm linh kiện + (dx, dy). Không có = tự đặt. */

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { PARTS } from '../../lib/circuit/parts';
 import { anchorContact } from '../../lib/circuit/contacts';
+import { bulbLabel, LED_COLORS } from '../../lib/circuit/lightParts';
+import { ledHex } from '../../lib/circuit/parts';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, parseCellType, parseHolderType, type CellKind, type HolderWiring } from '../../lib/circuit/powerParts';
 import { WIRE_COLORS } from '../../lib/circuit/render';
 import { deleteWire, resetWire, rotateParts, updatePart, updateWire } from '../../lib/circuit/ops';
@@ -100,8 +102,33 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
         <>
           <div className="mb-2 text-white/50">{PARTS[part.type]?.desc ?? part.type}</div>
           <Field label="Ký hiệu" value={part.id} onCommit={(v) => set({ id: v })} />
-          {part.type !== 'bus' && part.type !== 'lead' && part.type !== 'psu' && !battery
+          {part.type !== 'bus' && part.type !== 'lead' && part.type !== 'psu' && part.type !== 'led' && part.type !== 'bulb' && !battery
             && <Field label="Chữ in trên thân" value={part.marking ?? ''} onCommit={(v) => set({ marking: v })} />}
+          {part.type === 'led' && (
+            <>
+              <div className="mb-1 text-white/50">Màu đèn</div>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {LED_COLORS.map((c) => (
+                  <button key={c.key} title={c.name} onClick={() => set({ color: c.key })}
+                    className="h-6 w-6 rounded-full border-2"
+                    style={{ background: c.hex, borderColor: ledHex(part) === c.hex ? '#F1641E' : 'rgba(255,255,255,0.15)' }} />
+                ))}
+              </div>
+            </>
+          )}
+          {part.type === 'bulb' && (
+            <>
+              <Field label="Điện áp (V)" value={part.value ?? ''}
+                onCommit={(v) => set((live) => ({ value: v, ...((live.label ?? '') === bulbLabel(live) ? { label: bulbLabel({ ...live, value: v }) } : {}) }))} />
+              <Field label="Công suất (W) — để trống nếu không cần" value={part.marking ?? ''}
+                onCommit={(v) => set((live) => ({ marking: v, ...((live.label ?? '') === bulbLabel(live) ? { label: bulbLabel({ ...live, marking: v }) } : {}) }))} />
+            </>
+          )}
+          {(part.type === 'led' || part.type === 'bulb') && (
+            <label className="mb-2 flex items-center gap-2">
+              <input type="checkbox" checked={!!part.lit} onChange={(e) => set({ lit: e.target.checked })} /> Đèn đang sáng
+            </label>
+          )}
           {part.type === 'psu' && (
             <>
               <Field label="Màn hình — điện áp (V)" value={part.value ?? ''} onCommit={(v) => set({ value: v })} />
