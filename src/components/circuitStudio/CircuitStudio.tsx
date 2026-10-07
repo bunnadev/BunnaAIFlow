@@ -14,7 +14,8 @@ import { duplicateProject, emptyLayout, newProject, type CircuitProject, type Pr
 import { deleteProject, listProjects, loadProject, saveProject } from '../../lib/circuit/circuitStore';
 import { partBox, partPreviewSvg, validateLayout } from '../../lib/circuit/render';
 import { routeWorld, routingSignature } from '../../lib/circuit/world';
-import { addPart, deleteParts, duplicateParts, resetAllWires, rotateParts, deleteWire } from '../../lib/circuit/ops';
+import { addPart, deleteParts, duplicateParts, resetAllWires, rotateParts, deleteWire, movePartsBy } from '../../lib/circuit/ops';
+import { contactSnap, syncContacts } from '../../lib/circuit/contacts';
 import { alignParts, distributeParts, type AlignMode } from '../../lib/circuit/arrange';
 import { BUILTIN_LIBRARY, LIBRARY_GROUPS, type LibraryItem } from '../../lib/circuit/libraryCatalog';
 import type { CircuitLayout } from '../../lib/circuit/types';
@@ -45,6 +46,8 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
   // Không mở / tạo được mạch nào: chặn bàn vẽ (sửa mà không lưu được thì mất)
   const [openError, setOpenError] = useState<string | null>(null);
   const apiRef = useRef<CanvasApi | null>(null);
+  // Vừa khung sau khi mở / tạo mạch: đợi bàn vẽ nhận bố cục mới rồi mới tính (gọi ngay thì còn bố cục cũ)
+  const fitPending = useRef(false);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const projectRef = useRef<CircuitProject | null>(null);
   projectRef.current = project;
@@ -52,6 +55,11 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
   layoutRef.current = state.layout;
 
   const layout = state.layout;
+  useEffect(() => {
+    if (!fitPending.current) return;
+    fitPending.current = false;
+    apiRef.current?.fit();
+  }, [layout]);
   // Chỉ đi dây lại khi hình học đổi (sửa nhãn / màu dây / tên chân không cần)
   const routeSig = useMemo(() => routingSignature(layout, partsVersion), [layout, partsVersion]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,7 +74,8 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
     setToast({ msg, error });
     setTimeout(() => setToast((t) => (t?.msg === msg ? null : t)), 4000);
   }, []);
-  const commit = useCallback((l: CircuitLayout) => dispatch({ type: 'commit', layout: l }), []);
+  // Mọi thay đổi đều đồng bộ dây chạm (pin rời đặt chạm đầu nhau thì tự nối, kéo ra thì tự bỏ)
+  const commit = useCallback((l: CircuitLayout) => dispatch({ type: 'commit', layout: syncContacts(l) }), []);
 
   // Ghi file lần lượt theo thứ tự gọi: bản ghi sau luôn đè bản trước (tự lưu đang chạy không đè tên vừa đổi)
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
@@ -116,7 +125,7 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
       setOpenError(null);
       dispatch({ type: 'load', layout: p.layout });
       setSelection({ parts: [], wire: null });
-      setTimeout(() => apiRef.current?.fit(), 0);
+      fitPending.current = true;
       return true;
     } catch (e) {
       flash(`Không mở được mạch: ${(e as Error).message}`, true);
@@ -139,7 +148,7 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
     setOpenError(null);
     dispatch({ type: 'load', layout: p.layout });
     setSelection({ parts: [], wire: null });
-    setTimeout(() => apiRef.current?.fit(), 0);
+    fitPending.current = true;
     try { await refreshList(); } catch (e) { flash(`Không đọc được danh sách mạch: ${(e as Error).message ?? e}`, true); }
     return true;
   }, [safeFlush, queueSave, refreshList, flash]);
@@ -207,7 +216,9 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
       const pt = apiRef.current?.clientToLayout(e.clientX, e.clientY);
       if (!pt) return;
       const res = addPart(layout, item.type, pt.x, pt.y, item.idBase);
-      commit(res.layout);
+      // Thả pin rời sát đầu pin khác → hít vào cho chạm
+      const s = contactSnap(res.layout, [res.id], 0, 0);
+      commit(s.snapped ? movePartsBy(res.layout, [res.id], s.dx, s.dy) : res.layout);
       setSelection({ parts: [res.id], wire: null });
     };
     const cancel = () => setPlacing(null);

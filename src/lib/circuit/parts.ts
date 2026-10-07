@@ -1,4 +1,5 @@
 import type { PlacedPart, Point } from './types';
+import { POWER_PARTS } from './powerParts';
 
 /**
  * Thư viện linh kiện vẽ bằng SVG. Mỗi linh kiện vẽ ở toạ độ cục bộ (tâm = 0,0,
@@ -22,6 +23,8 @@ export interface PartDef {
   /** Ghi chú về chân cho AI (VD chiều xoay mặc định). */
   pinNote: string;
   render: (p: PlacedPart) => string;
+  /** Chân nằm trong thân (VD jack máy nguồn) nhưng dây phải đi thẳng ra theo pinDirs, không bò trên mặt linh kiện. */
+  straightOut?: boolean;
   /** Vẽ phía sau linh kiện (tản nhiệt) — tuỳ chọn. */
   renderBehind?: (p: PlacedPart) => string;
 }
@@ -386,4 +389,5 @@ export const PARTS: Record<string, PartDef> = {
   terminal2,
   lead,
   bus,
+  ...POWER_PARTS,
 };

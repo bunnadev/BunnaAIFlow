@@ -1,6 +1,7 @@
 import { endPartId, resolvePoint } from './geometry';
 import { followEnd } from './wireEdit';
 import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
+import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, POWER_TYPES } from './powerParts';
 
 /**
  * Mọi thao tác sửa bố cục của Xưởng vẽ mạch. Hàm thuần: nhận bố cục, trả bố cục
@@ -12,7 +13,8 @@ const snap10 = (v: number) => Math.round(v / 10) * 10;
 const PREFIX: Record<string, string> = {
   resistor: 'R', cap_elec: 'C', cap_ceramic: 'C', pot: 'VR', diode: 'D',
   to92: 'Q', to220: 'Q', to3: 'Q', pentawatt: 'U', dip8: 'U', dip14: 'U', dip16: 'U',
-  led: 'LED', speaker: 'SP', jack35: 'J', mic: 'MIC', terminal2: 'PWR', lead: 'OUT',
+  led: 'LED', speaker: 'SP', jack35: 'J', mic: 'MIC', terminal2: 'PWR', lead: 'OUT', psu: 'PSU',
+  ...Object.fromEntries(CELL_KINDS.flatMap((k) => [cellType(k), ...[1, 2, 3].map((n) => holderType(k, n))].map((t) => [t, 'BAT']))),
 };
 
 const DEFAULTS: Record<string, Partial<PlacedPart>> = {
@@ -33,6 +35,9 @@ const DEFAULTS: Record<string, Partial<PlacedPart>> = {
   lead: { label: 'OUT' },
   mic: { label: 'MIC' },
   bus: { length: 600 },
+  psu: { value: '12.00', marking: '1.000' },
+  ...Object.fromEntries(CELL_KINDS.map((k) => [cellType(k), { label: `${CELLS[k].volts}V` }])),
+  ...Object.fromEntries(CELL_KINDS.flatMap((k) => [1, 2, 3].map((n) => [holderType(k, n), { label: holderVolts(k, n) }]))),
 };
 
 const SIGNAL_COLORS = ['yellow', 'green', 'orange', 'teal', 'purple', 'white', 'blue', 'pink'];
@@ -143,7 +148,8 @@ export function suggestWireColor(layout: CircuitLayout, from: string, to: string
     const p = layout.parts.find((q) => q.id === endPartId(ref));
     if (!p) return null;
     if (p.type === 'bus') return /GND|MASS/i.test(p.id) ? 'neg' : 'pos';
-    if (p.type === 'terminal2') return ref.endsWith('.+') ? 'pos' : ref.endsWith('.-') ? 'neg' : null;
+    // Cọc nguồn, máy nguồn, pin, đế pin: chân + → đỏ, chân − → đen
+    if (p.type === 'terminal2' || POWER_TYPES.has(p.type)) return ref.endsWith('.+') ? 'pos' : ref.endsWith('.-') ? 'neg' : null;
     return null;
   };
   const roles = [role(from), role(to)];

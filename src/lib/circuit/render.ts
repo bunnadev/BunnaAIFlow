@@ -170,7 +170,7 @@ export function validateLayout(layout: CircuitLayout, expectedWireCount?: number
   });
   layout.wires.forEach((w, i) => {
     const pts = paths[i]?.points;
-    if (!pts) return;
+    if (!pts || w.color === 'contact') return;
     const fromId = w.from.split(/[.@]/)[0];
     const toId = w.to.split(/[.@]/)[0];
     const last = pts.length - 2;
@@ -203,7 +203,7 @@ export function validateLayout(layout: CircuitLayout, expectedWireCount?: number
   const segs: { n: number; a: Point; b: Point; ends: string[] }[] = [];
   layout.wires.forEach((w, i) => {
     const pts = paths[i]?.points;
-    if (!pts) return;
+    if (!pts || w.color === 'contact') return;
     for (let k = 0; k < pts.length - 1; k++) segs.push({ n: w.n ?? i + 1, a: pts[k], b: pts[k + 1], ends: [w.from, w.to] });
   });
   const reported = new Set<string>();
@@ -369,7 +369,7 @@ const DEFS = `
 </defs>`;
 
 function renderWire(w: Wire, rw: RoutedWire | null, dashed = false, shadowId = 'fWireShadow', darkBg = false): { body: string; joints: string } {
-  if (!rw) return { body: '', joints: '' };
+  if (!rw || w.color === 'contact') return { body: '', joints: '' };
   const pts = rw.points;
   const colorName = normalizeWireColor(w.color);
   const [main, rim] = WIRE_COLORS[colorName];

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { PARTS } from '../../lib/circuit/parts';
+import { anchorContact } from '../../lib/circuit/contacts';
+import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, parseCellType, parseHolderType, type CellKind, type HolderWiring } from '../../lib/circuit/powerParts';
 import { WIRE_COLORS } from '../../lib/circuit/render';
 import { deleteWire, resetWire, rotateParts, updatePart, updateWire } from '../../lib/circuit/ops';
 import type { CircuitLayout, PlacedPart } from '../../lib/circuit/types';
@@ -46,6 +48,14 @@ function Field({ label, value, onCommit }: { label: string; value: string; onCom
 /** Nhãn tự sinh từ giá trị điện trở ("1k" → "1kΩ"); nhãn còn đúng dạng này thì đổi theo giá trị. */
 const ohms = (v: string | undefined) => (v?.trim() ? `${v.trim()}Ω` : '');
 
+/** Nhãn tự sinh của pin rời / đế pin (VD "1.5V", "4.5V"); nhãn còn đúng dạng này thì đổi theo khi đổi loại / số viên / cách mắc. */
+function batteryLabel(type: string, wiring?: HolderWiring): string | null {
+  const h = parseHolderType(type);
+  if (h) return holderVolts(h.kind, h.n, wiring);
+  const c = parseCellType(type);
+  return c ? `${CELLS[c].volts}V` : null;
+}
+
 const btn = 'rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-30';
 
 export default function InspectorPanel({ layout, selection, onCommit, onSelect, onError, getLayout }: Props) {
@@ -68,13 +78,59 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
     }
   };
 
+  // Pin rời / đế pin: đổi loại, số viên, cách mắc (đổi loại linh kiện — chân vẫn tên +/− nên dây không đứt)
+  const holder = part ? parseHolderType(part.type) : null;
+  const cellKind = part ? parseCellType(part.type) : null;
+  const battery = holder ? { kind: holder.kind, n: holder.n as number | null } : cellKind ? { kind: cellKind, n: null as number | null } : null;
+  const setBattery = (ch: { kind?: CellKind; n?: number; wiring?: HolderWiring }) => set((live) => {
+    const h = parseHolderType(live.type), c = parseCellType(live.type);
+    const kind = ch.kind ?? h?.kind ?? c!;
+    const type = h ? holderType(kind, ch.n ?? h.n) : cellType(kind);
+    const wiring = h ? (ch.wiring ?? live.wiring ?? 'series') : undefined;
+    const autoNow = batteryLabel(live.type, live.wiring);
+    const patch = { type, wiring, ...((live.label ?? '') === autoNow ? { label: batteryLabel(type, wiring) ?? live.label } : {}) };
+    return anchorContact(getLayout?.() ?? layout, live.id, patch);
+  });
+  // Nút đang chọn: tô cam (style trực tiếp — lớp viền / nền của btn đè mất lớp Tailwind thêm vào)
+  const pick = (on: boolean) => ({ className: btn, style: on ? { borderColor: '#F1641E', background: 'rgba(241,100,30,0.28)', color: '#fff' } : undefined });
+
   return (
     <div className="p-3 text-xs text-white/80">
       {part && (
         <>
           <div className="mb-2 text-white/50">{PARTS[part.type]?.desc ?? part.type}</div>
           <Field label="Ký hiệu" value={part.id} onCommit={(v) => set({ id: v })} />
-          {part.type !== 'bus' && part.type !== 'lead' && <Field label="Chữ in trên thân" value={part.marking ?? ''} onCommit={(v) => set({ marking: v })} />}
+          {part.type !== 'bus' && part.type !== 'lead' && part.type !== 'psu' && !battery
+            && <Field label="Chữ in trên thân" value={part.marking ?? ''} onCommit={(v) => set({ marking: v })} />}
+          {part.type === 'psu' && (
+            <>
+              <Field label="Màn hình — điện áp (V)" value={part.value ?? ''} onCommit={(v) => set({ value: v })} />
+              <Field label="Màn hình — dòng (A)" value={part.marking ?? ''} onCommit={(v) => set({ marking: v })} />
+            </>
+          )}
+          {battery && (
+            <>
+              <div className="mb-1 text-white/50">Loại pin</div>
+              <div className="mb-2 flex gap-1.5">
+                {CELL_KINDS.map((k) => <button key={k} {...pick(battery.kind === k)} onClick={() => setBattery({ kind: k })}>{CELLS[k].name}</button>)}
+              </div>
+              {battery.n !== null && (
+                <>
+                  <div className="mb-1 text-white/50">Số viên</div>
+                  <div className="mb-2 flex gap-1.5">
+                    {[1, 2, 3].map((n) => <button key={n} {...pick(battery.n === n)} onClick={() => setBattery({ n })}>{n}</button>)}
+                  </div>
+                  <div className="mb-1 text-white/50">Cách mắc</div>
+                  <div className="mb-2 flex gap-1.5">
+                    {([['series', 'Nối tiếp'], ['parallel', 'Song song']] as const).map(([w, t]) => (
+                      <button key={w} disabled={battery.n === 1} {...pick(battery.n !== 1 && (part.wiring ?? 'series') === w)} onClick={() => setBattery({ wiring: w })}>{t}</button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {battery.n === null && <div className="mb-2 text-white/40">Kéo đầu pin chạm vào đầu pin khác để nối thẳng, không cần dây.</div>}
+            </>
+          )}
           {part.type === 'resistor' && <Field label="Giá trị (tô vạch màu, VD 4.7k)" value={part.value ?? ''}
             onCommit={(v) => set((live) => ({ value: v, ...((live.label ?? '') === ohms(live.value) ? { label: ohms(v) } : {}) }))} />}
           <Field label="Nhãn xanh" value={part.label ?? ''} onCommit={(v) => set({ label: v })} />
@@ -91,7 +147,7 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               <input type="checkbox" checked={!!part.heatsink} onChange={(e) => set({ heatsink: e.target.checked })} /> Tản nhiệt
             </label>
           )}
-          {part.type !== 'bus' && Object.keys(PARTS[part.type]?.pins ?? {}).length > 0 && (
+          {part.type !== 'bus' && part.type !== 'psu' && !battery && Object.keys(PARTS[part.type]?.pins ?? {}).length > 0 && (
             <div className="mt-3 border-t border-white/10 pt-2">
               <div className="mb-1 text-white/50">Tên chân thật (VD C1815: 1 = E, 2 = C, 3 = B)</div>
               {Object.keys(PARTS[part.type].pins).map((pin) => (

@@ -9,6 +9,7 @@ import {
 import { addWire, deleteWire, movePartsBy, resetWire, resizeBus, setWirePoints, updatePart } from '../../lib/circuit/ops';
 import { addBend, moveSegment, removeCorner, segOrientation, simplify } from '../../lib/circuit/wireEdit';
 import { snapDelta, type Guide } from '../../lib/circuit/arrange';
+import { contactSnap } from '../../lib/circuit/contacts';
 import { contentBounds } from '../../lib/circuit/world';
 import { blurActiveField } from './noFocus';
 import { wheelView, zoomAt } from '../../lib/circuit/viewport';
@@ -241,7 +242,9 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
         const rx = pt.x - drag.start.x, ry = pt.y - drag.start.y;
         if (e.altKey) { setDrag({ ...drag, dx: Math.round(rx), dy: Math.round(ry), guides: [] }); break; }
         const s = snapDelta(layout, drag.ids, snap10(rx), snap10(ry));
-        setDrag({ ...drag, dx: s.dx, dy: s.dy, guides: s.guides });
+        // Cực pin rời tới gần cực pin khác → hít vào cho chạm (ưu tiên hơn gióng hàng)
+        const c = contactSnap(layout, drag.ids, s.dx, s.dy);
+        setDrag({ ...drag, dx: c.dx, dy: c.dy, guides: c.snapped ? [] : s.guides });
         break;
       }
       case 'marquee':

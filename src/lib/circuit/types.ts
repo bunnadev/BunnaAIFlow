@@ -32,6 +32,8 @@ export interface PlacedPart {
   pinNames?: Record<string, string>;
   /** In tên chân (pinNames) lên ảnh. */
   showPinNames?: boolean;
+  /** Chỉ cho đế pin 2–3 viên: cách mắc các viên bên trong. Không có = nối tiếp. */
+  wiring?: 'series' | 'parallel';
   /** Nhãn đã kéo tay: tâm nhãn = tâm linh kiện + (dx, dy). Không có = tự đặt. */
   labelPos?: { dx: number; dy: number };
 }

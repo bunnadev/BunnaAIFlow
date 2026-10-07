@@ -60,7 +60,7 @@ function distToSegment(pt: Point, a: Point, b: Point): number {
 export function hitWire(routed: (RoutedWire | null)[], pt: Point, tol = 9): number | null {
   for (let i = routed.length - 1; i >= 0; i--) {
     const pts = routed[i]?.points;
-    if (!pts) continue;
+    if (!pts || routed[i]?.hidden) continue;
     for (let k = 0; k < pts.length - 1; k++) if (distToSegment(pt, pts[k], pts[k + 1]) <= tol) return i;
   }
   return null;

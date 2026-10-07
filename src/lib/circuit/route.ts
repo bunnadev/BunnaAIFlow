@@ -82,7 +82,7 @@ function parseEnd(layout: CircuitLayout, ref: string, H: number): End | null {
   if (!local) return null;
   const r = rotate(local, part.rotation ?? 0);
   const def = PARTS[part.type];
-  const interior = part.type !== 'lead' && Math.abs(local.x) < def.w / 2 - 30 && Math.abs(local.y) < def.h / 2 - 30;
+  const interior = part.type !== 'lead' && !def.straightOut && Math.abs(local.x) < def.w / 2 - 30 && Math.abs(local.y) < def.h / 2 - 30;
   return { point: { x: part.x + r.x, y: part.y + r.y }, dir: pinDir(part, local, H, pinName), part, isLead: part.type === 'lead', interior };
 }
 
@@ -115,6 +115,8 @@ export interface RoutedWire {
   to: End;
   auto: boolean;
   failed?: boolean;
+  /** Dây chạm (pin rời chạm đầu nhau): không vẽ, không bắt chuột. */
+  hidden?: boolean;
 }
 
 export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean } = {}): (RoutedWire | null)[] {
@@ -217,8 +219,15 @@ export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean }
   const ends = layout.wires.map((w) => [parseEnd(layout, w.from, H), parseEnd(layout, w.to, H)] as const);
   const out: (RoutedWire | null)[] = layout.wires.map(() => null);
 
+  // Dây chạm (2 cực pin chạm nhau) → nối thẳng, không đi dây, không chiếm ô
+  layout.wires.forEach((w, i) => {
+    const [a, b] = ends[i];
+    if (w.color === 'contact' && a && b) out[i] = { points: [a.point, b.point], from: a, to: b, auto: false, hidden: true };
+  });
+
   // Dây đã có via (sửa tay) → giữ nguyên và đánh dấu trước
   layout.wires.forEach((w, i) => {
+    if (out[i]) return;
     const [a, b] = ends[i];
     if (!a || !b || !w.via?.length) return;
     const pts = [a.point, ...w.via.map(([x, y]) => ({ x, y })), b.point];

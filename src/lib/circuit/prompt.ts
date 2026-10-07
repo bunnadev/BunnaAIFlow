@@ -1,18 +1,22 @@
 import { PARTS } from './parts';
 import { isBuiltinPart } from './registry';
+import { POWER_TYPES } from './powerParts';
+
+/** Linh kiện đưa vào prompt AI: chỉ loại có sẵn từ trước (không có linh kiện tự thêm, không có nhóm pin / máy nguồn của Xưởng vẽ). */
+const forAi = (type: string) => isBuiltinPart(type) && !POWER_TYPES.has(type);
 
 /** Danh mục linh kiện vẽ được — dùng cho cả Kỹ sư mạch lẫn bước lên bố cục. */
 export function partCatalogShort(): string {
   // Chỉ linh kiện có sẵn: linh kiện tự thêm (ảnh) chỉ dùng trong Xưởng vẽ mạch, không đưa vào prompt AI
   return Object.entries(PARTS)
-    .filter(([type]) => type !== 'bus' && isBuiltinPart(type))
+    .filter(([type]) => type !== 'bus' && forAi(type))
     .map(([type, d]) => `- ${type}: ${d.desc}`)
     .join('\n');
 }
 
 export function partCatalogDetailed(): string {
   return Object.entries(PARTS)
-    .filter(([type]) => isBuiltinPart(type))
+    .filter(([type]) => forAi(type))
     .map(([type, d]) => {
       const pins = Object.entries(d.pins).map(([name, pt]) => `${name}(${pt.x},${pt.y})`).join(', ');
       return `- "${type}": ${d.desc}. Khung ${d.w}×${d.h}. Chân: ${pins || '(xem ghi chú)'}. ${d.pinNote}.`;

@@ -2,7 +2,7 @@
 
 export interface LibraryItem { type: string; name: string; group: string; idBase?: string }
 
-export const LIBRARY_GROUPS = ['Cơ bản', 'Bán dẫn / IC', 'Nguồn & đầu nối', 'Của tôi'];
+export const LIBRARY_GROUPS = ['Cơ bản', 'Bán dẫn / IC', 'Nguồn & đầu nối', 'Pin & máy nguồn', 'Của tôi'];
 
 export const BUILTIN_LIBRARY: LibraryItem[] = [
   { type: 'resistor', name: 'Điện trở', group: 'Cơ bản' },
@@ -25,4 +25,11 @@ export const BUILTIN_LIBRARY: LibraryItem[] = [
   { type: 'jack35', name: 'Jack 3.5mm', group: 'Nguồn & đầu nối' },
   { type: 'mic', name: 'Micro', group: 'Nguồn & đầu nối' },
   { type: 'speaker', name: 'Loa', group: 'Nguồn & đầu nối' },
+  { type: 'psu', name: 'Máy cấp nguồn', group: 'Pin & máy nguồn' },
+  { type: 'cell_aa', name: 'Pin AA', group: 'Pin & máy nguồn' },
+  { type: 'cell_aaa', name: 'Pin AAA', group: 'Pin & máy nguồn' },
+  { type: 'cell_18650', name: 'Pin 18650', group: 'Pin & máy nguồn' },
+  { type: 'bh_aa_2', name: 'Đế pin AA', group: 'Pin & máy nguồn' },
+  { type: 'bh_aaa_2', name: 'Đế pin AAA', group: 'Pin & máy nguồn' },
+  { type: 'bh_18650_2', name: 'Đế pin 18650', group: 'Pin & máy nguồn' },
 ];
