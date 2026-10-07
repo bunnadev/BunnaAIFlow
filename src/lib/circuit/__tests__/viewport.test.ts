@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { wheelView } from '../viewport';
+import { wheelView, zoomAt } from '../viewport';
 
 const v = { zoom: 1, pan: { x: 100, y: 50 } };
 const ev = (o: Partial<{ deltaX: number; deltaY: number; deltaMode: number; ctrlKey: boolean; metaKey: boolean }>) =>
@@ -24,5 +24,17 @@ describe('wheelView', () => {
     expect(wheelView(v, ev({ deltaY: 1000, ctrlKey: true }), 0, 0).zoom).toBeCloseTo(Math.exp(-0.5));
     expect(wheelView({ ...v, zoom: 3.9 }, ev({ deltaY: -50, ctrlKey: true }), 0, 0).zoom).toBe(4);
     expect(wheelView({ ...v, zoom: 0.11 }, ev({ deltaY: 50, ctrlKey: true }), 0, 0).zoom).toBe(0.1);
+  });
+});
+
+describe('zoomAt', () => {
+  it('giữ điểm tâm đứng yên và kẹp trong 0.1..4', () => {
+    const z = zoomAt(v, 2, 300, 250);
+    expect(z.zoom).toBe(2);
+    // điểm bố cục dưới (300,250) trước và sau vẫn trùng nhau
+    expect((300 - z.pan.x) / z.zoom).toBeCloseTo((300 - v.pan.x) / v.zoom);
+    expect((250 - z.pan.y) / z.zoom).toBeCloseTo((250 - v.pan.y) / v.zoom);
+    expect(zoomAt(v, 100, 0, 0).zoom).toBe(4);
+    expect(zoomAt(v, 0.001, 0, 0).zoom).toBe(0.1);
   });
 });

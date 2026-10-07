@@ -41,6 +41,15 @@ describe('arrange', () => {
     expect([pos(d, 'R1')[0], pos(d, 'R2')[0], pos(d, 'R3')[0]]).toEqual([300, 600, 900]);
   });
 
+  it('chia đều không ra toạ độ lẻ: làm tròn về lưới 10px', () => {
+    const odd = { ...l, parts: l.parts.map((p) => (p.id === 'R3' ? { ...p, x: 1000 } : p)) };
+    const xs = ['R1', 'R2', 'R3'].map((id) => pos(distributeParts(odd, ['R1', 'R2', 'R3'], 'x'), id)[0]);
+    expect(xs).toEqual([300, 650, 1000]);
+    const four = { ...odd, parts: [...odd.parts, { ...odd.parts.find((p) => p.id === 'R1')!, id: 'R9', x: 1300 }] };
+    const xs4 = ['R1', 'R2', 'R3', 'R9'].map((id) => pos(distributeParts(four, ['R1', 'R2', 'R3', 'R9'], 'x'), id)[0]);
+    expect(xs4.every((x) => x % 10 === 0)).toBe(true);
+  });
+
   it('snapDelta hít vào tâm linh kiện khác khi gần, trả đường gióng', () => {
     // dời LED1 sang x=303 → gần tâm R1 (300) → hít về 300
     const s = snapDelta(l, ['LED1'], 3, 0);

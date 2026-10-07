@@ -43,6 +43,9 @@ function Field({ label, value, onCommit }: { label: string; value: string; onCom
   );
 }
 
+/** Nhãn tự sinh từ giá trị điện trở ("1k" → "1kΩ"); nhãn còn đúng dạng này thì đổi theo giá trị. */
+const ohms = (v: string | undefined) => (v?.trim() ? `${v.trim()}Ω` : '');
+
 const btn = 'rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-30';
 
 export default function InspectorPanel({ layout, selection, onCommit, onSelect, onError, getLayout }: Props) {
@@ -72,7 +75,8 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
           <div className="mb-2 text-white/50">{PARTS[part.type]?.desc ?? part.type}</div>
           <Field label="Ký hiệu" value={part.id} onCommit={(v) => set({ id: v })} />
           {part.type !== 'bus' && part.type !== 'lead' && <Field label="Chữ in trên thân" value={part.marking ?? ''} onCommit={(v) => set({ marking: v })} />}
-          {part.type === 'resistor' && <Field label="Giá trị (tô vạch màu, VD 4.7k)" value={part.value ?? ''} onCommit={(v) => set({ value: v })} />}
+          {part.type === 'resistor' && <Field label="Giá trị (tô vạch màu, VD 4.7k)" value={part.value ?? ''}
+            onCommit={(v) => set((live) => ({ value: v, ...((live.label ?? '') === ohms(live.value) ? { label: ohms(v) } : {}) }))} />}
           <Field label="Nhãn xanh" value={part.label ?? ''} onCommit={(v) => set({ label: v })} />
           {part.labelPos && <button className={`${btn} mb-2`} onClick={() => set({ labelPos: undefined })}>Nhãn tự đặt lại</button>}
           {part.type !== 'bus' && (

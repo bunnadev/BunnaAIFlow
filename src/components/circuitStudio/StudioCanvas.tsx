@@ -10,7 +10,7 @@ import { addBend, moveSegment, removeCorner, segOrientation, simplify } from '..
 import { snapDelta, type Guide } from '../../lib/circuit/arrange';
 import { contentBounds } from '../../lib/circuit/world';
 import { blurActiveField } from './noFocus';
-import { wheelView } from '../../lib/circuit/viewport';
+import { wheelView, zoomAt } from '../../lib/circuit/viewport';
 
 export interface Selection { parts: string[]; wire: number | null }
 export interface CanvasApi {
@@ -19,6 +19,8 @@ export interface CanvasApi {
   focusBox(b: Box): void;
   /** Huỷ thao tác kéo đang dở (Esc) — không ghi gì; trả true nếu có thao tác bị huỷ. */
   cancelDrag(): boolean;
+  /** Phóng/thu quanh giữa màn hình (nút −/+ và phím -/=). */
+  zoomBy(factor: number): void;
 }
 
 interface Props {
@@ -28,6 +30,8 @@ interface Props {
   onSelect(s: Selection): void;
   onCommit(l: CircuitLayout): void;
   onApi(api: CanvasApi): void;
+  /** Báo mức phóng hiện tại (hiện % trên thanh công cụ). */
+  onZoomChange?(zoom: number): void;
 }
 
 type Drag =
@@ -45,7 +49,7 @@ const WOOD_TILE = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
 const snap10 = (v: number) => Math.round(v / 10) * 10;
 const rectOf = (a: Point, b: Point): Box => ({ x1: Math.min(a.x, b.x), y1: Math.min(a.y, b.y), x2: Math.max(a.x, b.x), y2: Math.max(a.y, b.y) });
 
-export default function StudioCanvas({ layout, routed, selection, onSelect, onCommit, onApi }: Props) {
+export default function StudioCanvas({ layout, routed, selection, onSelect, onCommit, onApi, onZoomChange }: Props) {
   const viewRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(0.6);
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
@@ -88,8 +92,16 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
     return true;
   };
 
+  const zoomBy = (factor: number) => {
+    const r = viewRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const v = zoomAt(viewState.current, factor, r.width / 2, r.height / 2);
+    applyView(v.zoom, v.pan);
+  };
+
   // Truyền api mới mỗi lần vẽ (pan/zoom/bố cục thay đổi thì toạ độ đổi theo)
-  useEffect(() => { onApi({ clientToLayout: toLayout, fit, focusBox, cancelDrag }); });
+  useEffect(() => { onApi({ clientToLayout: toLayout, fit, focusBox, cancelDrag, zoomBy }); });
+  useEffect(() => { onZoomChange?.(zoom); }, [zoom]);
 
   // Lăn chuột: gắn listener thường (không passive) để chặn trình duyệt tự phóng to cả trang khi chụm trackpad
   useEffect(() => {

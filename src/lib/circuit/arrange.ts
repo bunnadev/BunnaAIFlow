@@ -42,7 +42,8 @@ export function distributeParts(layout: CircuitLayout, ids: string[], axis: 'x' 
   const first = parts[0][axis], step = (parts[parts.length - 1][axis] - first) / (parts.length - 1);
   let out = layout;
   parts.forEach((p, i) => {
-    const d = first + step * i - p[axis];
+    // về lưới 10px như khi thả / kéo linh kiện (chân luôn nằm trên lưới để dây thẳng hàng)
+    const d = Math.round((first + step * i) / 10) * 10 - p[axis];
     out = movePartsBy(out, [p.id], axis === 'x' ? d : 0, axis === 'y' ? d : 0);
   });
   return out;

@@ -35,6 +35,7 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
   const [state, dispatch] = useReducer(studioReducer, initialStudioState(emptyLayout()));
   const [selection, setSelection] = useState<Selection>({ parts: [], wire: null });
   const [partsVersion, setPartsVersion] = useState(0);
+  const [zoom, setZoom] = useState(0.6);
   const [wizard, setWizard] = useState<{ existing?: CustomPartEntry } | null>(null);
   const [itemMenu, setItemMenu] = useState<{ x: number; y: number; code: string } | null>(null);
   const [showLibrary, setShowLibrary] = useState(true);
@@ -226,7 +227,8 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
       const cmd = e.metaKey || e.ctrlKey;
       const k = e.key.toLowerCase();
       const handled = (cmd && (k === 'z' || (k === 'd' && selection.parts.length > 0))) || e.key === 'Delete' || e.key === 'Backspace'
-        || (k === 'r' && !cmd && selection.parts.length > 0) || e.key === '0' || e.key === 'Escape';
+        || (k === 'r' && !cmd && selection.parts.length > 0) || e.key === '0' || e.key === 'Escape'
+        || (!cmd && (e.key === '-' || e.key === '=' || e.key === '+'));
       if (!handled) return;
       e.stopPropagation();
       if (cmd && e.key.toLowerCase() === 'z') { e.preventDefault(); dispatch({ type: e.shiftKey ? 'redo' : 'undo' }); return; }
@@ -250,6 +252,8 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
       }
       if (e.key.toLowerCase() === 'r' && !cmd && selection.parts.length) { commit(rotateParts(layout, selection.parts, e.shiftKey ? -1 : 1)); return; }
       if (e.key === '0') { apiRef.current?.fit(); return; }
+      if (e.key === '-') { apiRef.current?.zoomBy(1 / 1.25); return; }
+      if (e.key === '=' || e.key === '+') { apiRef.current?.zoomBy(1.25); return; }
       // Esc: đang kéo dở thì huỷ thao tác kéo (không ghi), không thì bỏ chọn
       if (e.key === 'Escape' && !apiRef.current?.cancelDrag()) setSelection({ parts: [], wire: null });
     };
@@ -284,6 +288,7 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
           routed={routed}
           selection={selection}
           onSelect={setSelection}
+          onZoomChange={setZoom}
           onCommit={commit}
           onApi={(api) => { apiRef.current = api; }}
         />
@@ -321,6 +326,9 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
         <button onMouseDown={noFocusMouseDown} className={btn} title="Thư viện linh kiện" onClick={() => setShowLibrary(!showLibrary)}>{icon('widgets')} Linh kiện</button>
         <button onMouseDown={noFocusMouseDown} className={btn} title="Hoàn tác (Cmd+Z)" disabled={!state.past.length} onClick={() => dispatch({ type: 'undo' })}>{icon('undo')}</button>
         <button onMouseDown={noFocusMouseDown} className={btn} title="Làm lại (Cmd+Shift+Z)" disabled={!state.future.length} onClick={() => dispatch({ type: 'redo' })}>{icon('redo')}</button>
+        <button onMouseDown={noFocusMouseDown} className={btn} title="Thu nhỏ (phím -)" onClick={() => apiRef.current?.zoomBy(1 / 1.25)}>{icon('zoom_out')}</button>
+        <span className="w-10 text-center text-xs tabular-nums text-white/60">{Math.round(zoom * 100)}%</span>
+        <button onMouseDown={noFocusMouseDown} className={btn} title="Phóng to (phím =)" onClick={() => apiRef.current?.zoomBy(1.25)}>{icon('zoom_in')}</button>
         <button onMouseDown={noFocusMouseDown} className={btn} title="Vừa màn hình (phím 0)" onClick={() => apiRef.current?.fit()}>{icon('fit_screen')}</button>
         <button onMouseDown={noFocusMouseDown} className={btn} title="Tự đi lại tất cả dây (bỏ mọi chỉnh tay)" onClick={() => commit(resetAllWires(layout))}>{icon('route')}</button>
         {selParts >= 2 && (
