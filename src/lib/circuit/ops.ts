@@ -13,7 +13,7 @@ const snap10 = (v: number) => Math.round(v / 10) * 10;
 const PREFIX: Record<string, string> = {
   resistor: 'R', cap_elec: 'C', cap_ceramic: 'C', pot: 'VR', diode: 'D',
   to92: 'Q', to220: 'Q', to3: 'Q', pentawatt: 'U', dip8: 'U', dip14: 'U', dip16: 'U',
-  led: 'LED', bulb: 'DEN', speaker: 'SP', jack35: 'J', mic: 'MIC', terminal2: 'PWR', lead: 'OUT', psu: 'PSU',
+  led: 'LED', bulb: 'DEN', cob: 'COB', res_cement: 'R', res_power: 'R', probe_red: 'VOM', probe_black: 'VOM', speaker: 'SP', jack35: 'J', mic: 'MIC', terminal2: 'PWR', lead: 'OUT', psu: 'PSU',
   ...Object.fromEntries(CELL_KINDS.flatMap((k) => [cellType(k), ...[1, 2, 3].map((n) => holderType(k, n))].map((t) => [t, 'BAT']))),
 };
 
@@ -37,6 +37,12 @@ const DEFAULTS: Record<string, Partial<PlacedPart>> = {
   bus: { length: 600 },
   psu: { value: '12.00', marking: '1.000' },
   bulb: { value: '12', marking: '5', label: '12V 5W' },
+  cob: { value: '12', label: '12V' },
+  res_cement: { value: '10', marking: '5', label: '10Ω 5W' },
+  res_power: { value: '33', marking: '1', label: '33Ω 1W' },
+  probe_red: { label: '+' },
+  probe_black: { label: 'COM' },
+  speaker: { view: 'front', value: '8', marking: '50', label: '8Ω 50W' },
   ...Object.fromEntries(CELL_KINDS.map((k) => [cellType(k), { label: `${CELLS[k].volts}V` }])),
   ...Object.fromEntries(CELL_KINDS.flatMap((k) => [1, 2, 3].map((n) => [holderType(k, n), { label: holderVolts(k, n) }]))),
 };

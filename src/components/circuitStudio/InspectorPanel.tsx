@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PARTS } from '../../lib/circuit/parts';
 import { anchorContact } from '../../lib/circuit/contacts';
 import { bulbLabel, LED_COLORS } from '../../lib/circuit/lightParts';
+import { isProbe, ohmWattLabel } from '../../lib/circuit/extraParts';
 import { ledHex } from '../../lib/circuit/parts';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, parseCellType, parseHolderType, type CellKind, type HolderWiring } from '../../lib/circuit/powerParts';
 import { WIRE_COLORS } from '../../lib/circuit/render';
@@ -58,6 +59,9 @@ function batteryLabel(type: string, wiring?: HolderWiring): string | null {
   return c ? `${CELLS[c].volts}V` : null;
 }
 
+/** Linh kiện có ô nhập riêng (không dùng ô "Chữ in trên thân" chung). */
+const OWN_FIELDS = new Set(['res_cement', 'res_power', 'cob', 'probe_red', 'probe_black']);
+
 const btn = 'rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-30';
 
 export default function InspectorPanel({ layout, selection, onCommit, onSelect, onError, getLayout }: Props) {
@@ -102,7 +106,7 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
         <>
           <div className="mb-2 text-white/50">{PARTS[part.type]?.desc ?? part.type}</div>
           <Field label="Ký hiệu" value={part.id} onCommit={(v) => set({ id: v })} />
-          {part.type !== 'bus' && part.type !== 'lead' && part.type !== 'psu' && part.type !== 'led' && part.type !== 'bulb' && !battery
+          {part.type !== 'bus' && part.type !== 'lead' && part.type !== 'psu' && part.type !== 'led' && part.type !== 'bulb' && !OWN_FIELDS.has(part.type) && !(part.type === 'speaker' && part.view) && !battery
             && <Field label="Chữ in trên thân" value={part.marking ?? ''} onCommit={(v) => set({ marking: v })} />}
           {part.type === 'led' && (
             <>
@@ -124,7 +128,30 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
                 onCommit={(v) => set((live) => ({ marking: v, ...((live.label ?? '') === bulbLabel(live) ? { label: bulbLabel({ ...live, marking: v }) } : {}) }))} />
             </>
           )}
-          {(part.type === 'led' || part.type === 'bulb') && (
+          {(part.type === 'res_cement' || part.type === 'res_power' || (part.type === 'speaker' && part.view)) && (
+            <>
+              {part.type === 'speaker' && (
+                <>
+                  <div className="mb-1 text-white/50">Hướng nhìn</div>
+                  <div className="mb-2 flex gap-1.5">
+                    {([['front', 'Mặt trước'], ['back', 'Mặt sau']] as const).map(([v, t]) => (
+                      <button key={v} {...pick(part.view === v)} onClick={() => set({ view: v })}>{t}</button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <Field label={part.type === 'speaker' ? 'Trở kháng (Ω)' : 'Giá trị (Ω)'} value={part.value ?? ''}
+                onCommit={(v) => set((live) => ({ value: v, ...((live.label ?? '') === ohmWattLabel(live) ? { label: ohmWattLabel({ ...live, value: v }) } : {}) }))} />
+              <Field label="Công suất (W)" value={part.marking ?? ''}
+                onCommit={(v) => set((live) => ({ marking: v, ...((live.label ?? '') === ohmWattLabel(live) ? { label: ohmWattLabel({ ...live, marking: v }) } : {}) }))} />
+            </>
+          )}
+          {part.type === 'cob' && (
+            <Field label="Điện áp (V)" value={part.value ?? ''}
+              onCommit={(v) => set((live) => ({ value: v, ...((live.label ?? '') === `${(live.value ?? '').trim()}V` ? { label: v.trim() ? `${v.trim()}V` : '' } : {}) }))} />
+          )}
+          {isProbe(part.type) && <div className="mb-2 text-white/40">Kéo đầu kim lại gần chân linh kiện để que tự chạm vào chân đó.</div>}
+          {(part.type === 'led' || part.type === 'bulb' || part.type === 'cob') && (
             <label className="mb-2 flex items-center gap-2">
               <input type="checkbox" checked={!!part.lit} onChange={(e) => set({ lit: e.target.checked })} /> Đèn đang sáng
             </label>
@@ -174,7 +201,7 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               <input type="checkbox" checked={!!part.heatsink} onChange={(e) => set({ heatsink: e.target.checked })} /> Tản nhiệt
             </label>
           )}
-          {part.type !== 'bus' && part.type !== 'psu' && !battery && Object.keys(PARTS[part.type]?.pins ?? {}).length > 0 && (
+          {part.type !== 'bus' && part.type !== 'psu' && !battery && !isProbe(part.type) && Object.keys(PARTS[part.type]?.pins ?? {}).length > 0 && (
             <div className="mt-3 border-t border-white/10 pt-2">
               <div className="mb-1 text-white/50">Tên chân thật (VD C1815: 1 = E, 2 = C, 3 = B)</div>
               {Object.keys(PARTS[part.type].pins).map((pin) => (
@@ -199,6 +226,9 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
                 className="h-6 w-6 rounded-full border-2" style={{ background: main, borderColor: wire.color === c ? '#F1641E' : 'transparent' }} />
             ))}
           </div>
+          <button className={`${btn} mb-3 w-full`}
+            style={wire.color === 'silver' ? { borderColor: '#F1641E', background: 'rgba(241,100,30,0.28)', color: '#fff' } : undefined}
+            onClick={() => onCommit(updateWire(layout, wireIdx, { color: 'silver' }))}>Chân trần / dây thiếc (hàn thẳng, không vỏ)</button>
           <div className="flex flex-col gap-1.5">
             <button className={btn} disabled={!wire.manual} onClick={() => onCommit(resetWire(layout, wireIdx))}>Tự đi lại dây này</button>
             <button className={`${btn} text-red-400`} onClick={() => { onCommit(deleteWire(layout, wireIdx)); onSelect({ parts: [], wire: null }); }}>Xoá dây</button>

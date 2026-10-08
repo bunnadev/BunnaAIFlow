@@ -36,6 +36,8 @@ export interface PlacedPart {
   color?: string;
   /** Đèn đang sáng (LED, bóng đèn): vẽ sáng rực + quầng sáng. */
   lit?: boolean;
+  /** Loa kiểu thật trong Xưởng vẽ: nhìn mặt trước / mặt sau. Không có = hình loa cũ. */
+  view?: 'front' | 'back';
   /** Chỉ cho đế pin 2–3 viên: cách mắc các viên bên trong. Không có = nối tiếp. */
   wiring?: 'series' | 'parallel';
   /** Nhãn đã kéo tay: tâm nhãn = tâm linh kiện + (dx, dy). Không có = tự đặt. */

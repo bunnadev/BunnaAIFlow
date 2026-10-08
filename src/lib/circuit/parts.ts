@@ -1,6 +1,10 @@
 import type { PlacedPart, Point } from './types';
 import { POWER_PARTS } from './powerParts';
 import { glow, LED_COLORS, LIGHT_PARTS, litLedBody } from './lightParts';
+import { EXTRA_PARTS, speakerReal } from './extraParts';
+import { resistorBands } from './bands';
+
+export { parseOhms, resistorBands } from './bands';
 
 /**
  * Thư viện linh kiện vẽ bằng SVG. Mỗi linh kiện vẽ ở toạ độ cục bộ (tâm = 0,0,
@@ -48,33 +52,7 @@ const leg = (x1: number, y1: number, x2: number, y2: number, w = 7) =>
   `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#7d848c" stroke-width="${w + 2}" stroke-linecap="round"/>` +
   `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="url(#gLeg)" stroke-width="${w}" stroke-linecap="round"/>`;
 
-// ─── Điện trở: vạch màu tự tính từ giá trị ────────────────────────────────
-const BAND = ['#1a1a1a', '#7b3f17', '#d42020', '#f07a12', '#f3d21c', '#2e9b3a', '#2662c7', '#7d3cc2', '#8a8a8a', '#f4f4f4'];
-
-export function parseOhms(value?: string): number | null {
-  if (!value) return null;
-  const m = value.trim().replace(',', '.').match(/^([\d.]+)\s*([kKmMrRΩ]?)/);
-  if (!m) return null;
-  let n = parseFloat(m[1]);
-  if (Number.isNaN(n)) return null;
-  const unit = m[2];
-  if (unit === 'k' || unit === 'K') n *= 1e3;
-  else if (unit === 'M') n *= 1e6;
-  else if (unit === 'm') n *= 1e6; // "1m" thường là gõ nhầm của 1M
-  return n;
-}
-
-export function resistorBands(value?: string): string[] {
-  const ohms = parseOhms(value);
-  if (!ohms || ohms <= 0) return [BAND[1], BAND[0], BAND[2], '#c9a227'];
-  let m = Math.floor(Math.log10(ohms)) - 1;
-  let sig = Math.round(ohms / Math.pow(10, m));
-  if (sig >= 100) { sig = Math.round(sig / 10); m += 1; }
-  const d1 = Math.floor(sig / 10);
-  const d2 = sig % 10;
-  const mult = m >= 0 ? BAND[Math.min(m, 9)] : m === -1 ? '#c9a227' : '#b8b8b8';
-  return [BAND[d1], BAND[d2], mult, '#c9a227'];
-}
+// ─── Điện trở: vạch màu tự tính từ giá trị (bands.ts) ─────────────────────
 
 const resistor: PartDef = {
   desc: 'Điện trở (vạch màu tự tính theo value)',
@@ -273,7 +251,8 @@ const speaker: PartDef = {
   w: 320, h: 340,
   pins: { '+': { x: -40, y: -170 }, '-': { x: 40, y: -170 } },
   pinNote: '2 cọc hàn ở mép TRÊN: + trái, − phải',
-  render: () =>
+  // Loa thả từ Xưởng vẽ có "view" → vẽ kiểu thật; loa cũ (node Vẽ mạch) giữ hình cũ
+  render: (p) => p.view ? speakerReal(p) :
     `<circle cx="0" cy="0" r="158" fill="url(#gMetal)" stroke="#6f767e" stroke-width="3"/>` +
     `<circle cx="0" cy="0" r="138" fill="url(#gCone)"/>` +
     [110, 85, 60].map((r) => `<circle cx="0" cy="0" r="${r}" fill="none" stroke="#000" stroke-opacity="0.35" stroke-width="2"/>`).join('') +
@@ -402,4 +381,5 @@ export const PARTS: Record<string, PartDef> = {
   bus,
   ...POWER_PARTS,
   ...LIGHT_PARTS,
+  ...EXTRA_PARTS,
 };

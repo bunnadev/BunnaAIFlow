@@ -2,9 +2,10 @@ import { PARTS } from './parts';
 import { isBuiltinPart } from './registry';
 import { POWER_TYPES } from './powerParts';
 import { LIGHT_TYPES } from './lightParts';
+import { EXTRA_TYPES } from './extraParts';
 
 /** Linh kiện đưa vào prompt AI: chỉ loại có sẵn từ trước (không có linh kiện tự thêm, không có nhóm pin / máy nguồn / bóng đèn của Xưởng vẽ). */
-const forAi = (type: string) => isBuiltinPart(type) && !POWER_TYPES.has(type) && !LIGHT_TYPES.has(type);
+const forAi = (type: string) => isBuiltinPart(type) && !POWER_TYPES.has(type) && !LIGHT_TYPES.has(type) && !EXTRA_TYPES.has(type);
 
 /** Danh mục linh kiện vẽ được — dùng cho cả Kỹ sư mạch lẫn bước lên bố cục. */
 export function partCatalogShort(): string {
