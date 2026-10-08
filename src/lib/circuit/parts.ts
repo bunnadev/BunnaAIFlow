@@ -95,7 +95,7 @@ const capElec: PartDef = {
   pins: { '+': { x: -14, y: 104 }, '-': { x: 14, y: 92 } },
   pinNote: 'thân dựng đứng, 2 chân chĩa XUỐNG ở cùng một đầu: + bên trái (chân dài hơn), − bên phải (phía vạch sáng có dấu −)',
   // Kiểu tụ thật (như ảnh mẫu Samxon): thân đen bóng, vạch xám dọc phía chân âm với dấu "−",
-  // đầu nhôm có rãnh khía chữ thập (van an toàn), đường gân thắt gần đầu, chữ in trắng dọc thân.
+  // đầu nhôm, đường gân thắt gần đầu, chữ in trắng dọc thân.
   render: (p) => {
     const marks = [-56, -30, -4, 22].map((y) => `<rect x="17" y="${y}" width="10" height="13" rx="2" fill="none" stroke="#2b2d31" stroke-width="2.4"/>` +
       `<rect x="19" y="${y + 5}" width="6" height="3" rx="1" fill="#2b2d31"/>`).join('');
@@ -107,9 +107,8 @@ const capElec: PartDef = {
       `<rect x="-30" y="32" width="60" height="8" rx="3" fill="#15171a"/>` +
       // vạch xám phía âm (bên phải) + dấu −
       `<rect x="13" y="-70" width="18" height="100" fill="url(#pt_capStripe)"/>` + marks +
-      // đầu nhôm + gân thắt + rãnh khía chữ thập
+      // đầu nhôm + gân thắt
       `<rect x="-34" y="-84" width="68" height="16" rx="7" fill="url(#gSilver)" stroke="#7d848c" stroke-width="1"/>` +
-      `<line x1="-24" y1="-79" x2="24" y2="-73" stroke="#7d848c" stroke-width="1.5"/><line x1="-24" y1="-73" x2="24" y2="-79" stroke="#7d848c" stroke-width="1.5"/>` +
       `<rect x="-34" y="-66" width="68" height="4" fill="#000" opacity="0.55"/>` +
       `<rect x="-31" y="-60" width="7" height="88" rx="3.5" fill="#fff" opacity="0.18"/>` +
       `<text x="-26" y="84" font-size="15" font-weight="900" fill="#ffb4b4" text-anchor="middle">+</text>` +
