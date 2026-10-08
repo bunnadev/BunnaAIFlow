@@ -90,22 +90,30 @@ const diode: PartDef = {
  * 2 chân 2 đầu, thân đen vạch xám → nhìn y hệt diode, người xem dễ nhầm.
  */
 const capElec: PartDef = {
-  desc: 'Tụ hoá (điện phân) loại đứng — thân trụ xanh, 2 chân ra cùng một đầu',
+  desc: 'Tụ hoá (điện phân) loại đứng — thân trụ đen, vạch xám phía chân âm, 2 chân ra cùng một đầu',
   w: 70, h: 210,
   pins: { '+': { x: -14, y: 104 }, '-': { x: 14, y: 92 } },
   pinNote: 'thân dựng đứng, 2 chân chĩa XUỐNG ở cùng một đầu: + bên trái (chân dài hơn), − bên phải (phía vạch sáng có dấu −)',
+  // Kiểu tụ thật (như ảnh mẫu Samxon): thân đen bóng, vạch xám dọc phía chân âm với dấu "−",
+  // đầu nhôm có rãnh khía chữ thập (van an toàn), đường gân thắt gần đầu, chữ in trắng dọc thân.
   render: (p) => {
-    const minus = [-58, -34, -10, 14].map((y) => `<rect x="17" y="${y}" width="9" height="3" rx="1.5" fill="#1f3354"/>`).join('');
+    const marks = [-56, -30, -4, 22].map((y) => `<rect x="17" y="${y}" width="10" height="13" rx="2" fill="none" stroke="#2b2d31" stroke-width="2.4"/>` +
+      `<rect x="19" y="${y + 5}" width="6" height="3" rx="1" fill="#2b2d31"/>`).join('');
     return leg(-14, 36, -14, 104, 5) + leg(14, 36, 14, 92, 5) +
-      // thân + đầu nhôm + đệm cao su
-      `<rect x="-34" y="-80" width="68" height="116" rx="10" fill="url(#gCapBlue)"/>` +
-      `<rect x="-34" y="-82" width="68" height="12" rx="6" fill="url(#gSilver)" stroke="#7d848c" stroke-width="1"/>` +
+      '<defs><linearGradient id="pt_capBody" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#050506"/><stop offset="0.3" stop-color="#2f3135"/><stop offset="0.5" stop-color="#43464b"/><stop offset="0.75" stop-color="#1a1b1e"/><stop offset="1" stop-color="#050506"/></linearGradient>' +
+      '<linearGradient id="pt_capStripe" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9da3aa"/><stop offset="0.5" stop-color="#d9dde1"/><stop offset="1" stop-color="#8a9097"/></linearGradient></defs>' +
+      // thân + đáy cao su
+      `<rect x="-34" y="-80" width="68" height="116" rx="10" fill="url(#pt_capBody)"/>` +
       `<rect x="-30" y="32" width="60" height="8" rx="3" fill="#15171a"/>` +
-      // vạch âm dọc thân
-      `<rect x="12" y="-70" width="20" height="102" fill="#c9d6ea"/>` + minus +
-      `<rect x="-31" y="-68" width="8" height="96" rx="4" fill="#fff" opacity="0.22"/>` +
+      // vạch xám phía âm (bên phải) + dấu −
+      `<rect x="13" y="-70" width="18" height="100" fill="url(#pt_capStripe)"/>` + marks +
+      // đầu nhôm + gân thắt + rãnh khía chữ thập
+      `<rect x="-34" y="-84" width="68" height="16" rx="7" fill="url(#gSilver)" stroke="#7d848c" stroke-width="1"/>` +
+      `<line x1="-24" y1="-79" x2="24" y2="-73" stroke="#7d848c" stroke-width="1.5"/><line x1="-24" y1="-73" x2="24" y2="-79" stroke="#7d848c" stroke-width="1.5"/>` +
+      `<rect x="-34" y="-66" width="68" height="4" fill="#000" opacity="0.55"/>` +
+      `<rect x="-31" y="-60" width="7" height="88" rx="3.5" fill="#fff" opacity="0.18"/>` +
       `<text x="-26" y="84" font-size="15" font-weight="900" fill="#ffb4b4" text-anchor="middle">+</text>` +
-      (p.marking ? upright(p, -6, -21, `<text x="0" y="0" font-size="13" font-weight="700" fill="#e8eef8" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" transform="translate(-6 -21) rotate(-90)">${esc(p.marking)}</text>`) : '');
+      (p.marking ? upright(p, -6, -21, `<text x="0" y="0" font-size="13" font-weight="700" fill="#eef1f4" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" transform="translate(-6 -21) rotate(-90)">${esc(p.marking)}</text>`) : '');
   },
 };
 
