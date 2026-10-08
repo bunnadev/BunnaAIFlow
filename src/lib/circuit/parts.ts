@@ -185,10 +185,25 @@ const to92: PartDef = {
   w: 70, h: 140,
   pins: { '1': { x: -24, y: 70 }, '2': { x: 0, y: 70 }, '3': { x: 24, y: 70 } },
   pinNote: 'mặt phẳng có chữ hướng lên, 3 chân chĩa XUỐNG: chân 1 trái, 2 giữa, 3 phải',
-  render: (p) =>
-    leg(-12, 10, -24, 70, 5) + leg(0, 10, 0, 70, 5) + leg(12, 10, 24, 70, 5) +
-    `<path d="M -32 15 L -32 -30 A 32 32 0 0 1 32 -30 L 32 15 Z" fill="url(#gBlack)"/>` +
-    (p.marking ? upright(p, 0, -16, `<text x="0" y="-10" font-size="13" font-weight="700" fill="#ddd" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif">${esc(p.marking)}</text>`) : ''),
+  // Nhìn thẳng mặt phẳng có chữ (như ảnh thật): thân đen chữ nhật, đỉnh bo tròn nhẹ,
+  // chân giữa thẳng, 2 chân ngoài bẻ xiên ra rồi chạy thẳng xuống
+  render: (p) => {
+    const bent = (x: number) => {
+      const path = `M ${x / 2} 12 L ${x / 2} 24 L ${x} 38 L ${x} 70`;
+      return `<path d="${path}" fill="none" stroke="#7d848c" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>` +
+        `<path d="${path}" fill="none" stroke="url(#gLeg)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    };
+    const lines = (p.marking ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 3);
+    const fs = lines.some((l) => l.length > 5) ? 11 : 13;
+    const text = lines.map((l, i) =>
+      `<text x="0" y="${-30 + (i - (lines.length - 1) / 2) * 15}" font-size="${fs}" font-weight="700" fill="#e4e4e4" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif">${esc(l)}</text>`).join('');
+    return bent(-24) + leg(0, 12, 0, 70, 5) + bent(24) +
+      `<rect x="-27" y="-64" width="54" height="78" rx="5" fill="url(#gBlack)" stroke="#000" stroke-width="1"/>` +
+      // mép trên bo tròn (lưng D của vỏ TO-92)
+      `<path d="M -27 -56 Q -27 -66 -17 -67 L 17 -67 Q 27 -66 27 -56 Q 0 -61 -27 -56 Z" fill="#45484e"/>` +
+      `<rect x="-24" y="-54" width="6" height="64" rx="3" fill="#fff" opacity="0.08"/>` +
+      (lines.length ? upright(p, 0, -30, text) : '');
+  },
 };
 
 const TO3_OUTLINE = 'M -150 0 Q -150 -38 -112 -48 L -46 -84 Q 0 -104 46 -84 L 112 -48 Q 150 -38 150 0 Q 150 38 112 48 L 46 84 Q 0 104 -46 84 L -112 48 Q -150 38 -150 0 Z';
