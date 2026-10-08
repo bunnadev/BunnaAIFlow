@@ -1,3 +1,4 @@
+import { busCenter, busPoint, busVertical } from './bus';
 import { PARTS } from './parts';
 import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
 
@@ -70,8 +71,8 @@ function parseEnd(layout: CircuitLayout, ref: string, H: number): End | null {
   const busId = (at > 0 ? ref.slice(0, at) : ref).trim();
   const busPart = layout.parts.find((p) => p.id === busId && p.type === 'bus');
   if (busPart) {
-    const x = at > 0 ? parseFloat(ref.slice(at + 1)) : busPart.x;
-    return { point: { x: Number.isNaN(x) ? busPart.x : x, y: busPart.y }, dir: 3, part: busPart, isLead: false, bus: busPart };
+    const c = at > 0 ? parseFloat(ref.slice(at + 1)) : busCenter(busPart);
+    return { point: busPoint(busPart, Number.isNaN(c) ? busCenter(busPart) : c), dir: busVertical(busPart) ? 2 : 3, part: busPart, isLead: false, bus: busPart };
   }
   const dot = ref.lastIndexOf('.');
   if (dot <= 0) return null;
@@ -165,6 +166,15 @@ export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean }
   const busEdge = new Uint8Array(cols * rows);
   for (const p of layout.parts.filter((q) => q.type === 'bus')) {
     const half = (p.length ?? 800) / 2;
+    if (busVertical(p)) {
+      // thanh dựng dọc: 1 cột ô, mép là 2 cột 2 bên
+      const c = Math.round(p.x / G);
+      for (let r = Math.ceil((p.y - half + 10) / G); r <= Math.floor((p.y + half - 10) / G); r++) {
+        if (r >= 0 && r < rows && c >= 0 && c < cols) { busCells.set(idx(c, r), p); blocked[idx(c, r)] = 0; }
+        for (const cc of [c - 1, c + 1]) if (r >= 0 && r < rows && cc >= 0 && cc < cols) busEdge[idx(cc, r)] = 1;
+      }
+      continue;
+    }
     const r = Math.round(p.y / G);
     for (let c = Math.ceil((p.x - half + 10) / G); c <= Math.floor((p.x + half - 10) / G); c++) {
       if (r >= 0 && r < rows && c >= 0 && c < cols) { busCells.set(idx(c, r), p); blocked[idx(c, r)] = 0; }
@@ -253,7 +263,9 @@ export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean }
     const goal = goalBus ? null : exitPoint(b);
     const gc = goal ? Math.round(goal.x / G) : 0, gr = goal ? Math.round(goal.y / G) : 0;
     const busRow = goalBus ? Math.round(goalBus.y / G) : 0;
-    const h = (c: number, r: number) => goal ? Math.abs(c - gc) + Math.abs(r - gr) : Math.abs(r - busRow);
+    const busCol = goalBus ? Math.round(goalBus.x / G) : 0;
+    const busV = !!goalBus && busVertical(goalBus);
+    const h = (c: number, r: number) => goal ? Math.abs(c - gc) + Math.abs(r - gr) : busV ? Math.abs(c - busCol) : Math.abs(r - busRow);
     const isGoal = (c: number, r: number) => goal ? (c === gc && r === gr) : busCells.get(idx(c, r)) === goalBus;
     // Ô thuộc thân linh kiện có chân "nằm giữa" → được đi trên mặt nó để vào chân
     const ownBoxes = [a, b].filter((e) => e.interior).map((e) => box(e.part));

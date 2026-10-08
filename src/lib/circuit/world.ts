@@ -1,3 +1,4 @@
+import { busVertical } from './bus';
 import { partBox, type Box } from './render';
 import { routeWires, type End, type RoutedWire } from './route';
 import type { CircuitLayout, Point } from './types';
@@ -30,7 +31,9 @@ export function routeWorld(layout: CircuitLayout): (RoutedWire | null)[] {
   const dy = MARGIN - Math.floor(b.y1 / 10) * 10;
   const shiftRef = (ref: string) => {
     const at = ref.indexOf('@');
-    return at < 0 ? ref : `${ref.slice(0, at)}@${parseFloat(ref.slice(at + 1)) + dx}`;
+    if (at < 0) return ref;
+    const bus = layout.parts.find((p) => p.id === ref.slice(0, at));
+    return `${ref.slice(0, at)}@${parseFloat(ref.slice(at + 1)) + (bus && busVertical(bus) ? dy : dx)}`;
   };
   const shifted: CircuitLayout = {
     parts: layout.parts.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy })),

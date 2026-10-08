@@ -201,7 +201,7 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
             onCommit={(v) => set((live) => ({ value: v, ...((live.label ?? '') === ohms(live.value) ? { label: ohms(v) } : {}) }))} />}
           <Field label="Nhãn xanh" value={part.label ?? ''} onCommit={(v) => set({ label: v })} />
           {part.labelPos && <button className={`${btn} mb-2`} onClick={() => set({ labelPos: undefined })}>Nhãn tự đặt lại</button>}
-          {part.type !== 'bus' && (
+          {(
             <div className="mb-2 flex items-center gap-2">
               <span className="text-white/50">Xoay</span>
               <button className={btn} onClick={() => onCommit(rotateParts(layout, [part.id], -1))}>⟲</button>

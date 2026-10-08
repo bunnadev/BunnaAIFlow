@@ -1,3 +1,4 @@
+import { busCoord, busEnds } from './bus';
 import { PARTS } from './parts';
 import { partBox, resolveEndpoint } from './render';
 import type { End, RoutedWire } from './route';
@@ -44,7 +45,7 @@ export function hitPin(layout: CircuitLayout, pt: Point, radius = 14): PinRef | 
 export function hitPart(layout: CircuitLayout, pt: Point): PlacedPart | null {
   for (let i = layout.parts.length - 1; i >= 0; i--) {
     const p = layout.parts[i];
-    const b = p.type === 'lead' ? { x1: p.x - 14, y1: p.y - 14, x2: p.x + 14, y2: p.y + 14 } : partBox(p, true);
+    const b = p.type === 'lead' ? { x1: p.x - 22, y1: p.y - 22, x2: p.x + 22, y2: p.y + 22 } : partBox(p, true);
     if (b && pt.x >= b.x1 && pt.x <= b.x2 && pt.y >= b.y1 && pt.y <= b.y2) return p;
   }
   return null;
@@ -78,9 +79,9 @@ export function dropTarget(layout: CircuitLayout, pt: Point): string | null {
   if (pin) return `${pin.partId}.${pin.pin}`;
   const part = hitPart(layout, pt);
   if (part?.type !== 'bus') return null;
-  const half = (part.length ?? 800) / 2;
-  const x = Math.min(Math.max(snap10(pt.x), part.x - half + 10), part.x + half - 10);
-  return `${part.id}@${x}`;
+  const [lo, hi] = busEnds(part);
+  const c = Math.min(Math.max(snap10(busCoord(part, pt)), lo + 10), hi - 10);
+  return `${part.id}@${c}`;
 }
 
 /** Tay cầm ở giữa từng đoạn dây đủ dài (đoạn dài 0 sinh ra khi thêm góc thì bỏ qua). */

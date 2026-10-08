@@ -4,12 +4,13 @@ import type { RoutedWire } from '../../lib/circuit/route';
 import { labelPlacements, partBox, renderScene, svgDefs, type Box } from '../../lib/circuit/render';
 import { dotGridTileSvg, GRID_BG } from '../../lib/circuit/dotGrid';
 import {
-  allPins, dropTarget, hitPart, hitPin, hitWire, nearestSegment, previewRouted, segmentHandles, wiresOfPart,
+  allPins, dropTarget, endPartId, hitPart, hitPin, hitWire, nearestSegment, previewRouted, segmentHandles, wiresOfPart,
 } from '../../lib/circuit/geometry';
 import { addWire, deleteWire, movePartsBy, resetWire, resizeBus, setWirePoints, updatePart } from '../../lib/circuit/ops';
 import { addBend, moveSegment, removeCorner, segOrientation, simplify } from '../../lib/circuit/wireEdit';
 import { snapDelta, type Guide } from '../../lib/circuit/arrange';
 import { contactSnap } from '../../lib/circuit/contacts';
+import { busCoord, busEnds, busPoint } from '../../lib/circuit/bus';
 import { contentBounds } from '../../lib/circuit/world';
 import { blurActiveField } from './noFocus';
 import { wheelView, zoomAt } from '../../lib/circuit/viewport';
@@ -184,10 +185,11 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
     // 1. tay cầm 2 đầu thanh đồng đang chọn
     const selBus = selection.parts.length === 1 ? layout.parts.find((p) => p.id === selection.parts[0] && p.type === 'bus') : undefined;
     if (selBus) {
-      const half = (selBus.length ?? 800) / 2;
+      const ends = busEnds(selBus);
       for (const side of [-1, 1] as const) {
-        const ex = selBus.x + side * half;
-        if (Math.hypot(pt.x - ex, pt.y - selBus.y) < 16) { setDrag({ kind: 'busEnd', id: selBus.id, side, startX: ex, endX: ex }); return; }
+        const ex = ends[side < 0 ? 0 : 1];
+        const h = busPoint(selBus, ex);
+        if (Math.hypot(pt.x - h.x, pt.y - h.y) < 16) { setDrag({ kind: 'busEnd', id: selBus.id, side, startX: ex, endX: ex }); return; }
       }
     }
     // 2. tay cầm đoạn của dây đang chọn
@@ -260,9 +262,11 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       case 'label':
         setDrag({ ...drag, cur: { dx: Math.round(drag.base.dx + pt.x - drag.start.x), dy: Math.round(drag.base.dy + pt.y - drag.start.y) } });
         break;
-      case 'busEnd':
-        setDrag({ ...drag, endX: snap10(pt.x) });
+      case 'busEnd': {
+        const bus = layout.parts.find((p) => p.id === drag.id);
+        setDrag({ ...drag, endX: snap10(bus ? busCoord(bus, pt) : pt.x) });
         break;
+      }
     }
   };
 
@@ -332,6 +336,9 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
   const hoverPin = hover ? hitPin(shown, hover) : null;
   const hoverPinPart = hoverPin && shown.parts.find((p) => p.id === hoverPin.partId);
   const selWirePts = selection.wire !== null ? shownRouted[selection.wire]?.points : undefined;
+  // Đầu dây tự do chưa nối dây: ảnh xuất không vẽ gì → trên bàn vẽ đánh dấu vòng đồng để thấy và bấm được
+  const looseLeads = shown.parts.filter((p) => p.type === 'lead' && !shown.wires.some((w) => endPartId(w.from) === p.id || endPartId(w.to) === p.id));
+  const leadR = Math.max(14, 9 / zoom);
   const selBusPart = selection.parts.length === 1 ? shown.parts.find((p) => p.id === selection.parts[0] && p.type === 'bus') : undefined;
   const overflowSvg: React.CSSProperties = { position: 'absolute', left: 0, top: 0, overflow: 'visible' };
 
@@ -361,9 +368,10 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
             const b = p && partBox(p, true);
             return b ? <rect key={id} x={b.x1 - 6} y={b.y1 - 6} width={b.x2 - b.x1 + 12} height={b.y2 - b.y1 + 12} fill="none" stroke={ORANGE} strokeWidth={3} strokeDasharray="10 6" rx={6} /> : null;
           })}
-          {selBusPart && [-1, 1].map((side) => (
-            <circle key={side} cx={selBusPart.x + side * (selBusPart.length ?? 800) / 2} cy={selBusPart.y} r={11} fill="#fff" stroke={ORANGE} strokeWidth={4} />
-          ))}
+          {selBusPart && busEnds(selBusPart).map((c, i) => {
+            const h = busPoint(selBusPart, c);
+            return <circle key={i} cx={h.x} cy={h.y} r={11} fill="#fff" stroke={ORANGE} strokeWidth={4} />;
+          })}
           {selWirePts && (
             <>
               <polyline points={selWirePts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#fde047" strokeOpacity={0.55} strokeWidth={22} strokeLinejoin="round" />
@@ -371,6 +379,12 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
               {selWirePts.slice(1, -1).map((p, i) => <rect key={`c${i}`} x={p.x - 6} y={p.y - 6} width={12} height={12} fill={ORANGE} />)}
             </>
           )}
+          {looseLeads.map((p) => (
+            <g key={`lead-${p.id}`}>
+              <circle cx={p.x} cy={p.y} r={leadR} fill="#3a2410" fillOpacity={0.55} stroke="#d08a3c" strokeWidth={Math.max(4, 3 / zoom)} strokeDasharray={`${leadR * 0.6} ${leadR * 0.35}`} />
+              <circle cx={p.x} cy={p.y} r={leadR * 0.35} fill="#f2b97a" />
+            </g>
+          ))}
           {pinsToShow.map((p) => <circle key={`${p.partId}.${p.pin}`} cx={p.x} cy={p.y} r={8} fill="#22d3ee" fillOpacity={0.85} stroke="#083344" strokeWidth={2} />)}
           {hoverPin && (
             <text x={hoverPin.x + 14} y={hoverPin.y - 14} fontSize={24} fontWeight={800} fill="#fff" stroke="#000" strokeWidth={5} paintOrder="stroke">

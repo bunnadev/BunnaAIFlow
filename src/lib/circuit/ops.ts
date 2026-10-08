@@ -1,4 +1,5 @@
 import { endPartId, resolvePoint } from './geometry';
+import { busCoord, busEnds, busPoint, busVertical } from './bus';
 import { followEnd } from './wireEdit';
 import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, POWER_TYPES } from './powerParts';
@@ -84,7 +85,8 @@ export function movePartsBy(layout: CircuitLayout, ids: string[], dx: number, dy
   const shiftRef = (ref: string) => {
     const at = ref.indexOf('@');
     if (at < 0 || !set.has(ref.slice(0, at))) return ref;
-    return `${ref.slice(0, at)}@${parseFloat(ref.slice(at + 1)) + dx}`;
+    const bus = layout.parts.find((p) => p.id === ref.slice(0, at));
+    return `${ref.slice(0, at)}@${parseFloat(ref.slice(at + 1)) + (bus && busVertical(bus) ? dy : dx)}`;
   };
   const after: CircuitLayout = {
     ...layout,
@@ -106,13 +108,28 @@ export function movePartsBy(layout: CircuitLayout, ids: string[], dx: number, dy
 }
 
 export function rotateParts(layout: CircuitLayout, ids: string[], dir: 1 | -1): CircuitLayout {
-  const set = new Set(layout.parts.filter((p) => ids.includes(p.id) && p.type !== 'bus').map((p) => p.id));
+  const set = new Set(layout.parts.filter((p) => ids.includes(p.id)).map((p) => p.id));
   if (!set.size) return layout;
+  const rot = (p: PlacedPart) => ((((p.rotation ?? 0) + dir * 90) % 360 + 360) % 360) as Rotation;
+  // Thanh đồng xoay quanh tâm: điểm nối "ID@c" xoay theo (ngang ↔ dọc), giữ khoảng cách tới tâm
+  const busRef = (ref: string) => {
+    const at = ref.indexOf('@');
+    if (at < 0 || !set.has(ref.slice(0, at))) return ref;
+    const bus = layout.parts.find((p) => p.id === ref.slice(0, at));
+    if (!bus || bus.type !== 'bus') return ref;
+    const pt = busPoint(bus, parseFloat(ref.slice(at + 1)));
+    const ox = pt.x - bus.x, oy = pt.y - bus.y;
+    const q = dir === 1 ? { x: bus.x - oy, y: bus.y + ox } : { x: bus.x + oy, y: bus.y - ox };
+    return `${bus.id}@${busCoord({ ...bus, rotation: rot(bus) }, q)}`;
+  };
   return {
     ...layout,
-    parts: layout.parts.map((p) => (set.has(p.id) ? { ...p, rotation: ((((p.rotation ?? 0) + dir * 90) % 360 + 360) % 360) as Rotation } : p)),
+    parts: layout.parts.map((p) => (set.has(p.id) ? { ...p, rotation: rot(p) } : p)),
     // Xoay làm đổi hướng chân → đường chỉnh tay không còn hợp, cho tự đi lại
-    wires: layout.wires.map((w) => (set.has(endPartId(w.from)) || set.has(endPartId(w.to)) ? clearManual(w) : w)),
+    wires: layout.wires.map((w) => {
+      const v = { ...w, from: busRef(w.from), to: busRef(w.to) };
+      return set.has(endPartId(w.from)) || set.has(endPartId(w.to)) ? clearManual(v) : v;
+    }),
   };
 }
 
@@ -188,7 +205,8 @@ export function setWirePoints(layout: CircuitLayout, i: number, pts: Point[]): C
   const w = layout.wires[i];
   const busRef = (ref: string, p: Point) => {
     const id = endPartId(ref);
-    return layout.parts.some((q) => q.id === id && q.type === 'bus') ? `${id}@${Math.round(p.x)}` : ref;
+    const bus = layout.parts.find((q) => q.id === id && q.type === 'bus');
+    return bus ? `${id}@${Math.round(busCoord(bus, p))}` : ref;
   };
   return updateWire(layout, i, {
     from: busRef(w.from, pts[0]),
@@ -211,16 +229,17 @@ export function resetAllWires(layout: CircuitLayout): CircuitLayout {
   return { ...layout, wires: layout.wires.map(clearManual) };
 }
 
-/** Kéo 1 đầu thanh đồng (side −1 trái, 1 phải) tới endX. Thanh dài tối thiểu 100px. */
+/** Kéo 1 đầu thanh đồng (side −1 đầu trái/trên, 1 phải/dưới) tới toạ độ endX dọc trục thanh. Thanh dài tối thiểu 100px. */
 export function resizeBus(layout: CircuitLayout, id: string, side: -1 | 1, endX: number): CircuitLayout {
   const bus = layout.parts.find((p) => p.id === id && p.type === 'bus');
   if (!bus) return layout;
-  const half = (bus.length ?? 800) / 2;
-  let left = bus.x - half, right = bus.x + half;
+  const vertical = busVertical(bus);
+  let [left, right] = busEnds(bus);
   if (side < 0) left = Math.min(snap10(endX), right - 100);
   else right = Math.max(snap10(endX), left + 100);
   // Ảnh khung cố định (node cũ) thì giữ thanh trong khung; mặt bàn không giới hạn thì thôi
-  if (layout.width) { left = Math.max(20, left); right = Math.min(layout.width - 20, right); }
+  const limit = vertical ? layout.height : layout.width;
+  if (limit) { left = Math.max(20, left); right = Math.min(limit - 20, right); }
   const clampRef = (ref: string) => {
     const at = ref.indexOf('@');
     if (at < 0 || ref.slice(0, at) !== id) return ref;
@@ -230,7 +249,7 @@ export function resizeBus(layout: CircuitLayout, id: string, side: -1 | 1, endX:
 
   let after: CircuitLayout = {
     ...layout,
-    parts: layout.parts.map((p) => (p.id === id ? { ...p, x: (left + right) / 2, length: right - left } : p)),
+    parts: layout.parts.map((p) => (p.id === id ? { ...p, [vertical ? 'y' : 'x']: (left + right) / 2, length: right - left } : p)),
     wires: layout.wires.map((w) => ({ ...w, from: clampRef(w.from), to: clampRef(w.to) })),
   };
 

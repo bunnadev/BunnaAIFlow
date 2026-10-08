@@ -49,11 +49,11 @@ describe('ops: linh kiện', () => {
     expect(moved.wires[2].to).toBe('GND@720');
   });
 
-  it('rotateParts xoay, bỏ chỉnh tay của dây nối vào; không xoay thanh đồng', () => {
+  it('rotateParts xoay, bỏ chỉnh tay của dây nối vào; thanh đồng xoay được (ngang ↔ dọc)', () => {
     let l = setWirePoints(base(), 1, [{ x: 475, y: 300 }, { x: 686, y: 300 }, { x: 686, y: 575 }]);
     l = rotateParts(l, ['R1', 'GND'], 1);
     expect(l.parts.find((p) => p.id === 'R1')!.rotation).toBe(90);
-    expect(l.parts.find((p) => p.id === 'GND')!.rotation ?? 0).toBe(0);
+    expect(l.parts.find((p) => p.id === 'GND')!.rotation).toBe(90);
     expect(l.wires[1].manual).toBeFalsy();
     expect(rotateParts(l, ['R1'], -1).parts.find((p) => p.id === 'R1')!.rotation).toBe(0);
   });
