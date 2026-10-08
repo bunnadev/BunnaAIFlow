@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PARTS } from '../../lib/circuit/parts';
 import { anchorContact } from '../../lib/circuit/contacts';
 import { bulbLabel, LED_COLORS } from '../../lib/circuit/lightParts';
-import { isProbe, ohmWattLabel } from '../../lib/circuit/extraParts';
+import { isProbe, MINI_BULB_COLORS, ohmWattLabel } from '../../lib/circuit/extraParts';
 import { ledHex } from '../../lib/circuit/parts';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, parseCellType, parseHolderType, type CellKind, type HolderWiring } from '../../lib/circuit/powerParts';
 import { WIRE_COLORS } from '../../lib/circuit/render';
@@ -60,7 +60,7 @@ function batteryLabel(type: string, wiring?: HolderWiring): string | null {
 }
 
 /** Linh kiện có ô nhập riêng (không dùng ô "Chữ in trên thân" chung). */
-const OWN_FIELDS = new Set(['res_cement', 'res_power', 'cob', 'probe_red', 'probe_black']);
+const OWN_FIELDS = new Set(['res_cement', 'res_power', 'cob', 'probe_red', 'probe_black', 'fan', 'motor', 'mini_bulb']);
 
 const btn = 'rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-30';
 
@@ -120,7 +120,17 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               </div>
             </>
           )}
-          {part.type === 'bulb' && (
+          {part.type === 'mini_bulb' && (
+            <>
+              <div className="mb-1 text-white/50">Màu kính</div>
+              <div className="mb-2 flex gap-1.5">
+                {MINI_BULB_COLORS.map((c) => (
+                  <button key={c.key} {...pick((part.color ?? 'clear') === c.key)} onClick={() => set({ color: c.key })}>{c.name}</button>
+                ))}
+              </div>
+            </>
+          )}
+          {(part.type === 'bulb' || part.type === 'mini_bulb') && (
             <>
               <Field label="Điện áp (V)" value={part.value ?? ''}
                 onCommit={(v) => set((live) => ({ value: v, ...((live.label ?? '') === bulbLabel(live) ? { label: bulbLabel({ ...live, value: v }) } : {}) }))} />
@@ -146,14 +156,15 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
                 onCommit={(v) => set((live) => ({ marking: v, ...((live.label ?? '') === ohmWattLabel(live) ? { label: ohmWattLabel({ ...live, marking: v }) } : {}) }))} />
             </>
           )}
-          {part.type === 'cob' && (
+          {(part.type === 'cob' || part.type === 'fan' || part.type === 'motor') && (
             <Field label="Điện áp (V)" value={part.value ?? ''}
               onCommit={(v) => set((live) => ({ value: v, ...((live.label ?? '') === `${(live.value ?? '').trim()}V` ? { label: v.trim() ? `${v.trim()}V` : '' } : {}) }))} />
           )}
           {isProbe(part.type) && <div className="mb-2 text-white/40">Kéo đầu kim lại gần chân linh kiện để que tự chạm vào chân đó.</div>}
-          {(part.type === 'led' || part.type === 'bulb' || part.type === 'cob') && (
+          {['led', 'bulb', 'cob', 'mini_bulb', 'fan', 'motor'].includes(part.type) && (
             <label className="mb-2 flex items-center gap-2">
-              <input type="checkbox" checked={!!part.lit} onChange={(e) => set({ lit: e.target.checked })} /> Đèn đang sáng
+              <input type="checkbox" checked={!!part.lit} onChange={(e) => set({ lit: e.target.checked })} />
+              {part.type === 'fan' || part.type === 'motor' ? 'Đang chạy' : 'Đèn đang sáng'}
             </label>
           )}
           {part.type === 'psu' && (

@@ -73,3 +73,24 @@ describe('điểm nối kiểu thật', () => {
     expect(legacy).toContain('r="10" fill="url(#gSolder)"');
   });
 });
+
+describe('quạt, motor, bóng dây tóc nhỏ', () => {
+  const p = (type: string, o: object = {}) => ({ id: 'X', type, x: 0, y: 0, ...o });
+  it('đang chạy / đang sáng vẽ khác lúc tắt', () => {
+    for (const t of ['fan', 'motor', 'mini_bulb']) expect(PARTS[t].render(p(t))).not.toBe(PARTS[t].render(p(t, { lit: true })));
+  });
+  it('bóng nhỏ: quầng sáng theo màu kính, tắt thì không có quầng', () => {
+    expect(PARTS.mini_bulb.renderGlow!(p('mini_bulb', { lit: true, color: 'amber' }))).toContain('lt_glow_ff9a1f');
+    expect(PARTS.mini_bulb.renderGlow!(p('mini_bulb'))).toBe('');
+  });
+  it('mặc định khi thả: nhãn, ký hiệu', () => {
+    const a = addPart({ parts: [], wires: [] }, 'mini_bulb', 0, 0);
+    expect(a.id).toBe('DEN1');
+    expect(a.layout.parts[0].label).toBe('12V 5W');
+    expect(addPart({ parts: [], wires: [] }, 'fan', 0, 0).id).toBe('FAN1');
+    expect(addPart({ parts: [], wires: [] }, 'motor', 0, 0).id).toBe('M1');
+  });
+  it('bóng đèn to vẫn còn nguyên', () => {
+    expect(PARTS.bulb).toBeDefined();
+  });
+});

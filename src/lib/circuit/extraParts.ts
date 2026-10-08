@@ -187,12 +187,138 @@ export function speakerReal(p: PlacedPart): string {
   return s;
 }
 
+// ─── Quạt tản nhiệt (khung vuông, 2 dây ra bên trái) ─────────────────────
+
+/** Một cánh quạt cong quanh tâm, xoay theo góc a (độ). */
+const fanBlade = (a: number, fill: string, opacity = 1) =>
+  `<path d="M 26 -8 C 40 -30 62 -40 72 -26 C 64 -18 50 -6 36 10 Z" fill="${fill}" stroke="#4a4e55" stroke-width="1.2" opacity="${opacity}" transform="rotate(${a})"/>`;
+
+const fan: PartDef = {
+  desc: 'Quạt tản nhiệt DC khung vuông (dây đỏ +, đen −) — value = điện áp V',
+  w: 230, h: 170,
+  pins: { '+': { x: -115, y: 30 }, '-': { x: -115, y: 52 } },
+  pinDirs: { '+': 2, '-': 2 },
+  pinNote: 'nhìn thẳng mặt quạt, 2 dây đỏ (+) / đen (−) thò ra cạnh TRÁI',
+  render: (p) => {
+    const cx = 30; // tâm quạt (khung 170×170 lệch phải, chừa chỗ dây bên trái)
+    const on = !!p.lit;
+    let s = DEFS;
+    // dây ra bên trái
+    const lead = (y: number, main: string, dark: string) =>
+      `<path d="M -55 ${y} L -100 ${y}" stroke="${dark}" stroke-width="10" stroke-linecap="round"/>` +
+      `<path d="M -55 ${y} L -100 ${y}" stroke="${main}" stroke-width="7" stroke-linecap="round"/>` +
+      `<path d="M -100 ${y} L -115 ${y}" stroke="#c9ced3" stroke-width="4" stroke-linecap="round"/>`;
+    s += lead(30, '#e32b2b', '#8f1414') + lead(52, '#2a2a2e', '#6a6a72');
+    // khung
+    s += `<rect x="${cx - 85}" y="-85" width="170" height="170" rx="12" fill="#17181b" stroke="#000" stroke-width="2"/>`;
+    s += `<rect x="${cx - 82}" y="-82" width="164" height="10" rx="5" fill="#fff" opacity="0.08"/>`;
+    for (const [dx, dy] of [[-66, -66], [66, -66], [-66, 66], [66, 66]]) s += `<circle cx="${cx + dx}" cy="${dy}" r="9" fill="#e9e9e6"/><circle cx="${cx + dx}" cy="${dy}" r="9" fill="none" stroke="#000" stroke-width="2"/>`;
+    s += `<circle cx="${cx}" cy="0" r="78" fill="#d7dbe0"/><circle cx="${cx}" cy="0" r="76" fill="#0d0e10"/>`;
+    // 3 thanh đỡ động cơ
+    for (const a of [30, 150, 270]) s += `<rect x="0" y="-3" width="76" height="6" fill="#1d1e21" transform="translate(${cx} 0) rotate(${a})"/>`;
+    // cánh quạt
+    s += `<g transform="translate(${cx} 0)">`;
+    if (on) {
+      s += `<circle cx="0" cy="0" r="72" fill="#2a2c30" opacity="0.55"/>`;
+      for (let i = 0; i < 9; i++) s += fanBlade(i * 40, '#3a3d42', 0.35) + fanBlade(i * 40 + 14, '#3a3d42', 0.2);
+      for (const r of [50, 62]) s += `<path d="M ${r} 0 A ${r} ${r} 0 0 1 ${-r * 0.5} ${r * 0.87}" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="2.5" stroke-linecap="round"/>`;
+    } else {
+      for (let i = 0; i < 9; i++) s += fanBlade(i * 40, '#2e3136') + `<path d="M 36 -6 C 46 -22 60 -30 68 -24" fill="none" stroke="#fff" stroke-opacity="0.22" stroke-width="2" transform="rotate(${i * 40})"/>`;
+    }
+    s += `<circle cx="0" cy="0" r="34" fill="#141518" stroke="#2c2e33" stroke-width="2"/><circle cx="-10" cy="-10" r="10" fill="#fff" opacity="0.06"/>`;
+    s += `<circle cx="-4" cy="0" r="2.5" fill="#3d4046"/><circle cx="4" cy="2" r="2" fill="#3d4046"/>`;
+    s += `</g>`;
+    return s;
+  },
+};
+
+// ─── Motor DC (kiểu 775: vỏ bạc, trục 2 đầu, 2 cọc hàn) ─────────────────
+
+const motor: PartDef = {
+  desc: 'Motor DC vỏ bạc (kiểu 775), trục 2 đầu, 2 cọc hàn ở đầu sau — value = điện áp V',
+  w: 280, h: 190,
+  pins: { '+': { x: 70, y: -95 }, '-': { x: 70, y: 95 } },
+  pinDirs: { '+': 3, '-': 1 },
+  pinNote: 'nằm ngang, trục chính bên TRÁI; 2 cọc hàn ở đầu sau bên phải: + chĩa LÊN, − chĩa XUỐNG',
+  render: (p) => {
+    const on = !!p.lit;
+    let s = DEFS + '<defs><linearGradient id="xp_can" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef1f4"/><stop offset="0.3" stop-color="#c6ccd2"/><stop offset="0.55" stop-color="#e3e7eb"/><stop offset="1" stop-color="#8d959d"/></linearGradient></defs>';
+    // trục trước + bạc đạn
+    s += `<rect x="-140" y="-7" width="46" height="14" rx="4" fill="url(#gLeg)" stroke="#6f767d" stroke-width="1.2"/>`;
+    s += `<rect x="-106" y="-22" width="12" height="44" rx="4" fill="url(#xp_can)" stroke="#7d848c" stroke-width="1.2"/>`;
+    // vỏ chính + vỏ sau
+    s += `<rect x="-96" y="-70" width="18" height="140" rx="8" fill="url(#xp_can)" stroke="#7d848c" stroke-width="1.5"/>`;
+    s += `<rect x="-84" y="-70" width="100" height="140" fill="url(#xp_can)" stroke="#7d848c" stroke-width="1.5"/>`;
+    s += `<rect x="14" y="-66" width="76" height="132" rx="6" fill="url(#xp_can)" stroke="#7d848c" stroke-width="1.5"/>`;
+    // khe thông gió thấy chổi than / cổ góp đồng
+    s += `<rect x="36" y="-26" width="26" height="52" rx="6" fill="#2b2420"/><rect x="40" y="-20" width="18" height="40" rx="3" fill="#b8733a"/><rect x="44" y="-20" width="4" height="40" fill="#e1a066"/>`;
+    s += `<rect x="40" y="-62" width="22" height="10" rx="3" fill="#3a332e"/>`;
+    // nắp sau + trục sau
+    s += `<rect x="88" y="-30" width="24" height="60" rx="10" fill="url(#xp_can)" stroke="#7d848c" stroke-width="1.5"/>`;
+    s += `<rect x="110" y="-7" width="30" height="14" rx="4" fill="url(#gLeg)" stroke="#6f767d" stroke-width="1.2"/>`;
+    // cọc hàn (đồng thau)
+    const tab = (y1: number, y2: number) => `<rect x="64" y="${Math.min(y1, y2)}" width="12" height="${Math.abs(y2 - y1)}" rx="2" fill="#d9b35a" stroke="#8a6a24" stroke-width="1.2"/>`;
+    s += tab(-66, -95) + tab(66, 95);
+    s += `<rect x="-82" y="-64" width="96" height="10" rx="4" fill="#fff" opacity="0.5"/>`;
+    s += `<text x="70" y="-108" font-family="${FONT}" font-size="20" font-weight="900" fill="#ff5a5a" text-anchor="middle">+</text>`;
+    s += `<text x="88" y="112" font-family="${FONT}" font-size="22" font-weight="900" fill="#9fb8d8" text-anchor="middle">−</text>`;
+    if (on) for (const r of [22, 32]) s += `<path d="M -124 ${-r} A ${r} ${r} 0 0 0 -124 ${r}" fill="none" stroke="#ffd34d" stroke-opacity="0.8" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 6"/>`;
+    return s;
+  },
+};
+
+// ─── Bóng đèn dây tóc nhỏ (kiểu 1157 / đèn hậu xe máy) ───────────────────
+
+export const MINI_BULB_COLORS: { key: string; name: string; glass: string; glassOn: string; glow: string }[] = [
+  { key: 'clear', name: 'Trong', glass: '#e8f1f6', glassOn: '#fff4c4', glow: '#ffd27a' },
+  { key: 'amber', name: 'Vàng cam', glass: '#f0901c', glassOn: '#ffb43a', glow: '#ff9a1f' },
+  { key: 'red', name: 'Đỏ', glass: '#d62424', glassOn: '#ff4a3a', glow: '#ff3b2b' },
+];
+
+const miniBulb: PartDef = {
+  desc: 'Bóng đèn dây tóc nhỏ (kiểu 1157, đèn hậu xe máy), 2 chân ra ở đuôi như LED — value = V, marking = W',
+  w: 80, h: 190,
+  pins: { '1': { x: -14, y: 95 }, '2': { x: 14, y: 95 } },
+  pinDirs: { '1': 1, '2': 1 },
+  pinNote: 'bóng ở trên, đuôi kim loại ở dưới, 2 chân chĩa XUỐNG: chân 1 trái, chân 2 phải',
+  render: (p) => {
+    const on = !!p.lit;
+    const c = MINI_BULB_COLORS.find((x) => x.key === p.color) ?? MINI_BULB_COLORS[0];
+    const clear = c.key === 'clear';
+    let s = DEFS;
+    s += leg(-10, 52, -14, 95, 5) + leg(10, 52, 14, 95, 5);
+    // đuôi kim loại (2 chốt ngàm) + đáy nhựa đen
+    s += `<rect x="-22" y="6" width="44" height="42" rx="3" fill="url(#gSilver)" stroke="#7d848c" stroke-width="1.5"/>`;
+    s += `<circle cx="-22" cy="26" r="4" fill="#8d949c"/><circle cx="22" cy="20" r="4" fill="#8d949c"/>`;
+    s += `<rect x="-18" y="46" width="36" height="8" rx="3" fill="#15171a"/>`;
+    // bóng thuỷ tinh dáng giọt
+    const glass = 'M -16 8 L -18 -14 C -38 -26 -38 -74 0 -82 C 38 -74 38 -26 18 -14 L 16 8 Z';
+    s += `<path d="${glass}" fill="${on ? c.glassOn : c.glass}" fill-opacity="${clear && !on ? 0.35 : 0.85}" stroke="${clear ? '#ffffff' : c.glass}" stroke-opacity="0.8" stroke-width="2"/>`;
+    // dây đỡ + sợi tóc
+    s += `<path d="M -6 6 L -8 -30 L -14 -50 M 6 6 L 8 -30 L 14 -50" fill="none" stroke="${clear ? '#8f979e' : '#5a3410'}" stroke-opacity="0.85" stroke-width="2"/>`;
+    const fil = 'M -14 -50 l 4 -5 l 4 5 l 4 -5 l 4 5 l 4 -5 l 4 5 l 4 -5';
+    s += on
+      ? `<path d="${fil}" fill="none" stroke="#ff9d1c" stroke-width="5"/><path d="${fil}" fill="none" stroke="#fffbe8" stroke-width="2"/>`
+      : `<path d="${fil}" fill="none" stroke="${clear ? '#5a4a3c' : '#4a2a0c'}" stroke-width="2"/>`;
+    s += `<path d="M -22 -56 C -22 -68 -12 -76 -2 -77" fill="none" stroke="#fff" stroke-opacity="0.75" stroke-width="5" stroke-linecap="round"/>`;
+    return s;
+  },
+  renderGlow: (p) => {
+    if (!p.lit) return '';
+    const c = MINI_BULB_COLORS.find((x) => x.key === p.color) ?? MINI_BULB_COLORS[0];
+    return glow(c.glow, 0, -48, 150, 0.85);
+  },
+};
+
 export const EXTRA_PARTS: Record<string, PartDef> = {
   res_cement: resCement,
   res_power: resPower,
   cob,
   probe_red: probe('red'),
   probe_black: probe('black'),
+  fan,
+  motor,
+  mini_bulb: miniBulb,
 };
 export const EXTRA_TYPES = new Set(Object.keys(EXTRA_PARTS));
 export const isProbe = (type: string) => type === 'probe_red' || type === 'probe_black';
