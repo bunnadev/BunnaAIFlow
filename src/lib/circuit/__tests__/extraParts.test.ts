@@ -94,3 +94,13 @@ describe('quạt, motor, bóng dây tóc nhỏ', () => {
     expect(PARTS.bulb).toBeDefined();
   });
 });
+
+describe('bóng dây tóc nhỏ kiểu đuôi ngàm', () => {
+  it('3 chân: chấm đáy đi xuống, 2 chốt vỏ đi sang 2 bên', () => {
+    const d = PARTS.mini_bulb;
+    expect(Object.keys(d.pins).sort()).toEqual(['day', 'vo_phai', 'vo_trai']);
+    expect(d.pinDirs).toEqual({ day: 1, vo_trai: 2, vo_phai: 0 });
+    expect(d.pins.vo_trai.y).toBe(d.pins.vo_phai.y);
+    expect(d.pins.day.x).toBe(0);
+  });
+});

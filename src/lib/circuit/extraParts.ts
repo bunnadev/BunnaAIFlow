@@ -275,22 +275,26 @@ export const MINI_BULB_COLORS: { key: string; name: string; glass: string; glass
   { key: 'red', name: 'Đỏ', glass: '#d62424', glassOn: '#ff4a3a', glow: '#ff3b2b' },
 ];
 
+const MB_NUB = 24, MB_TIP = 62; // chốt ngàm vỏ / chấm đáy
+
 const miniBulb: PartDef = {
-  desc: 'Bóng đèn dây tóc nhỏ (kiểu 1157, đèn hậu xe máy), 2 chân ra ở đuôi như LED — value = V, marking = W',
-  w: 80, h: 190,
-  pins: { '1': { x: -14, y: 95 }, '2': { x: 14, y: 95 } },
-  pinDirs: { '1': 1, '2': 1 },
-  pinNote: 'bóng ở trên, đuôi kim loại ở dưới, 2 chân chĩa XUỐNG: chân 1 trái, chân 2 phải',
+  desc: 'Bóng đèn dây tóc nhỏ (kiểu 1157, đèn hậu xe máy): cực 1 = chấm đáy, cực 2 = vỏ đuôi (2 chốt ngàm 2 bên thông nhau) — value = V, marking = W',
+  w: 64, h: 170,
+  // "day" = chấm thiếc giữa đáy; "vo_trai" / "vo_phai" = 2 chốt ngàm trên vỏ đuôi (cùng 1 cực)
+  pins: { day: { x: 0, y: MB_TIP }, vo_trai: { x: -30, y: MB_NUB }, vo_phai: { x: 30, y: MB_NUB } },
+  pinDirs: { day: 1, vo_trai: 2, vo_phai: 0 },
+  pinNote: 'bóng ở trên, đuôi kim loại ở dưới: chân "day" ở giữa đáy (dây đi xuống), 2 chốt vỏ "vo_trai" / "vo_phai" ở 2 bên đuôi (dây đi ngang, cùng 1 cực)',
   render: (p) => {
     const on = !!p.lit;
     const c = MINI_BULB_COLORS.find((x) => x.key === p.color) ?? MINI_BULB_COLORS[0];
     const clear = c.key === 'clear';
     let s = DEFS;
-    s += leg(-10, 52, -14, 95, 5) + leg(10, 52, 14, 95, 5);
-    // đuôi kim loại (2 chốt ngàm) + đáy nhựa đen
-    s += `<rect x="-22" y="6" width="44" height="42" rx="3" fill="url(#gSilver)" stroke="#7d848c" stroke-width="1.5"/>`;
-    s += `<circle cx="-22" cy="26" r="4" fill="#8d949c"/><circle cx="22" cy="20" r="4" fill="#8d949c"/>`;
-    s += `<rect x="-18" y="46" width="36" height="8" rx="3" fill="#15171a"/>`;
+    // đuôi kim loại (cực vỏ) + 2 chốt ngàm 2 bên, đáy nhựa đen + chấm thiếc giữa đáy (cực đáy)
+    s += `<rect x="-20" y="6" width="40" height="42" rx="3" fill="url(#gSilver)" stroke="#7d848c" stroke-width="1.5"/>`;
+    for (const y of [16, 30]) s += `<path d="M -20 ${y} Q 0 ${y + 4} 20 ${y}" fill="none" stroke="#7d848c" stroke-width="1.2" opacity="0.7"/>`;
+    for (const sx of [-1, 1]) s += `<rect x="${sx < 0 ? -31 : 19}" y="${MB_NUB - 6}" width="12" height="12" rx="5" fill="url(#gSilver)" stroke="#6f767d" stroke-width="1.3"/>`;
+    s += `<rect x="-16" y="46" width="32" height="9" rx="3" fill="#15171a"/>`;
+    s += `<ellipse cx="0" cy="${MB_TIP - 4}" rx="9" ry="6" fill="url(#gSolder)" stroke="#6f767d" stroke-width="1.2"/>`;
     // bóng thuỷ tinh dáng giọt
     const glass = 'M -16 8 L -18 -14 C -38 -26 -38 -74 0 -82 C 38 -74 38 -26 18 -14 L 16 8 Z';
     s += `<path d="${glass}" fill="${on ? c.glassOn : c.glass}" fill-opacity="${clear && !on ? 0.35 : 0.85}" stroke="${clear ? '#ffffff' : c.glass}" stroke-opacity="0.8" stroke-width="2"/>`;

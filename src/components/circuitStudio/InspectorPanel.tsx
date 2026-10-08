@@ -130,6 +130,7 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               </div>
             </>
           )}
+          {part.type === 'mini_bulb' && <div className="mb-2 text-white/40">Nối dây: chấm giữa đáy là 1 cực; 2 chốt ngàm 2 bên vỏ là cực còn lại (thông nhau, nối vào chốt nào cũng được).</div>}
           {(part.type === 'bulb' || part.type === 'mini_bulb') && (
             <>
               <Field label="Điện áp (V)" value={part.value ?? ''}
@@ -212,7 +213,7 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               <input type="checkbox" checked={!!part.heatsink} onChange={(e) => set({ heatsink: e.target.checked })} /> Tản nhiệt
             </label>
           )}
-          {part.type !== 'bus' && part.type !== 'psu' && !battery && !isProbe(part.type) && Object.keys(PARTS[part.type]?.pins ?? {}).length > 0 && (
+          {part.type !== 'bus' && part.type !== 'psu' && part.type !== 'mini_bulb' && !battery && !isProbe(part.type) && Object.keys(PARTS[part.type]?.pins ?? {}).length > 0 && (
             <div className="mt-3 border-t border-white/10 pt-2">
               <div className="mb-1 text-white/50">Tên chân thật (VD C1815: 1 = E, 2 = C, 3 = B)</div>
               {Object.keys(PARTS[part.type].pins).map((pin) => (
