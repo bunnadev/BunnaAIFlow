@@ -1,4 +1,6 @@
-import { labelPlacements, renderScene, svgDefs, titleSvg, woodBackground } from './render';
+import { labelPlacements, renderScene, svgDefs, titleSvg } from './render';
+// Nền gỗ mặc định khi xuất ảnh: ảnh ván gỗ thật (nhúng sẵn dạng data URL để vẽ được lên canvas)
+import WOOD_PHOTO from '../../assets/circuit/wood-planks.webp?inline';
 import type { RoutedWire } from './route';
 import { endPartId } from './geometry';
 import { contentBounds } from './world';
@@ -63,7 +65,7 @@ export function renderExportSvg(
     ? `<rect width="${W}" height="${H}" fill="${opts.background.color}"/>`
     : opts.background.kind === 'image' && opts.backgroundDataUrl
       ? `<image href="${opts.backgroundDataUrl}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
-      : woodBackground(W, H);
+      : `<image href="${WOOD_PHOTO}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`;
   const scene = renderScene(sub, { routed: subRouted, frame: null, labels });
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
     svgDefs() + bg +

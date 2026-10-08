@@ -41,10 +41,12 @@ describe('exportImage', () => {
   });
 
   it('nền gỗ / màu / ảnh, tiêu đề, phần chọn rỗng', () => {
-    expect(renderExportSvg(l, routed, { aspect: '4:5', background: wood })!.svg).toContain('fill="url(#gWood)"');
+    // nền gỗ = ảnh ván gỗ thật nhúng dạng data URL, phủ kín khung (cắt, không méo)
+    const woodSvg = renderExportSvg(l, routed, { aspect: '4:5', background: wood })!.svg;
+    expect(woodSvg).toMatch(/<image href="data:image\/webp;base64,[^"]+" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice"\/>/);
     const color = renderExportSvg(l, routed, { aspect: '4:5', background: { kind: 'color', color: '#ffffff' } })!.svg;
     expect(color).toContain('fill="#ffffff"');
-    expect(color).not.toContain('fill="url(#gWood)"');
+    expect(color).not.toContain('data:image/webp');
     const img = renderExportSvg(l, routed, { aspect: '4:5', background: { kind: 'image', id: 'a' }, backgroundDataUrl: 'data:image/png;base64,QQ==' })!.svg;
     expect(img).toContain('href="data:image/png;base64,QQ=="');
     expect(renderExportSvg(l, routed, { aspect: '4:5', background: wood, titleTop: 'ABC' })!.svg).toContain('>ABC</text>');
