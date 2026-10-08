@@ -14,7 +14,7 @@ const snap10 = (v: number) => Math.round(v / 10) * 10;
 const PREFIX: Record<string, string> = {
   resistor: 'R', cap_elec: 'C', cap_ceramic: 'C', pot: 'VR', diode: 'D',
   to92: 'Q', to220: 'Q', to3: 'Q', pentawatt: 'U', dip8: 'U', dip14: 'U', dip16: 'U',
-  led: 'LED', bulb: 'DEN', cob: 'COB', res_cement: 'R', res_power: 'R', probe_red: 'VOM', probe_black: 'VOM', fan: 'FAN', motor: 'M', mini_bulb: 'DEN', speaker: 'SP', jack35: 'J', mic: 'MIC', terminal2: 'PWR', lead: 'OUT', psu: 'PSU',
+  led: 'LED', bulb: 'DEN', cob: 'COB', res_cement: 'R', res_power: 'R', probe_red: 'VOM', probe_black: 'VOM', fan: 'FAN', motor: 'M', mini_bulb: 'DEN', sw_rocker2: 'SW', sw_rocker3: 'SW', speaker: 'SP', jack35: 'J', mic: 'MIC', terminal2: 'PWR', lead: 'OUT', psu: 'PSU',
   ...Object.fromEntries(CELL_KINDS.flatMap((k) => [cellType(k), ...[1, 2, 3].map((n) => holderType(k, n))].map((t) => [t, 'BAT']))),
 };
 
@@ -41,6 +41,8 @@ const DEFAULTS: Record<string, Partial<PlacedPart>> = {
   cob: { value: '12', label: '12V' },
   res_cement: { value: '10', marking: '5', label: '10Ω 5W' },
   res_power: { value: '33', marking: '1', label: '33Ω 1W' },
+  sw_rocker2: { label: 'SW' },
+  sw_rocker3: { label: 'SW' },
   fan: { value: '12', label: '12V' },
   motor: { value: '12', label: '12V' },
   mini_bulb: { value: '12', marking: '5', color: 'clear', label: '12V 5W' },

@@ -104,3 +104,14 @@ describe('bóng dây tóc nhỏ kiểu đuôi ngàm', () => {
     expect(d.pins.day.x).toBe(0);
   });
 });
+
+describe('công tắc bập bênh', () => {
+  it('2 chân / 3 chân, bật khác tắt, ký hiệu SW', () => {
+    expect(Object.keys(PARTS.sw_rocker2.pins)).toEqual(['1', '2']);
+    expect(Object.keys(PARTS.sw_rocker3.pins)).toEqual(['1', '2', '3']);
+    expect(PARTS.sw_rocker3.pins['2'].x).toBe(0);
+    const p = { id: 'SW1', type: 'sw_rocker2', x: 0, y: 0 };
+    expect(PARTS.sw_rocker2.render(p)).not.toBe(PARTS.sw_rocker2.render({ ...p, lit: true }));
+    expect(addPart({ parts: [], wires: [] }, 'sw_rocker3', 0, 0).id).toBe('SW1');
+  });
+});

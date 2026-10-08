@@ -60,7 +60,7 @@ function batteryLabel(type: string, wiring?: HolderWiring): string | null {
 }
 
 /** Linh kiện có ô nhập riêng (không dùng ô "Chữ in trên thân" chung). */
-const OWN_FIELDS = new Set(['res_cement', 'res_power', 'cob', 'probe_red', 'probe_black', 'fan', 'motor', 'mini_bulb']);
+const OWN_FIELDS = new Set(['res_cement', 'res_power', 'cob', 'probe_red', 'probe_black', 'fan', 'motor', 'mini_bulb', 'sw_rocker2', 'sw_rocker3']);
 
 const btn = 'rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-30';
 
@@ -162,12 +162,13 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               onCommit={(v) => set((live) => ({ value: v, ...((live.label ?? '') === `${(live.value ?? '').trim()}V` ? { label: v.trim() ? `${v.trim()}V` : '' } : {}) }))} />
           )}
           {isProbe(part.type) && <div className="mb-2 text-white/40">Kéo đầu kim lại gần chân linh kiện để que tự chạm vào chân đó.</div>}
-          {['led', 'bulb', 'cob', 'mini_bulb', 'fan', 'motor'].includes(part.type) && (
+          {['led', 'bulb', 'cob', 'mini_bulb', 'fan', 'motor', 'sw_rocker2', 'sw_rocker3'].includes(part.type) && (
             <label className="mb-2 flex items-center gap-2">
               <input type="checkbox" checked={!!part.lit} onChange={(e) => set({ lit: e.target.checked })} />
-              {part.type === 'fan' || part.type === 'motor' ? 'Đang chạy' : 'Đèn đang sáng'}
+              {part.type === 'fan' || part.type === 'motor' ? 'Đang chạy' : part.type.startsWith('sw_') ? 'Đang bật (nhấn phía I)' : 'Đèn đang sáng'}
             </label>
           )}
+          {part.type === 'sw_rocker3' && <div className="mb-2 text-white/40">Chân 2 (giữa) thường là chân chung. Mỗi hãng nối khác nhau — đo lại bằng đồng hồ VOM trên công tắc thật trước khi hàn.</div>}
           {part.type === 'psu' && (
             <>
               <Field label="Màn hình — điện áp (V)" value={part.value ?? ''} onCommit={(v) => set({ value: v })} />

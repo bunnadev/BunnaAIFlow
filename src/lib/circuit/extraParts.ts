@@ -314,6 +314,49 @@ const miniBulb: PartDef = {
   },
 };
 
+// ─── Công tắc bập bênh KCD11 (2 chân / 3 chân) ──────────────────────────
+
+const SW_PIN_Y = 78;
+
+function rocker(n: 2 | 3): PartDef {
+  const xs = n === 2 ? [-16, 16] : [-22, 0, 22];
+  const pins: Record<string, { x: number; y: number }> = {};
+  xs.forEach((x, i) => { pins[String(i + 1)] = { x, y: SW_PIN_Y }; });
+  return {
+    desc: n === 2
+      ? 'Công tắc bập bênh KCD11 2 chân (bật/tắt), nút đỏ I/O'
+      : 'Công tắc bập bênh KCD11 3 chân (chân 2 ở giữa là chân chung), nút đỏ I/O',
+    w: 90, h: 156,
+    pins,
+    pinDirs: Object.fromEntries(Object.keys(pins).map((k) => [k, 1])) as Record<string, 1>,
+    pinNote: n === 2 ? 'nhìn thẳng mặt nút, 2 chân lá chĩa XUỐNG: chân 1 trái, chân 2 phải' : 'nhìn thẳng mặt nút, 3 chân lá chĩa XUỐNG: chân 1 trái, chân 2 giữa (chung), chân 3 phải',
+    render: (p) => {
+      const on = !!p.lit;
+      let s = DEFS;
+      // chân lá dẹt
+      for (const x of xs) s += `<rect x="${x - 4}" y="28" width="8" height="${SW_PIN_Y - 28}" rx="1.5" fill="url(#gSilver)" stroke="#6f767d" stroke-width="1"/><circle cx="${x}" cy="${SW_PIN_Y - 16}" r="2" fill="#6f767d"/>`;
+      // thân + chữ in
+      s += `<rect x="-34" y="-14" width="68" height="44" rx="3" fill="url(#gBlack)" stroke="#000" stroke-width="1"/>`;
+      s += `<text x="0" y="4" font-family="${FONT}" font-size="10" font-weight="700" fill="#9aa0a6" text-anchor="middle">KCD11</text>`;
+      s += `<text x="0" y="18" font-family="${FONT}" font-size="9" font-weight="700" fill="#9aa0a6" text-anchor="middle">3A 250V AC</text>`;
+      // viền khung + lỗ
+      s += `<rect x="-42" y="-74" width="84" height="64" rx="5" fill="#18191c" stroke="#000" stroke-width="1.5"/>`;
+      s += `<rect x="-40" y="-72" width="80" height="6" rx="3" fill="#fff" opacity="0.08"/>`;
+      s += `<rect x="-34" y="-66" width="68" height="48" rx="3" fill="#060607"/>`;
+      // nút bập bênh: nửa bị nhấn tối hơn, nửa nhô sáng hơn
+      const pressedI = on;
+      const half = (x: number, raised: boolean) =>
+        `<rect x="${x}" y="${raised ? -66 : -64}" width="33" height="${raised ? 48 : 44}" rx="3" fill="${raised ? '#e0362f' : '#a51d18'}"/>` +
+        (raised ? `<rect x="${x + 3}" y="-63" width="27" height="7" rx="3" fill="#fff" opacity="0.28"/>` : '');
+      s += half(-34, !pressedI) + half(1, pressedI);
+      s += `<line x1="0.5" y1="-66" x2="0.5" y2="-18" stroke="#5c0d0a" stroke-width="2"/>`;
+      s += `<line x1="-17" y1="-50" x2="-17" y2="-34" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.9"/>`;
+      s += `<circle cx="17" cy="-42" r="7" fill="none" stroke="#fff" stroke-width="2.6" opacity="0.9"/>`;
+      return s;
+    },
+  };
+}
+
 export const EXTRA_PARTS: Record<string, PartDef> = {
   res_cement: resCement,
   res_power: resPower,
@@ -323,6 +366,8 @@ export const EXTRA_PARTS: Record<string, PartDef> = {
   fan,
   motor,
   mini_bulb: miniBulb,
+  sw_rocker2: rocker(2),
+  sw_rocker3: rocker(3),
 };
 export const EXTRA_TYPES = new Set(Object.keys(EXTRA_PARTS));
 export const isProbe = (type: string) => type === 'probe_red' || type === 'probe_black';

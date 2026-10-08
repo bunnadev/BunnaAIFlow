@@ -12,6 +12,8 @@ export const BUILTIN_LIBRARY: LibraryItem[] = [
   { type: 'cob', name: 'Đèn LED bảng', group: 'Cơ bản' },
   { type: 'fan', name: 'Quạt tản nhiệt', group: 'Cơ bản' },
   { type: 'motor', name: 'Motor DC', group: 'Cơ bản' },
+  { type: 'sw_rocker2', name: 'Công tắc 2 chân', group: 'Cơ bản' },
+  { type: 'sw_rocker3', name: 'Công tắc 3 chân', group: 'Cơ bản' },
   { type: 'res_cement', name: 'Điện trở xi măng', group: 'Cơ bản' },
   { type: 'res_power', name: 'Điện trở công suất', group: 'Cơ bản' },
   { type: 'cap_elec', name: 'Tụ hoá', group: 'Cơ bản' },
