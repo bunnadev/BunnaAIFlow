@@ -243,7 +243,7 @@ Huy chốt thêm sau khi duyệt bản trên. **Mục này thay cho các chỗ m
 Những chỗ bản đã làm khác các mục ở trên:
 
 - **Thêm góc:** bấm đúp vào một đoạn dây thì đoạn đó tách thành 2 nửa, mỗi nửa kéo riêng được. Chưa kéo trực tiếp được 1 góc.
-- **Thanh đồng (mass / nguồn +):** chỉ đặt nằm ngang.
+- **Thanh đồng (mass / nguồn +):** nằm ngang hoặc dọc (xoay bằng phím R / nút xoay, từ 2026-10-08). Điểm nối "ID@c" ghi toạ độ dọc trục thanh.
 - **Tiêu đề trên / dưới:** gõ trong hộp thoại Xuất ảnh, không gõ trên bàn vẽ. Hộp thoại nhớ tiêu đề đã gõ cho lần xuất sau.
 - **Lăn chuột / vuốt trackpad:** kéo bàn vẽ. Muốn phóng to / thu nhỏ thì giữ Cmd (hoặc Ctrl) khi lăn, chụm 2 ngón trên trackpad, bấm nút −/+ trên thanh công cụ, hoặc bấm phím `-` / `=`. Phím `0` để vừa màn hình.
 - **Nhãn điện trở:** nhãn xanh tự đổi theo giá trị (VD "1k" → "1kΩ") nếu chưa bị sửa tay. Đã gõ nhãn khác thì nhãn đó được giữ nguyên.
