@@ -701,12 +701,16 @@ export function woodTileSvg(W = 1080, H = 1350): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${DEFS}${woodBackground(W, H, false)}</svg>`;
 }
 
-/** Ảnh mạch khung cố định (node "Vẽ mạch"): nền gỗ + mạch + tiêu đề. */
-export function renderCircuitSvg(layout: CircuitLayout, opts: RenderOptions = {}): string {
+/**
+ * Ảnh mạch khung cố định (node "Vẽ mạch"): nền + mạch + tiêu đề. Nền mặc định là gỗ vẽ
+ * bằng code; app truyền `background` = ảnh ván gỗ thật (woodPhoto.ts).
+ */
+export function renderCircuitSvg(layout: CircuitLayout, opts: RenderOptions & { background?: (W: number, H: number) => string } = {}): string {
   const W = layout.width ?? 1080;
   const H = layout.height ?? 1350;
+  const { background, ...sceneOpts } = opts;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
-    DEFS + woodBackground(W, H) + renderScene(layout, { ...opts, frame: { W, H } }) +
+    DEFS + (background ? background(W, H) : woodBackground(W, H)) + renderScene(layout, { ...sceneOpts, frame: { W, H } }) +
     titleSvg(layout.titleTop, 92, W) + titleSvg(layout.titleBottom, H - 40, W) +
     `</svg>`;
 }

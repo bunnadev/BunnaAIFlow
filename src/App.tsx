@@ -44,6 +44,7 @@ import NodeLibraryPanel from './components/NodeLibraryPanel';
 import { WORKFLOW_TEMPLATES } from './lib/workflowTemplates';
 import CircuitDrawNode from './components/nodes/CircuitDrawNode';
 import { renderCircuitSvg, validateLayout, parseLayout, expectedWireCountFromDesign, severeIssues } from './lib/circuit/render';
+import { woodPhotoBackground } from './lib/circuit/woodPhoto';
 import { buildCircuitLayoutPrompt, buildCircuitRepairPrompt } from './lib/circuit/prompt';
 import { svgToPngBase64 } from './lib/circuit/rasterize';
 import type { CircuitLayout } from './lib/circuit/types';
@@ -998,7 +999,8 @@ throw new Error(`Bố cục mạch có lỗi: ${errors.join(' | ')}`);
 }
 const width = layout.width ?? 1080;
 const height = layout.height ?? 1350;
-const b64 = await svgToPngBase64(renderCircuitSvg(layout), width, height);
+// Nền ảnh ván gỗ thật (giống nền mặc định khi xuất ảnh ở Xưởng vẽ), tối dần 4 góc như nền gỗ cũ
+const b64 = await svgToPngBase64(renderCircuitSvg(layout, { background: (W, H) => woodPhotoBackground(W, H, true) }), width, height);
 const asset = await saveAssetFromBase64(b64, 'image/png');
 setNodes(nds => nds.map(n => n.id === nodeId ? {
 ...n,

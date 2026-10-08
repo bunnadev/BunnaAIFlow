@@ -53,3 +53,15 @@ describe('exportImage', () => {
     expect(renderExportSvg(l, routed, { aspect: '4:5', background: wood, ids: [] })).toBeNull();
   });
 });
+
+describe('nền node "Vẽ mạch"', () => {
+  it('app truyền nền ảnh gỗ (có tối 4 góc); không truyền thì vẫn là gỗ vẽ bằng code', async () => {
+    const { renderCircuitSvg } = await import('../render');
+    const { woodPhotoBackground } = await import('../woodPhoto');
+    const lay = { parts: [{ id: 'R1', type: 'resistor', x: 540, y: 600 }], wires: [] };
+    const photo = renderCircuitSvg(lay, { background: (W, H) => woodPhotoBackground(W, H, true) });
+    expect(photo).toMatch(/<image href="data:image\/webp;base64,[^"]+" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice"\/><rect width="1080" height="1350" fill="url\(#gVignette\)"\/>/);
+    expect(photo).not.toContain('fill="url(#gWood)"');
+    expect(renderCircuitSvg(lay)).toContain('fill="url(#gWood)"');
+  });
+});
