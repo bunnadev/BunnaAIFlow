@@ -65,11 +65,12 @@ describe('điểm nối kiểu thật', () => {
     parts: [{ id: 'R1', type: 'resistor', x: 0, y: 0 }, { id: 'R2', type: 'resistor', x: 400, y: 200 }],
     wires: [{ from: 'R1.2', to: 'R2.1', color: 'red' }],
   };
-  it('Xưởng vẽ (không khung): cục hàn dạng giọt + lõi thiếc; khung cố định (node cũ) giữ chấm tròn', () => {
+  it('Xưởng vẽ (không khung): mối hàn ôm chân + nhựa thông; khung cố định (node cũ) giữ chấm tròn', () => {
     const studio = renderScene(lay, { frame: null });
     const legacy = renderScene(lay);
-    expect(studio).toContain('C -10 -10 4 -11 12 -5');
-    expect(legacy).not.toContain('C -10 -10 4 -11 12 -5');
+    expect(studio).toContain('url(#gSolderJoint)');
+    expect(studio).toContain('url(#gFlux)');
+    expect(legacy).not.toContain('url(#gSolderJoint)');
     expect(legacy).toContain('r="10" fill="url(#gSolder)"');
   });
 });

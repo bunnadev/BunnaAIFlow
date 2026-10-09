@@ -381,17 +381,23 @@ function trimEnds(pts: Point[], a: number, b: number): Point[] {
   return out;
 }
 
-/** Cục thiếc hàn dạng giọt ở chân, kéo dài theo hướng dây đi ra (toward = điểm kế tiếp trên dây). */
+/**
+ * Mối hàn (Xưởng vẽ): thiếc ôm quanh chỗ nối, giữa phình, 2 đầu thon bằng cỡ chân /
+ * lõi dây rồi liền vào kim loại; vệt sáng chạy dọc; quầng nhựa thông hổ phách bên dưới.
+ * Trục +x hướng về phía dây; khối thiếc dừng ở x=12, trước vỏ nhựa (STRIP) — lộ đoạn lõi trần.
+ */
 function solderBlob(pt: Point, toward: Point): string {
   const deg = (Math.atan2(toward.y - pt.y, toward.x - pt.x) * 180) / Math.PI;
-  // thu nhỏ theo dây bọc (dây Xưởng vẽ mảnh còn ~70%)
-  return `<g transform="translate(${pt.x} ${pt.y}) rotate(${deg.toFixed(1)}) scale(0.8)">` +
-    `<path d="M -10 0 C -10 -10 4 -11 12 -5 C 18 -2 22 -1 26 0 C 22 1 18 2 12 5 C 4 11 -10 10 -10 0 Z" fill="url(#gBlob)" stroke="#43484e" stroke-width="1.3"/>` +
-    `<ellipse cx="-2" cy="-4" rx="3.6" ry="1.9" fill="#fff" opacity="0.9"/>` +
+  return `<g transform="translate(${pt.x} ${pt.y}) rotate(${deg.toFixed(1)})">` +
+    `<ellipse cx="-3" cy="1.5" rx="20" ry="13" fill="url(#gFlux)"/>` +
+    `<path d="M -18 -3.6 C -13 -3.8 -10 -7.4 -3 -7.4 C 4 -7.4 7 -4.4 12 -4 L 12 4 C 7 4.4 4 7.4 -3 7.4 C -10 7.4 -13 3.8 -18 3.6 Z" fill="url(#gSolderJoint)"/>` +
+    // viền chỉ 2 bên sườn — 2 đầu không viền để thiếc liền vào chân / lõi (không thành cái khâu bóp)
+    `<path d="M -18 -3.6 C -13 -3.8 -10 -7.4 -3 -7.4 C 4 -7.4 7 -4.4 12 -4 M -18 3.6 C -13 3.8 -10 7.4 -3 7.4 C 4 7.4 7 4.4 12 4" fill="none" stroke="#3d4248" stroke-width="1"/>` +
+    `<path d="M -12 -4.2 C -7 -5.8 1 -5.8 7 -4.2" fill="none" stroke="#fff" stroke-opacity="0.75" stroke-width="1.4" stroke-linecap="round"/>` +
     `</g>`;
 }
 
-const STRIP = 18; // đoạn lõi tráng thiếc lộ ra giữa vỏ dây và cục hàn
+const STRIP = 22; // vỏ dây dừng cách chân: lộ đoạn lõi tráng thiếc giữa vỏ và mối hàn // đoạn lõi tráng thiếc lộ ra giữa vỏ dây và cục hàn
 
 function renderWire(w: Wire, rw: RoutedWire | null, dashed = false, shadowId = 'fWireShadow', darkBg = false, real = false): { body: string; joints: string } {
   if (!rw || w.color === 'contact') return { body: '', joints: '' };
@@ -713,8 +719,10 @@ function studioFilterDefs(r: Box): { defs: string; shadow: string; wireShadow: s
   const defs = `<defs>` +
     `<filter id="${shadow}" ${region}><feDropShadow dx="5" dy="8" stdDeviation="6" flood-color="#000" flood-opacity="0.5"/></filter>` +
     `<filter id="${wireShadow}" ${region}><feDropShadow dx="3" dy="5" stdDeviation="3" flood-color="#000" flood-opacity="0.45"/></filter>` +
-    // thiếc hàn: xám bạc bóng, mép tối (cục hàn dạng giọt của Xưởng vẽ)
-    `<radialGradient id="gBlob" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#f3f5f7"/><stop offset="0.35" stop-color="#b8bec4"/><stop offset="0.8" stop-color="#7a8188"/><stop offset="1" stop-color="#4c5258"/></radialGradient>` +
+    // mối hàn Xưởng vẽ: thiếc xám bạc, sáng thành vệt dọc giữa thân
+    `<linearGradient id="gSolderJoint" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4b5157"/><stop offset="0.22" stop-color="#9aa1a8"/><stop offset="0.4" stop-color="#eef1f3"/><stop offset="0.58" stop-color="#b4bac0"/><stop offset="0.82" stop-color="#737980"/><stop offset="1" stop-color="#454b51"/></linearGradient>` +
+    // nhựa thông còn lại quanh mối hàn
+    `<radialGradient id="gFlux" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#c9902f" stop-opacity="0.55"/><stop offset="0.6" stop-color="#b57a22" stop-opacity="0.3"/><stop offset="1" stop-color="#9a6418" stop-opacity="0"/></radialGradient>` +
     `</defs>`;
   return { defs, shadow, wireShadow };
 }
