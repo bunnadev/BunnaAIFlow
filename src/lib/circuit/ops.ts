@@ -144,11 +144,18 @@ export function deleteParts(layout: CircuitLayout, ids: string[]): { layout: Cir
   };
 }
 
+/** Ký hiệu cho bản sao của linh kiện không có tiền tố chuẩn (thanh đồng, dây ra, linh kiện tự thêm): GND → GND2, IN1 → IN2. */
+function copyId(layout: CircuitLayout, id: string): string {
+  const used = new Set(layout.parts.map((p) => p.id));
+  const base = id.replace(/\d+$/, '') || 'X';
+  for (let i = base === id ? 2 : 1; ; i++) if (!used.has(`${base}${i}`)) return `${base}${i}`;
+}
+
 export function duplicateParts(layout: CircuitLayout, ids: string[]): { layout: CircuitLayout; newIds: string[] } {
   let out = layout;
   const newIds: string[] = [];
   for (const p of layout.parts.filter((q) => ids.includes(q.id))) {
-    const id = nextPartId(out, p.type, p.type === 'bus' ? p.id.replace(/\d+$/, '') : undefined);
+    const id = PREFIX[p.type] && p.type !== 'lead' ? nextPartId(out, p.type) : copyId(out, p.id);
     out = { ...out, parts: [...out.parts, { ...p, id, x: p.x + 40, y: p.y + 40 }] };
     newIds.push(id);
   }

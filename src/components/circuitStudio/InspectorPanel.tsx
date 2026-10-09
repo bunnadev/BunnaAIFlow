@@ -6,7 +6,7 @@ import { isProbe, MINI_BULB_COLORS, ohmWattLabel } from '../../lib/circuit/extra
 import { ledHex } from '../../lib/circuit/parts';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, parseCellType, parseHolderType, type CellKind, type HolderWiring } from '../../lib/circuit/powerParts';
 import { WIRE_COLORS } from '../../lib/circuit/render';
-import { deleteWire, resetWire, rotateParts, updatePart, updateWire } from '../../lib/circuit/ops';
+import { deleteWire, duplicateParts, resetWire, rotateParts, updatePart, updateWire } from '../../lib/circuit/ops';
 import type { CircuitLayout, PlacedPart } from '../../lib/circuit/types';
 import type { Selection } from './StudioCanvas';
 
@@ -97,6 +97,13 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
     const patch = { type, wiring, ...((live.label ?? '') === autoNow ? { label: batteryLabel(type, wiring) ?? live.label } : {}) };
     return anchorContact(getLayout?.() ?? layout, live.id, patch);
   });
+  /** Nhân bản linh kiện đang chọn (lệch 40px, không kèm dây) rồi chọn bản sao — bấm tiếp sẽ ra thêm bản nữa. */
+  const duplicate = () => {
+    const r = duplicateParts(getLayout?.() ?? layout, selection.parts);
+    if (!r.newIds.length) return;
+    onCommit(r.layout);
+    onSelect({ parts: r.newIds, wire: null });
+  };
   // Nút đang chọn: tô cam (style trực tiếp — lớp viền / nền của btn đè mất lớp Tailwind thêm vào)
   const pick = (on: boolean) => ({ className: btn, style: on ? { borderColor: '#F1641E', background: 'rgba(241,100,30,0.28)', color: '#fff' } : undefined });
 
@@ -207,6 +214,7 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               <span className="text-white/50">Xoay</span>
               <button className={btn} onClick={() => onCommit(rotateParts(layout, [part.id], -1))}>⟲</button>
               <button className={btn} onClick={() => onCommit(rotateParts(layout, [part.id], 1))}>⟳</button>
+              <button className={`${btn} ml-auto`} title="Tạo thêm 1 cái giống hệt (không kèm dây) — phím tắt ⌘D" onClick={duplicate}>Nhân bản</button>
             </div>
           )}
           {['to220', 'to3', 'pentawatt'].includes(part.type) && (
@@ -251,7 +259,10 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
       )}
 
       {!part && !wire && selection.parts.length > 1 && (
-        <div className="text-white/60">Đã chọn {selection.parts.length} linh kiện — dùng các nút căn hàng / chia đều ở thanh trên.</div>
+        <>
+          <div className="mb-2 text-white/60">Đã chọn {selection.parts.length} linh kiện — dùng các nút căn hàng / chia đều ở thanh trên.</div>
+          <button className={`${btn} w-full`} title="Phím tắt ⌘D" onClick={duplicate}>Nhân bản {selection.parts.length} linh kiện (không kèm dây)</button>
+        </>
       )}
     </div>
   );

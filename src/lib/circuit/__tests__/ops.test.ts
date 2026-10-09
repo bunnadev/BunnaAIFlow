@@ -72,6 +72,17 @@ describe('ops: linh kiện', () => {
     expect(layout.wires).toHaveLength(3);
   });
 
+  it('duplicateParts giữ giá trị, số ký hiệu tiếp theo cho thanh đồng / linh kiện tự thêm', () => {
+    const l0 = base();
+    const l1 = { ...l0, parts: [...l0.parts.map((p) => (p.id === 'R1' ? { ...p, label: '220Ω' } : p)), { id: 'MOD1', type: 'custom_xyz', x: 0, y: 0 }] };
+    const { layout, newIds } = duplicateParts(l1, ['GND', 'MOD1', 'R1']);
+    expect(newIds).toEqual(['R2', 'GND2', 'MOD2']);
+    expect(layout.parts.find((p) => p.id === 'R2')).toMatchObject({ value: '1k', label: '220Ω' });
+    const again = duplicateParts(layout, ['R2']);
+    expect(again.newIds).toEqual(['R3']);
+    expect(again.layout.parts.find((p) => p.id === 'R3')).toMatchObject({ x: 480, y: 380 });
+  });
+
   it('updatePart đổi ký hiệu cập nhật cả đầu dây; chặn trùng/sai', () => {
     const l = updatePart(base(), 'GND', { id: 'MASS' });
     expect(l.wires[2].to).toBe('MASS@700');
