@@ -227,7 +227,10 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       setDrag({ kind: 'label', id: labPart.id, start: pt, base, cur: base });
       return;
     }
-    // 5. linh kiện
+    // 5. dây vẽ đè lên thân linh kiện (VD nối chéo chân IC): bấm trúng thân dây thì chọn dây, không chọn linh kiện bên dưới
+    const onWire = hitWire(routed, pt, 6);
+    if (onWire !== null && !e.shiftKey) { onSelect({ parts: [], wire: onWire }); return; }
+    // 5b. linh kiện
     const part = hitPart(layout, pt);
     if (part) {
       if (e.shiftKey) {
