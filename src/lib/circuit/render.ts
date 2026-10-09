@@ -449,25 +449,33 @@ function renderWire(w: Wire, rw: RoutedWire | null, dashed = false, shadowId = '
 
 /**
  * Dây bọc nhựa kiểu thật (Xưởng vẽ): vỏ dây dừng cách chân một đoạn, lộ lõi tráng
- * thiếc, cục hàn dạng giọt ôm chân. Đầu dây tự do giữ kiểu lõi đồng như cũ.
+ * thiếc, mối hàn ôm chân. Đầu dây tự do giữ kiểu lõi đồng như cũ.
  */
 function realWire(pts: Point[], rw: RoutedWire, main: string, dark: string, dashed: boolean, shadowId: string): { body: string; joints: string } {
   const fromLead = rw.from.isLead, toLead = rw.to.isLead;
   const ins = trimEnds(pts, fromLead ? 0 : STRIP, toLead ? 0 : STRIP);
   const d = roundedPath(ins);
   const dash = dashed ? ' stroke-dasharray="20 14"' : '';
-  const body =
-    `<g filter="url(#${shadowId})">` +
-    `<path d="${d}" fill="none" stroke="${dark}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"${dash}/>` +
-    `<path d="${d}" fill="none" stroke="${main}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"${dash}/>` +
-    `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="0.38" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(-1.5 -1.8)"${dash}/>` +
-    `</g>`;
-  let joints = '';
   const ends: [Point, Point, Point, boolean][] = [
     [pts[0], ins[0], pts[1], fromLead],
     [pts[pts.length - 1], ins[ins.length - 1], pts[pts.length - 2], toLead],
   ];
-  for (const [pt, cutAt, next, isLead] of ends) {
+  // Lõi tráng thiếc lộ ra: vẽ DƯỚI vỏ nhựa, thò từ trong vỏ ra tới chân (vỏ cắt phẳng, lõi không đè lên vỏ)
+  const cores = ends.filter(([, , , isLead]) => !isLead).map(([pt, , next]) => {
+    const deg = (Math.atan2(next.y - pt.y, next.x - pt.x) * 180) / Math.PI;
+    return `<g transform="translate(${pt.x} ${pt.y}) rotate(${deg.toFixed(1)})">` +
+      `<rect x="0" y="-3" width="${STRIP + 4}" height="6" fill="url(#gTinnedCore)"/>` +
+      `<line x1="0" y1="-3" x2="${STRIP + 4}" y2="-3" stroke="#5d646b" stroke-width="0.8"/><line x1="0" y1="3" x2="${STRIP + 4}" y2="3" stroke="#5d646b" stroke-width="0.8"/>` +
+      `</g>`;
+  }).join('');
+  const body =
+    `<g filter="url(#${shadowId})">` + cores +
+    `<path d="${d}" fill="none" stroke="${dark}" stroke-width="11" stroke-linecap="butt" stroke-linejoin="round"${dash}/>` +
+    `<path d="${d}" fill="none" stroke="${main}" stroke-width="8" stroke-linecap="butt" stroke-linejoin="round"${dash}/>` +
+    `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="0.38" stroke-width="2" stroke-linecap="butt" stroke-linejoin="round" transform="translate(-1.5 -1.8)"${dash}/>` +
+    `</g>`;
+  let joints = '';
+  for (const [pt, , next, isLead] of ends) {
     if (isLead) {
       const dx = pt.x - next.x, dy = pt.y - next.y, len = Math.hypot(dx, dy) || 1;
       const x2 = pt.x + (dx / len) * 30, y2 = pt.y + (dy / len) * 30;
@@ -475,10 +483,7 @@ function realWire(pts: Point[], rw: RoutedWire, main: string, dark: string, dash
         `<line x1="${pt.x}" y1="${pt.y}" x2="${x2}" y2="${y2}" stroke="#f2b97a" stroke-width="5" stroke-linecap="round"/>`;
       continue;
     }
-    // lõi tráng thiếc lộ ra + cục hàn
-    joints += `<line x1="${pt.x}" y1="${pt.y}" x2="${cutAt.x.toFixed(1)}" y2="${cutAt.y.toFixed(1)}" stroke="#7d848c" stroke-width="8" stroke-linecap="round"/>` +
-      `<line x1="${pt.x}" y1="${pt.y}" x2="${cutAt.x.toFixed(1)}" y2="${cutAt.y.toFixed(1)}" stroke="url(#gLeg)" stroke-width="5" stroke-linecap="round"/>` +
-      solderBlob(pt, next);
+    joints += solderBlob(pt, next);
   }
   return { body, joints };
 }
@@ -720,6 +725,8 @@ function studioFilterDefs(r: Box): { defs: string; shadow: string; wireShadow: s
     `<filter id="${shadow}" ${region}><feDropShadow dx="5" dy="8" stdDeviation="6" flood-color="#000" flood-opacity="0.5"/></filter>` +
     `<filter id="${wireShadow}" ${region}><feDropShadow dx="3" dy="5" stdDeviation="3" flood-color="#000" flood-opacity="0.45"/></filter>` +
     // mối hàn Xưởng vẽ: thiếc xám bạc, sáng thành vệt dọc giữa thân
+    // lõi dây tráng thiếc: bạc sáng, bóng theo chiều ngang thân lõi
+    `<linearGradient id="gTinnedCore" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c838a"/><stop offset="0.3" stop-color="#d3d8dc"/><stop offset="0.45" stop-color="#f6f8f9"/><stop offset="0.7" stop-color="#b6bcc2"/><stop offset="1" stop-color="#737a81"/></linearGradient>` +
     `<linearGradient id="gSolderJoint" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4b5157"/><stop offset="0.22" stop-color="#9aa1a8"/><stop offset="0.4" stop-color="#eef1f3"/><stop offset="0.58" stop-color="#b4bac0"/><stop offset="0.82" stop-color="#737980"/><stop offset="1" stop-color="#454b51"/></linearGradient>` +
     // nhựa thông còn lại quanh mối hàn
     `<radialGradient id="gFlux" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#c9902f" stop-opacity="0.55"/><stop offset="0.6" stop-color="#b57a22" stop-opacity="0.3"/><stop offset="1" stop-color="#9a6418" stop-opacity="0"/></radialGradient>` +
