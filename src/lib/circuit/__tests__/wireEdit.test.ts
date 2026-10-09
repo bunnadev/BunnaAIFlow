@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../types';
-import { addBend, followEnd, moveSegment, removeCorner, segOrientation, simplify } from '../wireEdit';
+import { addBend, followEnd, leadOutOk, moveSegment, moveSegmentKeepLeads, removeCorner, segOrientation, simplify } from '../wireEdit';
 
 const P = (x: number, y: number): Point => ({ x, y });
 
@@ -94,5 +94,27 @@ describe('wireEdit', () => {
     expect(out[out.length - 1]).toEqual(P(50, 250));
     expect(out[0]).toEqual(P(0, 0));
     orthogonal(out);
+  });
+});
+
+describe('đoạn rời chân', () => {
+  // chân ở (0,0) hướng xuống (dir 1), dây xuống 60 rồi rẽ phải
+  const pts = [{ x: 0, y: 0 }, { x: 0, y: 60 }, { x: 200, y: 60 }, { x: 200, y: 300 }];
+  it('leadOutOk: đúng hướng chân và ≥ 40px', () => {
+    expect(leadOutOk(pts, 1, null)).toBe(true);
+    expect(leadOutOk([{ x: 0, y: 0 }, { x: 0, y: 30 }, { x: 200, y: 30 }], 1, null)).toBe(false);
+    expect(leadOutOk([{ x: 0, y: 0 }, { x: 200, y: 0 }], 1, null)).toBe(false);
+  });
+  it('kéo đoạn ngang lên sát chân thì dừng ở 40px', () => {
+    const m = moveSegmentKeepLeads(pts, 1, -60, 1, null);
+    expect(m.delta).toBe(-20);
+    expect(simplify(m.pts)[1]).toEqual({ x: 0, y: 40 });
+  });
+  it('không kéo ngang được đoạn chạm chân (dây sẽ rời chân theo phương ngang)', () => {
+    expect(moveSegmentKeepLeads(pts, 0, 30, 1, null).delta).toBe(0);
+  });
+  it('dây cũ vốn đã sai thì không chặn', () => {
+    const bad = [{ x: 0, y: 0 }, { x: 0, y: 20 }, { x: 200, y: 20 }];
+    expect(moveSegmentKeepLeads(bad, 1, 10, 1, null).delta).toBe(10);
   });
 });

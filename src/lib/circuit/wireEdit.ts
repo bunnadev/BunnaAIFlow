@@ -80,3 +80,41 @@ export function simplify(pts: Point[]): Point[] {
   if (a.length > 1) out.push({ ...a[a.length - 1] });
   return out;
 }
+
+/** Hướng chân: 0 phải, 1 xuống, 2 trái, 3 lên (giống bộ đi dây). */
+const DIRV = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }];
+
+/** Đoạn rời chân tối thiểu: đủ chỗ cho mối hàn + lõi trần + 1 khúc vỏ thẳng trước khi rẽ. */
+export const LEAD_OUT = 40;
+
+/**
+ * Dây rời chân đúng hướng chân và đi thẳng ≥ LEAD_OUT trước khi rẽ? dir = null: không
+ * ràng buộc (thanh đồng, dây ra, chân nằm giữa thân).
+ */
+export function leadOutOk(pts: Point[], startDir: number | null, endDir: number | null, min = LEAD_OUT): boolean {
+  const check = (q: Point[], dir: number | null) => {
+    if (dir === null) return true;
+    const a = q[0];
+    const b = q.find((p) => p.x !== a.x || p.y !== a.y);
+    if (!b) return true;
+    const v = DIRV[dir];
+    const along = (b.x - a.x) * v.x + (b.y - a.y) * v.y;
+    const side = Math.abs((b.x - a.x) * v.y - (b.y - a.y) * v.x);
+    return side === 0 && along >= min;
+  };
+  return check(pts, startDir) && check([...pts].reverse(), endDir);
+}
+
+/**
+ * Kéo đoạn nhưng không cho phá đoạn rời chân: lùi delta về 0 (từng bước 10px) tới khi hợp lệ.
+ * Đường gốc vốn đã sai (dây cũ) thì không chặn.
+ */
+export function moveSegmentKeepLeads(pts: Point[], k: number, delta: number, startDir: number | null, endDir: number | null): { pts: Point[]; delta: number } {
+  if (!leadOutOk(pts, startDir, endDir)) return { pts: moveSegment(pts, k, delta), delta };
+  const step = delta > 0 ? -10 : 10;
+  for (let d = delta; d !== 0 && Math.sign(d) === Math.sign(delta); d += step) {
+    const out = moveSegment(pts, k, d);
+    if (leadOutOk(simplify(out), startDir, endDir)) return { pts: out, delta: d };
+  }
+  return { pts: moveSegment(pts, k, 0), delta: 0 };
+}

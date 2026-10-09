@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { CircuitLayout, Point } from '../../lib/circuit/types';
-import type { RoutedWire } from '../../lib/circuit/route';
+import type { End, RoutedWire } from '../../lib/circuit/route';
 import { labelPlacements, partBox, renderScene, svgDefs, type Box } from '../../lib/circuit/render';
 import { dotGridTileSvg, GRID_BG } from '../../lib/circuit/dotGrid';
 import {
   allPins, dropTarget, endPartId, hitPart, hitPin, hitWire, nearestSegment, previewRouted, segmentHandles, wiresOfPart,
 } from '../../lib/circuit/geometry';
 import { addWire, deleteWire, movePartsBy, resetWire, resizeBus, setWirePoints, updatePart } from '../../lib/circuit/ops';
-import { addBend, moveSegment, removeCorner, segOrientation, simplify } from '../../lib/circuit/wireEdit';
+import { addBend, moveSegmentKeepLeads, removeCorner, segOrientation, simplify } from '../../lib/circuit/wireEdit';
 import { snapDelta, type Guide } from '../../lib/circuit/arrange';
 import { contactSnap } from '../../lib/circuit/contacts';
 import { busCoord, busEnds, busPoint } from '../../lib/circuit/bus';
@@ -256,7 +256,12 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       case 'segment': {
         const o = segOrientation(drag.base[drag.seg], drag.base[drag.seg + 1]);
         const delta = o === 'h' ? snap10(pt.y - drag.start.y) : snap10(pt.x - drag.start.x);
-        if (delta !== drag.delta) setDrag({ ...drag, delta, pts: moveSegment(drag.base, drag.seg, delta) });
+        if (delta === drag.delta) break;
+        // Đoạn rời chân phải đi thẳng theo hướng chân đủ dài (mối hàn không bị xoay ngang / vỏ không đè lên mối hàn)
+        const rw = shownRouted[drag.wire];
+        const pinDir = (e: End) => (e.bus || e.isLead || e.interior ? null : e.dir);
+        const m = rw ? moveSegmentKeepLeads(drag.base, drag.seg, delta, pinDir(rw.from), pinDir(rw.to)) : { pts: drag.base, delta: 0 };
+        if (m.delta !== drag.delta) setDrag({ ...drag, delta: m.delta, pts: m.pts });
         break;
       }
       case 'label':
@@ -374,9 +379,9 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
           })}
           {selWirePts && (
             <>
-              <polyline points={selWirePts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#fde047" strokeOpacity={0.55} strokeWidth={18} strokeLinejoin="round" />
-              {segmentHandles(selWirePts).map((h) => <circle key={h.k} cx={h.x} cy={h.y} r={9} fill="#fff" stroke={ORANGE} strokeWidth={4} />)}
-              {selWirePts.slice(1, -1).map((p, i) => <rect key={`c${i}`} x={p.x - 6} y={p.y - 6} width={12} height={12} fill={ORANGE} />)}
+              <polyline points={selWirePts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#fde047" strokeOpacity={0.5} strokeWidth={11} strokeLinejoin="round" />
+              {segmentHandles(selWirePts).map((h) => <circle key={h.k} cx={h.x} cy={h.y} r={6} fill="#fff" stroke={ORANGE} strokeWidth={3} />)}
+              {selWirePts.slice(1, -1).map((p, i) => <rect key={`c${i}`} x={p.x - 4} y={p.y - 4} width={8} height={8} fill={ORANGE} />)}
             </>
           )}
           {looseLeads.map((p) => (

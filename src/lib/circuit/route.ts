@@ -13,6 +13,7 @@ const G = 10; // bước lưới (px)
 const MARGIN = 14; // khoảng chừa quanh thân linh kiện
 const TOP = 130; // dưới dòng tiêu đề trên
 const BOTTOM_PAD = 100; // trên dòng tiêu đề dưới
+const LEAD_OUT = 40; // = wireEdit.LEAD_OUT
 
 export type Dir = 0 | 1 | 2 | 3; // phải, xuống, trái, lên
 const DX = [1, 0, -1, 0];
@@ -232,7 +233,9 @@ export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean; 
     const onBus = (px: number, py: number) => busCells.has(idx(Math.round(px / G), Math.round(py / G)));
     let i = 0;
     while (i < 80 && inOwn(x, y) && !onBus(x + DX[e.dir] * G, y + DY[e.dir] * G)) { x += DX[e.dir] * G; y += DY[e.dir] * G; i++; }
-    for (let k = 0; k < 2; k++) {
+    // Xưởng vẽ: đoạn rời chân đủ dài cho mối hàn + lõi trần + 1 khúc vỏ thẳng trước khi rẽ
+    const far = () => Math.abs(x - e.point.x) + Math.abs(y - e.point.y) >= LEAD_OUT;
+    for (let k = 0; k < 2 || (opts.spread && k < 6 && !far()); k++) {
       const nc = Math.round((x + DX[e.dir] * G) / G), nr = Math.round((y + DY[e.dir] * G) / G);
       if (nc < 0 || nc >= cols || nr < 0 || nr >= rows || blocked[idx(nc, nr)] || busCells.has(idx(nc, nr))) break;
       x += DX[e.dir] * G; y += DY[e.dir] * G;
@@ -323,7 +326,9 @@ export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean; 
         let cost = 1;
         if (nd !== dir) cost += 8;
         if (nearPart[ni]) cost += 1.5;
-        if (steps > 2 && (!goal || Math.abs(nc - gc) + Math.abs(nr - gr) > 2)) {
+        // Sát điểm đầu / đích: không phạt (dây phải vào được chân). Xưởng vẽ: đoạn rời chân đã dài nên chỉ miễn 1 ô
+        const free = opts.spread ? 1 : 2;
+        if (steps > free && (!goal || Math.abs(nc - gc) + Math.abs(nr - gr) > free)) {
           if (opts.spread) {
             const ax = nd === 0 || nd === 2 ? 1 : 2;
             if (wireCell[ni] >= 0) cost += onAxis[ni] & ax ? 80 : 45; // chồng lên dây khác / cắt ngang
