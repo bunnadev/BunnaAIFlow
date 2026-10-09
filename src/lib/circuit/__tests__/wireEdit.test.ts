@@ -118,3 +118,11 @@ describe('đoạn rời chân', () => {
     expect(moveSegmentKeepLeads(bad, 1, 10, 1, null).delta).toBe(10);
   });
 });
+
+describe('moveSegment trượt đầu dây', () => {
+  it('slide.end: đoạn cuối kéo ngang thì điểm cuối đi theo (không gập móc)', () => {
+    const pts = [P(0, 0), P(0, 100), P(200, 100), P(200, 300)];
+    expect(moveSegment(pts, 2, 50, { end: true })).toEqual([P(0, 0), P(0, 100), P(250, 100), P(250, 300)]);
+    expect(moveSegment(pts, 2, 50)).toHaveLength(5);
+  });
+});

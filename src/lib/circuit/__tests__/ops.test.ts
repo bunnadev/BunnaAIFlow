@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { CircuitLayout } from '../types';
 import {
-  addPart, addWire, deleteParts, deleteWire, duplicateParts, movePartsBy, nextPartId, resetAllWires,
+  addPart, addWire, deleteParts, deleteWire, duplicateParts, moveBusEnd, movePartsBy, nextPartId, resetAllWires,
   resetWire, resizeBus, rotateParts, setWirePoints, suggestWireColor, updatePart, updateWire, wirePoints,
 } from '../ops';
+import { resolvePoint } from '../geometry';
 
 const base = (): CircuitLayout => ({
   width: 1080, height: 1350,
@@ -151,5 +152,33 @@ describe('ops: dây', () => {
     // Điểm cuối nằm trên đầu thanh mới (x clamped, y = bus.y)
     expect(pts[pts.length - 1].x).toBe(590);
     expect(pts[pts.length - 1].y).toBe(1100);
+  });
+});
+
+describe('moveBusEnd', () => {
+  // GND nằm ngang tâm 700, dài 600 → 400..1000
+  const lay = (): CircuitLayout => ({
+    parts: [{ id: 'R1', type: 'resistor', x: 700, y: 600, rotation: 90 }, { id: 'GND', type: 'bus', x: 700, y: 1000, length: 600 }],
+    wires: [{ from: 'R1.2', to: 'GND@700', color: 'black' }],
+  });
+  it('dây tự đi: đổi toạ độ trên thanh, kẹp trong thân thanh', () => {
+    expect(moveBusEnd(lay(), 0, 'to', 820).wires[0].to).toBe('GND@820');
+    expect(moveBusEnd(lay(), 0, 'to', 5000).wires[0].to).toBe('GND@990');
+    expect(moveBusEnd(lay(), 0, 'to', 820).wires[0].manual).toBeUndefined();
+  });
+  it('dây chỉnh tay: góc kề chỉnh theo, vẫn vuông góc', () => {
+    const l0 = lay();
+    const p = resolvePoint(l0, 'R1.2')!;
+    const l = setWirePoints(l0, 0, [p, { x: p.x, y: 900 }, { x: 600, y: 900 }, { x: 600, y: 1000 }]);
+    const out = moveBusEnd(l, 0, 'to', 850);
+    expect(out.wires[0].to).toBe('GND@850');
+    expect(out.wires[0].via).toEqual([[p.x, 900], [850, 900]]);
+  });
+  it('dây chỉnh tay thẳng 1 đoạn: gập ở giữa, vẫn rời chân thẳng đứng', () => {
+    const l0 = lay();
+    const p = resolvePoint(l0, 'R1.2')!;
+    const out = moveBusEnd(setWirePoints(l0, 0, [p, { x: p.x, y: 1000 }]), 0, 'to', 850);
+    const jy = Math.round((p.y + 1000) / 20) * 10;
+    expect(out.wires[0].via).toEqual([[p.x, jy], [850, jy]]);
   });
 });

@@ -1,6 +1,6 @@
 import { endPartId, resolvePoint } from './geometry';
 import { busCoord, busEnds, busPoint, busVertical } from './bus';
-import { followEnd } from './wireEdit';
+import { followEnd, simplify } from './wireEdit';
 import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, POWER_TYPES } from './powerParts';
 
@@ -228,6 +228,35 @@ export function setWirePoints(layout: CircuitLayout, i: number, pts: Point[]): C
 function clearManual(w: Wire): Wire {
   const { via: _via, manual: _manual, ...rest } = w;
   return rest;
+}
+
+/**
+ * Trượt đầu dây nối vào thanh đồng tới toạ độ c dọc thanh (kẹp trong thân thanh).
+ * Dây chỉnh tay: góc kề chỉnh theo cho vẫn vuông góc; dây tự đi: bộ đi dây tính lại.
+ */
+export function moveBusEnd(layout: CircuitLayout, i: number, which: 'from' | 'to', c: number): CircuitLayout {
+  const w = layout.wires[i];
+  const ref = w?.[which];
+  const at = ref?.indexOf('@') ?? -1;
+  if (!w || at < 0) return layout;
+  const bus = layout.parts.find((p) => p.id === ref.slice(0, at) && p.type === 'bus');
+  if (!bus) return layout;
+  const [lo, hi] = busEnds(bus);
+  const cc = Math.min(Math.max(c, lo + 10), hi - 10);
+  const old = wirePoints(layout, i);
+  const moved = updateWire(layout, i, { [which]: `${bus.id}@${cc}` });
+  if (!old) return moved;
+  const np = busPoint(bus, cc);
+  const s = simplify(old);
+  if (s.length === 2) {
+    // Dây thẳng 1 đoạn: gập ở giữa (dây vẫn rời chân thẳng như cũ, không bị bẻ ngang ngay tại chân)
+    const pin = which === 'from' ? s[1] : s[0];
+    const pts = busVertical(bus)
+      ? (() => { const jx = snap10((pin.x + np.x) / 2); return [pin, { x: jx, y: pin.y }, { x: jx, y: np.y }, np]; })()
+      : (() => { const jy = snap10((pin.y + np.y) / 2); return [pin, { x: pin.x, y: jy }, { x: np.x, y: jy }, np]; })();
+    return setWirePoints(moved, i, which === 'from' ? pts.reverse() : pts);
+  }
+  return setWirePoints(moved, i, followEnd(old, which === 'from' ? 'start' : 'end', np));
 }
 
 export function resetWire(layout: CircuitLayout, i: number): CircuitLayout {

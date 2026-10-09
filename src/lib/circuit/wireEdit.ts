@@ -16,15 +16,18 @@ export function segOrientation(a: Point, b: Point): Orientation {
   return null;
 }
 
+/** Đầu dây trượt được theo đoạn bị kéo (đầu nối vào thanh đồng) thay vì đứng yên. */
+export interface SlideEnds { start?: boolean; end?: boolean }
+
 /** Kéo đoạn k (pts[k]→pts[k+1]) đi delta theo phương vuông góc với nó. */
-export function moveSegment(pts: Point[], k: number, delta: number): Point[] {
+export function moveSegment(pts: Point[], k: number, delta: number, slide: SlideEnds = {}): Point[] {
   const o = segOrientation(pts[k], pts[k + 1]);
   if (!o || delta === 0) return pts.map((p) => ({ ...p }));
   const out = pts.map((p) => ({ ...p }));
   let i = k;
   // Đoạn chạm chân: nhân đôi điểm chân để chân đứng yên, đoạn nối chân thành đoạn vuông góc mới
-  if (i === 0) { out.splice(1, 0, { ...out[0] }); i = 1; }
-  if (i + 1 === out.length - 1) out.splice(out.length - 1, 0, { ...out[out.length - 1] });
+  if (i === 0 && !slide.start) { out.splice(1, 0, { ...out[0] }); i = 1; }
+  if (i + 1 === out.length - 1 && !slide.end) out.splice(out.length - 1, 0, { ...out[out.length - 1] });
   if (o === 'h') { out[i].y += delta; out[i + 1].y += delta; }
   else { out[i].x += delta; out[i + 1].x += delta; }
   return out;
@@ -109,11 +112,11 @@ export function leadOutOk(pts: Point[], startDir: number | null, endDir: number 
  * Kéo đoạn nhưng không cho phá đoạn rời chân: lùi delta về 0 (từng bước 10px) tới khi hợp lệ.
  * Đường gốc vốn đã sai (dây cũ) thì không chặn.
  */
-export function moveSegmentKeepLeads(pts: Point[], k: number, delta: number, startDir: number | null, endDir: number | null): { pts: Point[]; delta: number } {
-  if (!leadOutOk(pts, startDir, endDir)) return { pts: moveSegment(pts, k, delta), delta };
+export function moveSegmentKeepLeads(pts: Point[], k: number, delta: number, startDir: number | null, endDir: number | null, slide: SlideEnds = {}): { pts: Point[]; delta: number } {
+  if (!leadOutOk(pts, startDir, endDir)) return { pts: moveSegment(pts, k, delta, slide), delta };
   const step = delta > 0 ? -10 : 10;
   for (let d = delta; d !== 0 && Math.sign(d) === Math.sign(delta); d += step) {
-    const out = moveSegment(pts, k, d);
+    const out = moveSegment(pts, k, d, slide);
     if (leadOutOk(simplify(out), startDir, endDir)) return { pts: out, delta: d };
   }
   return { pts: moveSegment(pts, k, 0), delta: 0 };

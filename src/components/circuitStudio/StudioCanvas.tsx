@@ -6,11 +6,11 @@ import { dotGridTileSvg, GRID_BG } from '../../lib/circuit/dotGrid';
 import {
   allPins, dropTarget, endPartId, hitPart, hitPin, hitWire, nearestSegment, previewRouted, segmentHandles, wiresOfPart,
 } from '../../lib/circuit/geometry';
-import { addWire, deleteWire, movePartsBy, resetWire, resizeBus, setWirePoints, updatePart } from '../../lib/circuit/ops';
+import { addWire, deleteWire, moveBusEnd, movePartsBy, resetWire, resizeBus, setWirePoints, updatePart } from '../../lib/circuit/ops';
 import { addBend, moveSegmentKeepLeads, removeCorner, segOrientation, simplify } from '../../lib/circuit/wireEdit';
 import { snapDelta, type Guide } from '../../lib/circuit/arrange';
 import { contactSnap } from '../../lib/circuit/contacts';
-import { busCoord, busEnds, busPoint } from '../../lib/circuit/bus';
+import { busCoord, busEnds, busPoint, busVertical } from '../../lib/circuit/bus';
 import { contentBounds } from '../../lib/circuit/world';
 import { blurActiveField } from './noFocus';
 import { wheelView, zoomAt } from '../../lib/circuit/viewport';
@@ -44,7 +44,8 @@ type Drag =
   | { kind: 'wire'; from: string; fromPt: Point; cur: Point }
   | { kind: 'segment'; wire: number; seg: number; start: Point; base: Point[]; pts: Point[]; delta: number }
   | { kind: 'label'; id: string; start: Point; base: { dx: number; dy: number }; cur: { dx: number; dy: number } }
-  | { kind: 'busEnd'; id: string; side: -1 | 1; startX: number; endX: number };
+  | { kind: 'busEnd'; id: string; side: -1 | 1; startX: number; endX: number }
+  | { kind: 'busJoint'; wire: number; which: 'from' | 'to'; bus: string; c0: number; c: number };
 
 const ORANGE = '#F1641E';
 const GRID_TILE_URL = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(dotGridTileSvg()) + '")';
@@ -158,6 +159,10 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
     if (drag.kind === 'label') {
       return { layout: updatePart(layout, drag.id, { labelPos: drag.cur }), routed, dashed: undefined };
     }
+    if (drag.kind === 'busJoint' && drag.c !== drag.c0) {
+      const l = moveBusEnd(layout, drag.wire, drag.which, drag.c);
+      return { layout: l, routed: previewRouted(routed, l, new Set([drag.wire])), dashed: layout.wires[drag.wire].manual ? undefined : new Set([drag.wire]) };
+    }
     if (drag.kind === 'busEnd') {
       const l = resizeBus(layout, drag.id, drag.side, drag.endX);
       const affected = new Set(wiresOfPart(l, drag.id));
@@ -197,6 +202,18 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       const pts = routed[selection.wire]?.points;
       const h = pts && segmentHandles(pts).find((s) => Math.hypot(s.x - pt.x, s.y - pt.y) < 14);
       if (pts && h) { setDrag({ kind: 'segment', wire: selection.wire, seg: h.k, start: pt, base: pts, pts, delta: 0 }); return; }
+    }
+    // 2b. mối hàn trên thanh đồng → trượt dọc thanh (bấm không kéo = chọn dây đó)
+    for (const [i, rw] of routed.entries()) {
+      if (!rw || rw.hidden) continue;
+      const hit = ([['from', rw.points[0], rw.from], ['to', rw.points[rw.points.length - 1], rw.to]] as const)
+        .find(([, p, end]) => end.bus && Math.hypot(p.x - pt.x, p.y - pt.y) < 12);
+      if (!hit) continue;
+      const [which, p, end] = hit;
+      const c = Math.round(busCoord(end.bus!, p));
+      onSelect({ parts: [], wire: i });
+      setDrag({ kind: 'busJoint', wire: i, which, bus: end.bus!.id, c0: c, c });
+      return;
     }
     // 3. chân → kéo dây mới
     const pin = hitPin(layout, pt);
@@ -260,7 +277,17 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
         // Đoạn rời chân phải đi thẳng theo hướng chân đủ dài (mối hàn không bị xoay ngang / vỏ không đè lên mối hàn)
         const rw = shownRouted[drag.wire];
         const pinDir = (e: End) => (e.bus || e.isLead || e.interior ? null : e.dir);
-        const m = rw ? moveSegmentKeepLeads(drag.base, drag.seg, delta, pinDir(rw.from), pinDir(rw.to)) : { pts: drag.base, delta: 0 };
+        // Đoạn dây đứng chạm thanh đồng: đầu dây trượt theo trên thanh (không gập móc), trong thân thanh
+        const n = drag.base.length;
+        const slides = (end: End, k: number, p: Point) => {
+          if (!end.bus || drag.seg !== k) return false;
+          const o = segOrientation(drag.base[drag.seg], drag.base[drag.seg + 1]);
+          if ((o === 'v') !== !busVertical(end.bus)) return false;
+          const c = busCoord(end.bus, p) + delta, [lo, hi] = busEnds(end.bus);
+          return c >= lo + 10 && c <= hi - 10;
+        };
+        const slide = rw ? { start: slides(rw.from, 0, drag.base[0]), end: slides(rw.to, n - 2, drag.base[n - 1]) } : {};
+        const m = rw ? moveSegmentKeepLeads(drag.base, drag.seg, delta, pinDir(rw.from), pinDir(rw.to), slide) : { pts: drag.base, delta: 0 };
         if (m.delta !== drag.delta) setDrag({ ...drag, delta: m.delta, pts: m.pts });
         break;
       }
@@ -270,6 +297,14 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       case 'busEnd': {
         const bus = layout.parts.find((p) => p.id === drag.id);
         setDrag({ ...drag, endX: snap10(bus ? busCoord(bus, pt) : pt.x) });
+        break;
+      }
+      case 'busJoint': {
+        const bus = layout.parts.find((p) => p.id === drag.bus);
+        if (!bus) break;
+        const [lo, hi] = busEnds(bus);
+        const c = Math.min(Math.max(snap10(busCoord(bus, pt)), lo + 10), hi - 10);
+        if (c !== drag.c) setDrag({ ...drag, c });
         break;
       }
     }
@@ -292,6 +327,9 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
         break;
       case 'busEnd':
         if (d.endX !== d.startX) onCommit(resizeBus(layout, d.id, d.side, d.endX));
+        break;
+      case 'busJoint':
+        if (d.c !== d.c0) onCommit(moveBusEnd(layout, d.wire, d.which, d.c));
         break;
       case 'wire': {
         const to = pt && dropTarget(layout, pt);
