@@ -169,7 +169,7 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
   const shown = preview?.layout ?? layout;
   const shownRouted = preview?.routed ?? routed;
   const scene = useMemo(
-    () => svgDefs() + renderScene(shown, { routed: shownRouted, dashed: preview?.dashed, frame: null, darkBg: true }),
+    () => svgDefs() + renderScene(shown, { routed: shownRouted, dashed: preview?.dashed, frame: null, darkBg: true, partIds: 'faint' }),
     [shown, shownRouted, preview],
   );
 

@@ -585,6 +585,55 @@ export function labelPlacements(
   return placeLabels(known, frame, wireSegBoxes(routed));
 }
 
+export interface IdPlacement { partId: string; x: number; y: number; size: number; box: Box }
+
+/**
+ * Chỗ đặt ký hiệu (R1, C2…): ngay trên linh kiện; đè nhãn / ký hiệu / linh kiện
+ * khác thì thử bên dưới, rồi 4 góc. Không ảnh hưởng chỗ đặt nhãn xanh.
+ */
+export function idPlacements(layout: CircuitLayout, labels: LabelPlacement[], size: number, routed: (RoutedWire | null)[] = []): IdPlacement[] {
+  const known = layout.parts.filter((p) => PARTS[p.type]);
+  const boxes = known.map((p) => ({ id: p.id, b: partBox(p, true) })).filter((x): x is { id: string; b: Box } => !!x.b);
+  const taken: Box[] = labels.map((l) => l.box);
+  const wires = wireSegBoxes(routed);
+  // Chân linh kiện (đầu chân, cục hàn) — chữ đè lên là khó nhìn chỗ nối
+  const pins: Box[] = [];
+  for (const p of known) {
+    if (p.type === 'bus') continue;
+    for (const pin of Object.keys(PARTS[p.type].pins ?? {})) {
+      const r = resolveEndpoint(layout, `${p.id}.${pin}`);
+      if (typeof r !== 'string') pins.push({ x1: r.point.x - 18, y1: r.point.y - 18, x2: r.point.x + 18, y2: r.point.y + 18 });
+    }
+  }
+  const area = (a: Box, b: Box) => Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1)) * Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1));
+  const res: IdPlacement[] = [];
+  for (const { id, b } of boxes) {
+    const w = id.length * size * 0.62, cx = (b.x1 + b.x2) / 2, g = 6;
+    const at = (x1: number, y1: number): Box => ({ x1, y1, x2: x1 + w, y2: y1 + size });
+    const cy = (b.y1 + b.y2) / 2;
+    const cands = [
+      at(cx - w / 2, b.y1 - g - size), at(b.x1 - w - g, cy - size / 2), at(b.x2 + g, cy - size / 2), at(cx - w / 2, b.y2 + g),
+      at(b.x1 - w - g, b.y1 - size), at(b.x2 + g, b.y1 - size),
+      at(b.x1 - w - g, b.y2), at(b.x2 + g, b.y2),
+    ];
+    let best = cands[0], bestScore = Infinity;
+    cands.forEach((c, i) => {
+      let score = i * 5;
+      for (const t of taken) score += area(t, c) * 50;
+      for (const o of boxes) score += area(o.b, c) * (o.id === id ? 50 : 20);
+      for (const pb of pins) score += area(pb, c) * 30;
+      for (const ws of wires) score += area(ws, c) * 10;
+      // Phải gần linh kiện của mình hơn mọi linh kiện khác (tránh gán nhầm)
+      const own = rectGap(c, b);
+      for (const o of boxes) if (o.id !== id && rectGap(c, o.b) < own) score += 20000;
+      if (score < bestScore) { bestScore = score; best = c; }
+    });
+    taken.push(best);
+    res.push({ partId: id, x: (best.x1 + best.x2) / 2, y: best.y1 + size * 0.82, size, box: best });
+  }
+  return res;
+}
+
 /** Tên chân thật (pinNames) in cạnh chân, khi bật showPinNames. */
 function renderPinNames(layout: CircuitLayout, H: number): string {
   let out = '';
@@ -617,6 +666,19 @@ export interface SceneOptions extends RenderOptions {
   frame?: { W: number; H: number } | null;
   /** Vị trí nhãn tính sẵn (xuất 1 phần mạch giữ đúng chỗ nhãn như trên bàn vẽ). */
   labels?: LabelPlacement[];
+  /** Ký hiệu linh kiện (R1, C2…): 'faint' = chữ xám nhỏ trên bàn vẽ, 'print' = chữ trắng viền đen in lên ảnh. */
+  partIds?: 'faint' | 'print';
+  /** Vị trí ký hiệu tính sẵn (ảnh xuất cần biết trước để tính khung). */
+  idPlacements?: IdPlacement[];
+}
+
+export const ID_SIZE = { faint: 22, print: 28 } as const;
+
+function idText(l: IdPlacement, mode: 'faint' | 'print'): string {
+  const x = l.x.toFixed(0), y = l.y.toFixed(0);
+  return mode === 'faint'
+    ? `<text x="${x}" y="${y}" font-family="${FONT}" font-size="${l.size}" font-weight="700" text-anchor="middle" fill="#c8c8c8" stroke="#141414" stroke-width="5" stroke-linejoin="round" paint-order="stroke" pointer-events="none">${esc(l.partId)}</text>`
+    : `<text x="${x}" y="${y}" font-family="${FONT}" font-size="${l.size}" font-weight="900" text-anchor="middle" fill="#ffffff" stroke="#000" stroke-width="6" stroke-linejoin="round" paint-order="stroke">${esc(l.partId)}</text>`;
 }
 
 /** Nội dung mạch (linh kiện, dây, tên chân, nhãn) — không nền, không tiêu đề, toạ độ gốc của bố cục. */
@@ -679,11 +741,13 @@ export function renderScene(layout: CircuitLayout, opts: SceneOptions = {}): str
     const s = PARTS[p.type].renderGlow?.(p);
     return s ? `<g transform="${tf(p)}">${s}</g>` : '';
   }).join('');
-  const labels = (opts.labels ?? placeLabels(known, frame, wireSegBoxes(routed)))
-    .map((l) => labelText(l.x, l.y, l.text, l.size, l.anchor, l.fill)).join('');
+  const placed = opts.labels ?? placeLabels(known, frame, wireSegBoxes(routed));
+  const labels = placed.map((l) => labelText(l.x, l.y, l.text, l.size, l.anchor, l.fill)).join('');
+  const mode = opts.partIds;
+  const ids = mode ? (opts.idPlacements ?? idPlacements(layout, placed, ID_SIZE[mode], routed)).map((l) => idText(l, mode)).join('') : '';
   return (studio?.defs ?? '') + behind + busSvg + partsSvg +
     wires.map((w) => w.body).join('') + wires.map((w) => w.joints).join('') + glows +
-    renderPinNames(layout, frame?.H ?? layout.height ?? 1350) + labels;
+    renderPinNames(layout, frame?.H ?? layout.height ?? 1350) + labels + ids;
 }
 
 export function titleSvg(text: string | undefined, y: number, W: number): string {

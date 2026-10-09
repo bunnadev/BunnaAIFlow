@@ -24,6 +24,15 @@ describe('exportImage', () => {
     expect(s.wireIndex).toEqual([0]);
   });
 
+  it('ký hiệu linh kiện chỉ in khi bật showIds', () => {
+    const off = renderExportSvg(l, routed, { aspect: '4:5', background: wood })!.svg;
+    const on = renderExportSvg(l, routed, { aspect: '4:5', background: wood, showIds: true })!.svg;
+    expect(off).not.toMatch(/>LED1<\/text>/);
+    expect(on).toMatch(/>R1<\/text>/);
+    expect(on).toMatch(/>LED1<\/text>/);
+    expect(on).toMatch(/>R2<\/text>/);
+  });
+
   it('kích thước theo khung', () => {
     expect(renderExportSvg(l, routed, { aspect: '4:5', background: wood })).toMatchObject({ width: 1080, height: 1350 });
     expect(renderExportSvg(l, routed, { aspect: '1:1', background: wood })!.height).toBe(1080);

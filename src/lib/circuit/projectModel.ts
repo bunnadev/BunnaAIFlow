@@ -4,7 +4,7 @@ import type { CircuitLayout } from './types';
 export type ExportAspect = '4:5' | '1:1' | '9:16';
 export type ExportBackground = { kind: 'wood' } | { kind: 'color'; color: string } | { kind: 'image'; id: string };
 /** Lựa chọn xuất ảnh lần trước của mạch (khung + nền). Tiêu đề nằm trong layout.titleTop/titleBottom. */
-export interface ExportSettings { aspect: ExportAspect; background: ExportBackground }
+export interface ExportSettings { aspect: ExportAspect; background: ExportBackground; showIds?: boolean }
 
 export interface CircuitProject {
   version: 1;

@@ -30,6 +30,7 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
   const [aspect, setAspect] = useState<ExportAspect>(settings?.aspect ?? '4:5');
   const [background, setBackground] = useState<ExportBackground>(settings?.background ?? { kind: 'wood' });
   const [color, setColor] = useState(settings?.background.kind === 'color' ? settings.background.color : '#f5f1e8');
+  const [showIds, setShowIds] = useState(!!settings?.showIds);
   const [titleTop, setTitleTop] = useState(layout.titleTop ?? '');
   const [titleBottom, setTitleBottom] = useState(layout.titleBottom ?? '');
   const [bgs, setBgs] = useState<BackgroundEntry[]>([]);
@@ -58,8 +59,8 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
   const bgDataUrl = background.kind === 'image' ? bgs.find((b) => b.id === background.id)?.dataUrl : undefined;
   const ids = scope === 'selected' ? selectedIds : undefined;
   const result = useMemo(
-    () => renderExportSvg(layout, routed, { aspect, background, backgroundDataUrl: bgDataUrl, titleTop: dTop, titleBottom: dBottom, ids }),
-    [layout, routed, aspect, background, bgDataUrl, dTop, dBottom, scope, selectedIds],
+    () => renderExportSvg(layout, routed, { aspect, background, backgroundDataUrl: bgDataUrl, titleTop: dTop, titleBottom: dBottom, ids, showIds }),
+    [layout, routed, aspect, background, bgDataUrl, dTop, dBottom, scope, selectedIds, showIds],
   );
   const preview = result ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(result.svg) : '';
 
@@ -100,7 +101,7 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
       const path = await save({ defaultPath: `${fileSlug(projectName)}${ids ? '_phan' : ''}.png`, filters: [{ name: 'PNG', extensions: ['png'] }] });
       if (!path) return;
       await writeFile(path, base64ToBytes(b64));
-      await onSaved({ aspect, background }, titleTop, titleBottom);
+      await onSaved({ aspect, background, showIds }, titleTop, titleBottom);
     } catch (e) {
       onError(`Lỗi xuất ảnh: ${(e as Error).message ?? e}`);
     } finally {
@@ -159,6 +160,11 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
               </label>
             </div>
           </div>
+
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={showIds} onChange={(e) => setShowIds(e.target.checked)} />
+            In ký hiệu linh kiện (R1, C2…) lên ảnh
+          </label>
 
           <label className="block">
             <span className="mb-1 block text-white/60">Tiêu đề trên (để trống = không có)</span>

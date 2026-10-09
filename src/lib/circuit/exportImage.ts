@@ -1,4 +1,4 @@
-import { labelPlacements, renderScene, svgDefs, titleSvg } from './render';
+import { ID_SIZE, idPlacements, labelPlacements, renderScene, svgDefs, titleSvg } from './render';
 import { woodPhotoBackground } from './woodPhoto';
 import type { RoutedWire } from './route';
 import { endPartId } from './geometry';
@@ -23,6 +23,8 @@ export interface ExportRenderOptions {
   titleBottom?: string;
   /** Chỉ xuất các linh kiện này (không có = tất cả). */
   ids?: string[];
+  /** In ký hiệu linh kiện (R1, C2…) lên ảnh. */
+  showIds?: boolean;
 }
 
 export function subsetLayout(layout: CircuitLayout, ids: string[]): { layout: CircuitLayout; wireIndex: number[] } {
@@ -47,8 +49,10 @@ export function renderExportSvg(
   // Nhãn giữ đúng chỗ như trên bàn vẽ (tính trên cả mạch rồi lọc)
   const labels = labelPlacements(layout, routed, null).filter((l) => ids.has(l.partId));
 
+  const idsPlaced = opts.showIds ? idPlacements(sub, labels, ID_SIZE.print, subRouted) : [];
+
   const b = contentBounds(sub, subRouted)!;
-  for (const l of labels) {
+  for (const l of [...labels, ...idsPlaced]) {
     b.x1 = Math.min(b.x1, l.box.x1); b.y1 = Math.min(b.y1, l.box.y1);
     b.x2 = Math.max(b.x2, l.box.x2); b.y2 = Math.max(b.y2, l.box.y2);
   }
@@ -65,7 +69,7 @@ export function renderExportSvg(
     : opts.background.kind === 'image' && opts.backgroundDataUrl
       ? `<image href="${opts.backgroundDataUrl}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
       : woodPhotoBackground(W, H);
-  const scene = renderScene(sub, { routed: subRouted, frame: null, labels });
+  const scene = renderScene(sub, { routed: subRouted, frame: null, labels, ...(opts.showIds ? { partIds: 'print' as const, idPlacements: idsPlaced } : {}) });
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
     svgDefs() + bg +
     `<g transform="translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${scale.toFixed(4)})">${scene}</g>` +
