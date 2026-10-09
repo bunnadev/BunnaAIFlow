@@ -384,11 +384,13 @@ function trimEnds(pts: Point[], a: number, b: number): Point[] {
 /**
  * Mối hàn (Xưởng vẽ): thiếc ôm quanh chỗ nối, giữa phình, 2 đầu thon bằng cỡ chân /
  * lõi dây rồi liền vào kim loại; vệt sáng chạy dọc; quầng nhựa thông hổ phách bên dưới.
- * Trục +x hướng về phía dây; khối thiếc dừng ở x=12, trước vỏ nhựa (STRIP) — lộ đoạn lõi trần.
+ * Trục +x hướng về phía dây; khối thiếc dừng ở x≈8, trước vỏ nhựa (STRIP) — lộ đoạn lõi trần.
  */
-function solderBlob(pt: Point, toward: Point): string {
+function solderBlob(pt: Point, toward: Point, onBus = false): string {
   const deg = (Math.atan2(toward.y - pt.y, toward.x - pt.x) * 180) / Math.PI;
-  return `<g transform="translate(${pt.x} ${pt.y}) rotate(${deg.toFixed(1)})">` +
+  // Dài 70% (x −12.6…8.4). Trên thanh đồng (dày 16): lùi về phía dây để đuôi nằm gọn trong thanh
+  const shift = onBus ? 5 : 0;
+  return `<g transform="translate(${pt.x} ${pt.y}) rotate(${deg.toFixed(1)}) translate(${shift} 0) scale(0.7 1)">` +
     `<ellipse cx="-3" cy="1.5" rx="20" ry="13" fill="url(#gFlux)"/>` +
     `<path d="M -18 -3.6 C -13 -3.8 -10 -7.4 -3 -7.4 C 4 -7.4 7 -4.4 12 -4 L 12 4 C 7 4.4 4 7.4 -3 7.4 C -10 7.4 -13 3.8 -18 3.6 Z" fill="url(#gSolderJoint)"/>` +
     // viền chỉ 2 bên sườn — 2 đầu không viền để thiếc liền vào chân / lõi (không thành cái khâu bóp)
@@ -397,7 +399,7 @@ function solderBlob(pt: Point, toward: Point): string {
     `</g>`;
 }
 
-const STRIP = 22; // vỏ dây dừng cách chân: lộ đoạn lõi tráng thiếc giữa vỏ và mối hàn // đoạn lõi tráng thiếc lộ ra giữa vỏ dây và cục hàn
+const STRIP = 18; // vỏ dây dừng cách chân: lộ đoạn lõi tráng thiếc giữa vỏ và mối hàn // đoạn lõi tráng thiếc lộ ra giữa vỏ dây và cục hàn
 
 function renderWire(w: Wire, rw: RoutedWire | null, dashed = false, shadowId = 'fWireShadow', darkBg = false, real = false): { body: string; joints: string } {
   if (!rw || w.color === 'contact') return { body: '', joints: '' };
@@ -475,7 +477,8 @@ function realWire(pts: Point[], rw: RoutedWire, main: string, dark: string, dash
     `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="0.38" stroke-width="2" stroke-linecap="butt" stroke-linejoin="round" transform="translate(-1.5 -1.8)"${dash}/>` +
     `</g>`;
   let joints = '';
-  for (const [pt, , next, isLead] of ends) {
+  const busEnd = [!!rw.from.bus, !!rw.to.bus];
+  for (const [k, [pt, , next, isLead]] of ends.entries()) {
     if (isLead) {
       const dx = pt.x - next.x, dy = pt.y - next.y, len = Math.hypot(dx, dy) || 1;
       const x2 = pt.x + (dx / len) * 30, y2 = pt.y + (dy / len) * 30;
@@ -483,7 +486,7 @@ function realWire(pts: Point[], rw: RoutedWire, main: string, dark: string, dash
         `<line x1="${pt.x}" y1="${pt.y}" x2="${x2}" y2="${y2}" stroke="#f2b97a" stroke-width="5" stroke-linecap="round"/>`;
       continue;
     }
-    joints += solderBlob(pt, next);
+    joints += solderBlob(pt, next, busEnd[k]);
   }
   return { body, joints };
 }
