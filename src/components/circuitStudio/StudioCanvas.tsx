@@ -374,7 +374,7 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
           })}
           {selWirePts && (
             <>
-              <polyline points={selWirePts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#fde047" strokeOpacity={0.55} strokeWidth={22} strokeLinejoin="round" />
+              <polyline points={selWirePts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#fde047" strokeOpacity={0.55} strokeWidth={18} strokeLinejoin="round" />
               {segmentHandles(selWirePts).map((h) => <circle key={h.k} cx={h.x} cy={h.y} r={9} fill="#fff" stroke={ORANGE} strokeWidth={4} />)}
               {selWirePts.slice(1, -1).map((p, i) => <rect key={`c${i}`} x={p.x - 6} y={p.y - 6} width={12} height={12} fill={ORANGE} />)}
             </>

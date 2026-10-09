@@ -120,7 +120,12 @@ export interface RoutedWire {
   hidden?: boolean;
 }
 
-export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean } = {}): (RoutedWire | null)[] {
+/**
+ * spread (Xưởng vẽ mạch): phân biệt cắt ngang dây khác (chấp nhận) với chạy chồng /
+ * chạy sát song song cùng hướng (phạt nặng) → các dây song song giữ khoảng cách ≥ 20px.
+ * Node "Vẽ mạch" cũ không bật → đường dây giữ y như trước.
+ */
+export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean; spread?: boolean } = {}): (RoutedWire | null)[] {
   // Mặt bàn vẽ không giới hạn (Xưởng vẽ mạch) không có tiêu đề → chỉ chừa mép 20px
   const top = opts.titleZones === false ? 20 : TOP;
   const bottomPad = opts.titleZones === false ? 20 : BOTTOM_PAD;
@@ -185,19 +190,28 @@ export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean }
   // Ô đã có dây đi qua (để các dây sau né)
   const wireCell = new Int16Array(cols * rows).fill(-1);
   const wireNear = new Uint8Array(cols * rows);
+  // Hướng dây đi qua ô (1 = ngang, 2 = dọc): trên chính ô / ô kề ±1 / ô cách 2
+  const onAxis = new Uint8Array(cols * rows);
+  const adjAxis = new Uint8Array(cols * rows);
+  const nearAxis = new Uint8Array(cols * rows);
 
   const markWire = (pts: Point[], id: number) => {
     for (let k = 0; k < pts.length - 1; k++) {
       const a = pts[k], b = pts[k + 1];
       const n = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) / G;
+      const axis = a.y === b.y ? 1 : a.x === b.x ? 2 : 3;
       for (let s = 0; s <= n; s++) {
         const c = Math.round((a.x + ((b.x - a.x) * s) / (n || 1)) / G);
         const r = Math.round((a.y + ((b.y - a.y) * s) / (n || 1)) / G);
         for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
           const cc = c + dc, rr = r + dr;
-          if (cc >= 0 && cc < cols && rr >= 0 && rr < rows) wireNear[idx(cc, rr)] = 1;
+          if (cc >= 0 && cc < cols && rr >= 0 && rr < rows) {
+            wireNear[idx(cc, rr)] = 1;
+            const d = Math.max(Math.abs(dr), Math.abs(dc));
+            if (d === 1) adjAxis[idx(cc, rr)] |= axis; else if (d === 2) nearAxis[idx(cc, rr)] |= axis;
+          }
         }
-        if (c >= 0 && c < cols && r >= 0 && r < rows) wireCell[idx(c, r)] = id;
+        if (c >= 0 && c < cols && r >= 0 && r < rows) { wireCell[idx(c, r)] = id; onAxis[idx(c, r)] |= axis; }
       }
     }
   };
@@ -310,7 +324,12 @@ export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean }
         if (nd !== dir) cost += 8;
         if (nearPart[ni]) cost += 1.5;
         if (steps > 2 && (!goal || Math.abs(nc - gc) + Math.abs(nr - gr) > 2)) {
-          if (wireCell[ni] >= 0) cost += 12; // cắt ngang dây khác (rẻ hơn đi vòng cả khung)
+          if (opts.spread) {
+            const ax = nd === 0 || nd === 2 ? 1 : 2;
+            if (wireCell[ni] >= 0) cost += onAxis[ni] & ax ? 80 : 45; // chồng lên dây khác / cắt ngang
+            else if (adjAxis[ni] & ax) cost += 25; // song song cách 10px: 2 dây dính vào nhau
+            else if (nearAxis[ni] & ax) cost += 3; // song song cách 20px: sát nhưng còn khe
+          } else if (wireCell[ni] >= 0) cost += 12; // cắt ngang dây khác (rẻ hơn đi vòng cả khung)
           else if (wireNear[ni]) cost += 10; // chạy sát dây khác
         }
         const ns = ni * 4 + nd;

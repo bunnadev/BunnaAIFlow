@@ -384,7 +384,8 @@ function trimEnds(pts: Point[], a: number, b: number): Point[] {
 /** Cục thiếc hàn dạng giọt ở chân, kéo dài theo hướng dây đi ra (toward = điểm kế tiếp trên dây). */
 function solderBlob(pt: Point, toward: Point): string {
   const deg = (Math.atan2(toward.y - pt.y, toward.x - pt.x) * 180) / Math.PI;
-  return `<g transform="translate(${pt.x} ${pt.y}) rotate(${deg.toFixed(1)})">` +
+  // thu nhỏ theo dây bọc (dây Xưởng vẽ mảnh còn ~70%)
+  return `<g transform="translate(${pt.x} ${pt.y}) rotate(${deg.toFixed(1)}) scale(0.8)">` +
     `<path d="M -10 0 C -10 -10 4 -11 12 -5 C 18 -2 22 -1 26 0 C 22 1 18 2 12 5 C 4 11 -10 10 -10 0 Z" fill="url(#gBlob)" stroke="#43484e" stroke-width="1.3"/>` +
     `<ellipse cx="-2" cy="-4" rx="3.6" ry="1.9" fill="#fff" opacity="0.9"/>` +
     `</g>`;
@@ -451,9 +452,9 @@ function realWire(pts: Point[], rw: RoutedWire, main: string, dark: string, dash
   const dash = dashed ? ' stroke-dasharray="20 14"' : '';
   const body =
     `<g filter="url(#${shadowId})">` +
-    `<path d="${d}" fill="none" stroke="${dark}" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"${dash}/>` +
-    `<path d="${d}" fill="none" stroke="${main}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"${dash}/>` +
-    `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="0.38" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" transform="translate(-2 -2.5)"${dash}/>` +
+    `<path d="${d}" fill="none" stroke="${dark}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"${dash}/>` +
+    `<path d="${d}" fill="none" stroke="${main}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"${dash}/>` +
+    `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="0.38" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(-1.5 -1.8)"${dash}/>` +
     `</g>`;
   let joints = '';
   const ends: [Point, Point, Point, boolean][] = [

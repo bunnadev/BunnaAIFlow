@@ -54,7 +54,7 @@ export function routeWorld(layout: CircuitLayout): (RoutedWire | null)[] {
     part: byId.get(e.part.id) ?? e.part,
     bus: e.bus ? byId.get(e.bus.id) ?? e.bus : undefined,
   });
-  return routeWires(shifted, { titleZones: false }).map((rw) => rw && {
+  return routeWires(shifted, { titleZones: false, spread: true }).map((rw) => rw && {
     ...rw,
     points: rw.points.map(back),
     from: backEnd(rw.from),
