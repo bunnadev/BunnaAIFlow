@@ -415,3 +415,23 @@ export const PARTS: Record<string, PartDef> = {
   ...LIGHT_PARTS,
   ...EXTRA_PARTS,
 };
+
+const scaledDefs = new WeakMap<PartDef, Map<number, PartDef>>();
+
+/**
+ * Định nghĩa linh kiện cho 1 chiếc đã đặt — đã tính p.scale (khung bao, toạ độ chân).
+ * render() giữ nguyên toạ độ gốc: bộ vẽ phóng to cả nhóm bằng transform scale().
+ */
+export function partDef(p: PlacedPart): PartDef | undefined {
+  const def = PARTS[p.type];
+  const s = p.scale;
+  if (!def || !s || s === 1) return def;
+  let byScale = scaledDefs.get(def);
+  if (!byScale) scaledDefs.set(def, (byScale = new Map()));
+  let out = byScale.get(s);
+  if (!out) {
+    out = { ...def, w: def.w * s, h: def.h * s, pins: Object.fromEntries(Object.entries(def.pins).map(([k, v]) => [k, { x: v.x * s, y: v.y * s }])) };
+    byScale.set(s, out);
+  }
+  return out;
+}

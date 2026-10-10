@@ -17,6 +17,8 @@ export interface PlacedPart {
   x: number;
   y: number;
   rotation?: Rotation;
+  /** Phóng to / thu nhỏ riêng chiếc này (1 = cỡ gốc trong thư viện). Chân và khung bao co giãn theo. */
+  scale?: number;
   /** Chữ in thật trên thân (VD "2N3055", "B50K", "104"). */
   marking?: string;
   /** Giá trị điện (điện trở dùng để tô vạch màu, VD "220", "4.7k"). */

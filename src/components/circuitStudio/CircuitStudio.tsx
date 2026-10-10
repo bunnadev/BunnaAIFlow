@@ -115,6 +115,19 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
     try { await flush(); return true; } catch (e) { flash(`Lỗi lưu: ${(e as Error).message ?? e}`, true); return false; }
   }, [flush, flash]);
 
+  /** Mở cửa sổ sửa linh kiện tự thêm (từ menu thư viện hoặc nút trong bảng chỉnh). */
+  const editCustomPart = useCallback(async (code: string) => {
+    // Linh kiện đang dùng: báo trước (vẫn cho sửa) — đổi tên / xoá chân làm đứt dây nối vào chân đó
+    if (await safeFlush()) {
+      try {
+        const using = await projectsUsingPart(code);
+        if (using.length) flash(`Đổi tên/xoá chân sẽ làm đứt dây trong: ${using.join(', ')}`, true);
+      } catch { /* không đọc được danh sách: vẫn cho sửa */ }
+    }
+    const existing = listCustomParts().find((c) => c.file.code === code);
+    if (existing) setWizard({ existing });
+  }, [safeFlush, flash]);
+
   /** Mở 1 mạch; trả false nếu không mở được (đã báo lỗi). */
   const openProject = useCallback(async (id: string) => {
     if (!(await safeFlush())) return false;
@@ -372,7 +385,7 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
       {hasSelection && (
         <FloatingPanel id="inspector" title={selection.wire !== null ? `Dây ${selection.wire + 1}` : selParts === 1 ? `Linh kiện ${selection.parts[0]}` : `${selParts} linh kiện`}
           defaultPos={{ x: window.innerWidth - 264, y: 72 }} width={252}>
-          <InspectorPanel key={selection.wire !== null ? `w${selection.wire}` : selection.parts.join(',')} layout={layout} selection={selection} onCommit={commit} onSelect={setSelection} onError={(m) => flash(m, true)} getLayout={() => layoutRef.current} />
+          <InspectorPanel key={selection.wire !== null ? `w${selection.wire}` : selection.parts.join(',')} layout={layout} selection={selection} onCommit={commit} onSelect={setSelection} onError={(m) => flash(m, true)} getLayout={() => layoutRef.current} onEditCustomPart={editCustomPart} />
         </FloatingPanel>
       )}
 
@@ -425,19 +438,7 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
       )}
       {itemMenu && (
         <div className="fixed z-[115] rounded-lg border border-white/10 bg-[#1f1f1f] py-1 text-sm shadow-xl" style={{ left: Math.min(itemMenu.x + 4, window.innerWidth - 220), top: Math.min(itemMenu.y + 4, window.innerHeight - 90) }} onPointerDown={(e) => e.stopPropagation()}>
-          <button className="block w-full px-4 py-1.5 text-left hover:bg-white/10" onClick={async () => {
-            const code = itemMenu.code;
-            setItemMenu(null);
-            // Linh kiện đang dùng: báo trước (vẫn cho sửa) — đổi tên / xoá chân làm đứt dây nối vào chân đó
-            if (await safeFlush()) {
-              try {
-                const using = await projectsUsingPart(code);
-                if (using.length) flash(`Đổi tên/xoá chân sẽ làm đứt dây trong: ${using.join(', ')}`, true);
-              } catch { /* không đọc được danh sách: vẫn cho sửa */ }
-            }
-            const existing = listCustomParts().find((c) => c.file.code === code);
-            if (existing) setWizard({ existing });
-          }}>Sửa chân / đổi ảnh</button>
+          <button className="block w-full px-4 py-1.5 text-left hover:bg-white/10" onClick={() => { const code = itemMenu.code; setItemMenu(null); editCustomPart(code); }}>Sửa chân / đổi ảnh</button>
           <button className="block w-full px-4 py-1.5 text-left text-red-400 hover:bg-white/10" onClick={async () => {
             const code = itemMenu.code;
             setItemMenu(null);

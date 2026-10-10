@@ -1,4 +1,4 @@
-import { PARTS } from './parts';
+import { PARTS, partDef } from './parts';
 import { pinDirection, routeWires, type RoutedWire } from './route';
 import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
 
@@ -46,7 +46,7 @@ function rotate(pt: Point, rot: Rotation = 0): Point {
 }
 
 export function partBox(p: PlacedPart, withHeatsink = false) {
-  const def = PARTS[p.type];
+  const def = partDef(p);
   if (!def) return null;
   // Tản nhiệt TO-3 nằm gọn trong khung sẵn có; TO-220/Pentawatt thì rộng hơn thân ~90px.
   const hs = withHeatsink && p.heatsink && p.type !== 'to3' ? 90 : 0;
@@ -77,7 +77,7 @@ export function resolveEndpoint(layout: CircuitLayout, ref: string): ResolvedEnd
   const pin = ref.slice(dot + 1).trim();
   const part = layout.parts.find((p) => p.id === id);
   if (!part) return `"${ref}": không có linh kiện "${id}"`;
-  const def = PARTS[part.type];
+  const def = partDef(part);
   if (!def) return `"${ref}": loại linh kiện "${part.type}" chưa có trong thư viện`;
   const local = def.pins[pin];
   if (!local) return `"${ref}": ${id} (${part.type}) không có chân "${pin}" — chỉ có: ${Object.keys(def.pins).join(', ')}`;
@@ -615,7 +615,7 @@ export function idPlacements(layout: CircuitLayout, labels: LabelPlacement[], si
   const pins: Box[] = [];
   for (const p of known) {
     if (p.type === 'bus') continue;
-    for (const pin of Object.keys(PARTS[p.type].pins ?? {})) {
+    for (const pin of Object.keys(PARTS[p.type].pins ?? {})) { // tên chân không đổi theo scale
       const r = resolveEndpoint(layout, `${p.id}.${pin}`);
       if (typeof r !== 'string') pins.push({ x1: r.point.x - 18, y1: r.point.y - 18, x2: r.point.x + 18, y2: r.point.y + 18 });
     }
@@ -739,7 +739,7 @@ function studioFilterDefs(r: Box): { defs: string; shadow: string; wireShadow: s
 
 export function renderScene(layout: CircuitLayout, opts: SceneOptions = {}): string {
   const frame = opts.frame === undefined ? { W: layout.width ?? 1080, H: layout.height ?? 1350 } : opts.frame;
-  const tf = (p: PlacedPart) => `translate(${p.x} ${p.y}) rotate(${p.rotation ?? 0})`;
+  const tf = (p: PlacedPart) => `translate(${p.x} ${p.y}) rotate(${p.rotation ?? 0})${p.scale && p.scale !== 1 ? ` scale(${p.scale})` : ''}`;
   const known = layout.parts.filter((p) => PARTS[p.type]);
   const buses = known.filter((p) => p.type === 'bus');
   const others = known.filter((p) => p.type !== 'bus' && p.type !== 'lead');

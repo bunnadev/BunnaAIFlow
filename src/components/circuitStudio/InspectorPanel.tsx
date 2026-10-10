@@ -9,7 +9,8 @@ import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, parseCellType, pa
 import { WIRE_COLORS } from '../../lib/circuit/render';
 import { deleteWire, duplicateParts, resetWire, rotateParts, updatePart, updateWire } from '../../lib/circuit/ops';
 import type { CircuitLayout, PlacedPart } from '../../lib/circuit/types';
-import type { Selection } from './StudioCanvas';
+import { clampScale, type Selection } from './StudioCanvas';
+import { isBuiltinPart } from '../../lib/circuit/registry';
 
 interface Props {
   layout: CircuitLayout;
@@ -19,6 +20,8 @@ interface Props {
   onError(msg: string): void;
   /** Bố cục mới nhất (ghi từ ô nhập lúc bảng đang bị gỡ không được dựa vào bố cục cũ). */
   getLayout?(): CircuitLayout;
+  /** Mở cửa sổ sửa linh kiện tự thêm (đổi ảnh, chấm lại chân, cỡ gốc). */
+  onEditCustomPart?(type: string): void;
 }
 
 /**
@@ -65,7 +68,7 @@ const OWN_FIELDS = new Set(['res_cement', 'res_power', 'cob', 'probe_red', 'prob
 
 const btn = 'rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-30';
 
-export default function InspectorPanel({ layout, selection, onCommit, onSelect, onError, getLayout }: Props) {
+export default function InspectorPanel({ layout, selection, onCommit, onSelect, onError, getLayout, onEditCustomPart }: Props) {
   const part = selection.parts.length === 1 ? layout.parts.find((p) => p.id === selection.parts[0]) : undefined;
   const wireIdx = selection.wire;
   const wire = wireIdx !== null ? layout.wires[wireIdx] : undefined;
@@ -225,6 +228,19 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               <button className={btn} onClick={() => onCommit(rotateParts(layout, [part.id], 1))}>⟳</button>
               <button className={`${btn} ml-auto`} title="Tạo thêm 1 cái giống hệt (không kèm dây) — phím tắt ⌘D" onClick={duplicate}>Nhân bản</button>
             </div>
+          )}
+          {part.type !== 'bus' && part.type !== 'lead' && (
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-white/50">Cỡ</span>
+              <button className={btn} onClick={() => set((live) => { const s = clampScale((live.scale ?? 1) - 0.1); return { scale: s === 1 ? undefined : s }; })}>−</button>
+              <span className="w-10 text-center">{Math.round((part.scale ?? 1) * 100)}%</span>
+              <button className={btn} onClick={() => set((live) => { const s = clampScale((live.scale ?? 1) + 0.1); return { scale: s === 1 ? undefined : s }; })}>+</button>
+              <button className={btn} disabled={!part.scale} onClick={() => set({ scale: undefined })}>Gốc</button>
+              <span className="text-white/30" title="Hoặc kéo ô vuông trắng ở góc dưới-phải của linh kiện trên bàn vẽ">↘ kéo góc</span>
+            </div>
+          )}
+          {!isBuiltinPart(part.type) && onEditCustomPart && (
+            <button className={`${btn} mb-2 w-full`} title="Đổi ảnh, chấm lại chân, đổi cỡ gốc — áp dụng cho mọi chỗ dùng linh kiện này" onClick={() => onEditCustomPart(part.type)}>✎ Sửa linh kiện (ảnh / chân)</button>
           )}
           {['to220', 'to3', 'pentawatt'].includes(part.type) && (
             <label className="mb-2 flex items-center gap-2">

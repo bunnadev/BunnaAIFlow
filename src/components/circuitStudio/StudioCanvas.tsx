@@ -45,12 +45,16 @@ type Drag =
   | { kind: 'segment'; wire: number; seg: number; start: Point; base: Point[]; pts: Point[]; delta: number }
   | { kind: 'label'; id: string; start: Point; base: { dx: number; dy: number }; cur: { dx: number; dy: number } }
   | { kind: 'busEnd'; id: string; side: -1 | 1; startX: number; endX: number }
-  | { kind: 'busJoint'; wire: number; which: 'from' | 'to'; bus: string; c0: number; c: number };
+  | { kind: 'busJoint'; wire: number; which: 'from' | 'to'; bus: string; c0: number; c: number }
+  | { kind: 'scale'; id: string; center: Point; d0: number; s0: number; s: number };
 
 const ORANGE = '#F1641E';
 const GRID_TILE_URL = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(dotGridTileSvg()) + '")';
 const FAR = 100000; // đường gióng kéo dài "vô tận"
 const snap10 = (v: number) => Math.round(v / 10) * 10;
+/** Cỡ riêng 1 linh kiện: 30%–400%, bước 5%. */
+export const clampScale = (s: number) => Math.round(Math.min(4, Math.max(0.3, s)) * 20) / 20;
+const scalable = (p: { type: string } | undefined) => !!p && p.type !== 'bus' && p.type !== 'lead';
 const rectOf = (a: Point, b: Point): Box => ({ x1: Math.min(a.x, b.x), y1: Math.min(a.y, b.y), x2: Math.max(a.x, b.x), y2: Math.max(a.y, b.y) });
 
 export default function StudioCanvas({ layout, routed, selection, onSelect, onCommit, onApi, onZoomChange }: Props) {
@@ -168,6 +172,11 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       const affected = new Set(wiresOfPart(l, drag.id));
       return { layout: l, routed: previewRouted(routed, l, affected), dashed: affected };
     }
+    if (drag.kind === 'scale' && drag.s !== drag.s0) {
+      const l = updatePart(layout, drag.id, { scale: drag.s === 1 ? undefined : drag.s });
+      const affected = new Set(wiresOfPart(l, drag.id));
+      return { layout: l, routed: previewRouted(routed, l, affected), dashed: new Set([...affected].filter((i) => !l.wires[i].manual)) };
+    }
     return null;
   }, [drag, layout, routed]);
 
@@ -195,6 +204,18 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
         const ex = ends[side < 0 ? 0 : 1];
         const h = busPoint(selBus, ex);
         if (Math.hypot(pt.x - h.x, pt.y - h.y) < 16) { setDrag({ kind: 'busEnd', id: selBus.id, side, startX: ex, endX: ex }); return; }
+      }
+    }
+    // 1b. tay cầm góc dưới-phải của linh kiện đang chọn → kéo đổi cỡ
+    const selOne = selection.parts.length === 1 ? layout.parts.find((p) => p.id === selection.parts[0]) : undefined;
+    const selOneBox = scalable(selOne) && partBox(selOne!, true);
+    if (selOne && selOneBox) {
+      const hr = Math.max(14, 10 / zoom);
+      if (Math.hypot(pt.x - (selOneBox.x2 + 6), pt.y - (selOneBox.y2 + 6)) < hr) {
+        const d0 = Math.max(1, Math.hypot(pt.x - selOne.x, pt.y - selOne.y));
+        const s0 = selOne.scale ?? 1;
+        setDrag({ kind: 'scale', id: selOne.id, center: { x: selOne.x, y: selOne.y }, d0, s0, s: s0 });
+        return;
       }
     }
     // 2. tay cầm đoạn của dây đang chọn
@@ -302,6 +323,11 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
         setDrag({ ...drag, endX: snap10(bus ? busCoord(bus, pt) : pt.x) });
         break;
       }
+      case 'scale': {
+        const s = clampScale(drag.s0 * Math.hypot(pt.x - drag.center.x, pt.y - drag.center.y) / drag.d0);
+        if (s !== drag.s) setDrag({ ...drag, s });
+        break;
+      }
       case 'busJoint': {
         const bus = layout.parts.find((p) => p.id === drag.bus);
         if (!bus) break;
@@ -333,6 +359,9 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
         break;
       case 'busJoint':
         if (d.c !== d.c0) onCommit(moveBusEnd(layout, d.wire, d.which, d.c));
+        break;
+      case 'scale':
+        if (d.s !== d.s0) onCommit(updatePart(layout, d.id, { scale: d.s === 1 ? undefined : d.s }));
         break;
       case 'wire': {
         const to = pt && dropTarget(layout, pt);
@@ -386,6 +415,9 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
   const looseLeads = shown.parts.filter((p) => p.type === 'lead' && !shown.wires.some((w) => endPartId(w.from) === p.id || endPartId(w.to) === p.id));
   const leadR = Math.max(14, 9 / zoom);
   const selBusPart = selection.parts.length === 1 ? shown.parts.find((p) => p.id === selection.parts[0] && p.type === 'bus') : undefined;
+  const selScalePart = selection.parts.length === 1 ? shown.parts.find((p) => p.id === selection.parts[0]) : undefined;
+  const scaleBox = scalable(selScalePart) ? partBox(selScalePart!, true) : null;
+  const hoverScale = !!(hover && scaleBox && Math.hypot(hover.x - (scaleBox.x2 + 6), hover.y - (scaleBox.y2 + 6)) < Math.max(14, 10 / zoom));
   const overflowSvg: React.CSSProperties = { position: 'absolute', left: 0, top: 0, overflow: 'visible' };
 
   return (
@@ -393,7 +425,7 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       ref={viewRef}
       className="absolute inset-0 overflow-hidden select-none"
       style={{
-        cursor: space ? (drag?.kind === 'pan' ? 'grabbing' : 'grab') : 'default',
+        cursor: space ? (drag?.kind === 'pan' ? 'grabbing' : 'grab') : drag?.kind === 'scale' || hoverScale ? 'nwse-resize' : 'default',
         backgroundColor: GRID_BG,
         backgroundImage: GRID_TILE_URL, // nền đứng yên, không theo zoom / kéo
       }}
@@ -414,6 +446,14 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
             const b = p && partBox(p, true);
             return b ? <rect key={id} x={b.x1 - 6} y={b.y1 - 6} width={b.x2 - b.x1 + 12} height={b.y2 - b.y1 + 12} fill="none" stroke={ORANGE} strokeWidth={3} strokeDasharray="10 6" rx={6} /> : null;
           })}
+          {scaleBox && (
+            <g>
+              <rect x={scaleBox.x2 + 6 - Math.max(9, 7 / zoom)} y={scaleBox.y2 + 6 - Math.max(9, 7 / zoom)} width={2 * Math.max(9, 7 / zoom)} height={2 * Math.max(9, 7 / zoom)} fill="#fff" stroke={ORANGE} strokeWidth={Math.max(3, 2 / zoom)} rx={3} />
+              {drag?.kind === 'scale' && (
+                <text x={scaleBox.x2 + 20} y={scaleBox.y2 + 40} fontSize={Math.max(22, 14 / zoom)} fontWeight={800} fill="#fff" stroke="#000" strokeWidth={5} paintOrder="stroke">{Math.round(drag.s * 100)}%</text>
+              )}
+            </g>
+          )}
           {selBusPart && busEnds(selBusPart).map((c, i) => {
             const h = busPoint(selBusPart, c);
             return <circle key={i} cx={h.x} cy={h.y} r={11} fill="#fff" stroke={ORANGE} strokeWidth={4} />;

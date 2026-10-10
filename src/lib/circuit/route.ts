@@ -1,5 +1,5 @@
 import { busCenter, busPoint, busVertical } from './bus';
-import { PARTS } from './parts';
+import { PARTS, partDef } from './parts';
 import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
 
 /**
@@ -29,7 +29,7 @@ function rotate(pt: Point, rot: Rotation = 0): Point {
 }
 
 function box(p: PlacedPart) {
-  const def = PARTS[p.type];
+  const def = partDef(p)!;
   const hs = p.heatsink && p.type !== 'to3' ? 90 : 0;
   const w0 = (p.type === 'bus' ? (p.length ?? 800) : def.w) + hs;
   const rot = p.rotation ?? 0;
@@ -40,7 +40,7 @@ function box(p: PlacedPart) {
 /** Hướng chân chĩa ra ngoài thân (theo pinDirs nếu có, không thì theo cạnh gần nhất), đã tính xoay. */
 function pinDir(p: PlacedPart, local: Point, H: number, pinName?: string): Dir {
   if (p.type === 'lead') return p.y < H / 2 ? 1 : 3;
-  const def = PARTS[p.type];
+  const def = partDef(p)!;
   const steps = ((p.rotation ?? 0) / 90) | 0;
   const fixed = pinName !== undefined ? def.pinDirs?.[pinName] : undefined;
   if (fixed !== undefined) return ((fixed + steps) % 4) as Dir;
@@ -52,7 +52,7 @@ function pinDir(p: PlacedPart, local: Point, H: number, pinName?: string): Dir {
 
 /** Hướng dây đi ra ở 1 chân của linh kiện đã đặt (null nếu không có chân đó). */
 export function pinDirection(part: PlacedPart, pin: string, H = 1350): Dir | null {
-  const local = PARTS[part.type]?.pins[pin];
+  const local = partDef(part)?.pins[pin];
   return local ? pinDir(part, local, H, pin) : null;
 }
 
@@ -80,10 +80,10 @@ function parseEnd(layout: CircuitLayout, ref: string, H: number): End | null {
   const part = layout.parts.find((p) => p.id === ref.slice(0, dot).trim());
   if (!part || !PARTS[part.type]) return null;
   const pinName = ref.slice(dot + 1).trim();
-  const local = PARTS[part.type].pins[pinName];
+  const def = partDef(part)!;
+  const local = def.pins[pinName];
   if (!local) return null;
   const r = rotate(local, part.rotation ?? 0);
-  const def = PARTS[part.type];
   const interior = part.type !== 'lead' && !def.straightOut && Math.abs(local.x) < def.w / 2 - 30 && Math.abs(local.y) < def.h / 2 - 30;
   return { point: { x: part.x + r.x, y: part.y + r.y }, dir: pinDir(part, local, H, pinName), part, isLead: part.type === 'lead', interior };
 }
