@@ -4,6 +4,7 @@ import { anchorContact } from '../../lib/circuit/contacts';
 import { bulbLabel, LED_COLORS } from '../../lib/circuit/lightParts';
 import { isProbe, MINI_BULB_COLORS, ohmWattLabel } from '../../lib/circuit/extraParts';
 import { ledHex } from '../../lib/circuit/parts';
+import { SENSOR_LIT_LABEL, SENSOR_PARTS } from '../../lib/circuit/sensorParts';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, parseCellType, parseHolderType, type CellKind, type HolderWiring } from '../../lib/circuit/powerParts';
 import { WIRE_COLORS } from '../../lib/circuit/render';
 import { deleteWire, duplicateParts, resetWire, rotateParts, updatePart, updateWire } from '../../lib/circuit/ops';
@@ -60,7 +61,7 @@ function batteryLabel(type: string, wiring?: HolderWiring): string | null {
 }
 
 /** Linh kiện có ô nhập riêng (không dùng ô "Chữ in trên thân" chung). */
-const OWN_FIELDS = new Set(['res_cement', 'res_power', 'cob', 'probe_red', 'probe_black', 'fan', 'motor', 'mini_bulb', 'sw_rocker2', 'sw_rocker3']);
+const OWN_FIELDS = new Set(['res_cement', 'res_power', 'cob', 'probe_red', 'probe_black', 'fan', 'motor', 'mini_bulb', 'sw_rocker2', 'sw_rocker3', ...Object.keys(SENSOR_PARTS)]);
 
 const btn = 'rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-30';
 
@@ -175,6 +176,14 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               {part.type === 'fan' || part.type === 'motor' ? 'Đang chạy' : part.type.startsWith('sw_') ? 'Đang bật (nhấn phía I)' : 'Đèn đang sáng'}
             </label>
           )}
+          {SENSOR_LIT_LABEL[part.type] && (
+            <label className="mb-2 flex items-center gap-2">
+              <input type="checkbox" checked={!!part.lit} onChange={(e) => set({ lit: e.target.checked })} />
+              {SENSOR_LIT_LABEL[part.type]}
+            </label>
+          )}
+          {part.type === 'ir_rx' && <div className="mb-2 text-white/40">LED thu thường mắc ngược: chân K (ngắn) về phía +, chân A về phía − qua điện trở kéo.</div>}
+          {part.type === 'buzzer_passive' && <div className="mb-2 text-white/40">Còi thụ động cấp điện một chiều sẽ không kêu — cần xung (VD từ NE555 hoặc Arduino).</div>}
           {part.type === 'sw_rocker3' && <div className="mb-2 text-white/40">Chân 2 (giữa) thường là chân chung. Mỗi hãng nối khác nhau — đo lại bằng đồng hồ VOM trên công tắc thật trước khi hàn.</div>}
           {part.type === 'psu' && (
             <>

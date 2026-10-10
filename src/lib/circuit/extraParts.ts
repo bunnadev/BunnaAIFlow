@@ -2,6 +2,7 @@ import type { PartDef } from './parts';
 import { resistorBands } from './bands';
 import type { PlacedPart } from './types';
 import { glow } from './lightParts';
+import { SENSOR_PARTS } from './sensorParts';
 
 /**
  * Linh kiện bổ sung của Xưởng vẽ mạch: điện trở xi măng, điện trở công suất dạng
@@ -357,7 +358,50 @@ function rocker(n: 2 | 3): PartDef {
   };
 }
 
+// ─── Biến trở tinh chỉnh (trimpot) xanh dương, núm trắng xẻ chữ thập ─────────
+
+const TRIM_PIN_Y = 100;
+
+const trimpot: PartDef = {
+  desc: 'Biến trở tinh chỉnh (trimpot) — đế vuông xanh dương, núm trắng xẻ rãnh chữ thập, 3 chân lá',
+  w: 110, h: TRIM_PIN_Y * 2,
+  pins: { '1': { x: -30, y: TRIM_PIN_Y }, '2': { x: 0, y: TRIM_PIN_Y - 10 }, '3': { x: 30, y: TRIM_PIN_Y } },
+  pinDirs: { '1': 1, '2': 1, '3': 1 },
+  pinNote: 'nhìn chéo từ trên, 3 chân lá chĩa XUỐNG: chân 1 trái, chân 2 giữa (con trượt, nằm phía sau), chân 3 phải',
+  render: (p) => {
+    // chân lá dẹt: vai rộng sát đế, gập khuỷu rồi thon lại
+    const tab = (x: number, top: number, end: number, out: number, back = false) =>
+      `<g${back ? ' opacity="0.85"' : ''}>` +
+      `<path d="M${x - 6} ${top} H${x + 6} V${top + 20} L${x + 6 + out} ${top + 30} V${top + 40} H${x - 6 + out} V${top + 30} L${x - 6} ${top + 20} Z" fill="url(#gSilver)" stroke="#6f767d" stroke-width="1"/>` +
+      `<rect x="${x - 3.5}" y="${top + 39}" width="7" height="${end - top - 39}" rx="1.5" fill="url(#gSilver)" stroke="#6f767d" stroke-width="1"/>` +
+      `<line x1="${x - 4 + out}" y1="${top + 31}" x2="${x + 4 + out}" y2="${top + 31}" stroke="#fff" stroke-width="1.5" opacity="0.6"/>` +
+      `</g>`;
+    // chân sau (con trượt) vẽ trước để đế che phần trên
+    let s = tab(0, 14, TRIM_PIN_Y - 10, 0, true);
+    // đế nhựa xanh: mặt trên sáng, mặt trước tối, góc vát
+    s += `<path d="M-46 -4 L-38 -40 H38 L46 -4 Z" fill="#3f6ae0" stroke="#1d3a94" stroke-width="1.5" stroke-linejoin="round"/>`;
+    s += `<path d="M-46 -4 H46 V26 Q46 30 42 30 H-42 Q-46 30 -46 26 Z" fill="#2449b8" stroke="#1d3a94" stroke-width="1.5"/>`;
+    s += `<rect x="-42" y="-2" width="84" height="5" rx="2" fill="#fff" opacity="0.18"/>`;
+    s += `<path d="M-46 4 H-40 V24 H-46 Z M40 4 H46 V24 H40 Z" fill="#183585" opacity="0.6"/>`;
+    // 2 chân trước
+    s += tab(-30, 24, TRIM_PIN_Y, -4) + tab(30, 24, TRIM_PIN_Y, 4);
+    // núm trắng: thân trụ + mặt trên, gờ 4 múi
+    s += `<path d="M-32 -30 V-20 A32 18 0 0 0 32 -20 V-30 Z" fill="#cfd2cf" stroke="#9a9e9a" stroke-width="1"/>`;
+    s += `<ellipse cx="0" cy="-30" rx="32" ry="18" fill="#f3f4f0" stroke="#b6bab5" stroke-width="1.2"/>`;
+    s += `<ellipse cx="0" cy="-30" rx="21" ry="11.5" fill="#e6e8e3"/>`;
+    // rãnh chữ thập
+    s += `<g transform="translate(0 -38) scale(1 0.62)">` +
+      `<rect x="-15" y="-4" width="30" height="8" rx="2" fill="#a9ada8"/><rect x="-4" y="-10" width="8" height="20" rx="2" fill="#a9ada8"/>` +
+      `<rect x="-15" y="-4" width="30" height="3" rx="1.5" fill="#8e928d"/><rect x="-4" y="-10" width="3" height="20" rx="1.5" fill="#8e928d"/></g>`;
+    s += `<ellipse cx="-20" cy="-40" rx="5" ry="2.2" fill="#fff" opacity="0.7"/>`;
+    // chữ in nằm ngang ngay dưới rãnh chữ thập (VD "103" = 10kΩ)
+    s += upright(p, 0, -23, `<text x="0" y="-17.5" font-family="${FONT}" font-size="15" font-weight="800" fill="#2f3236" text-anchor="middle">${esc(p.marking || '103')}</text>`);
+    return s;
+  },
+};
+
 export const EXTRA_PARTS: Record<string, PartDef> = {
+  trimpot,
   res_cement: resCement,
   res_power: resPower,
   cob,
@@ -368,6 +412,7 @@ export const EXTRA_PARTS: Record<string, PartDef> = {
   mini_bulb: miniBulb,
   sw_rocker2: rocker(2),
   sw_rocker3: rocker(3),
+  ...SENSOR_PARTS,
 };
 export const EXTRA_TYPES = new Set(Object.keys(EXTRA_PARTS));
 export const isProbe = (type: string) => type === 'probe_red' || type === 'probe_black';

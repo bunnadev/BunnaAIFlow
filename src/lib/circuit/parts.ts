@@ -312,6 +312,18 @@ const terminal2: PartDef = {
 
 // ─── IC chân cắm DIP (nhìn từ trên, khấc bên TRÁI) ────────────────────────
 const DIP_PITCH = 40;
+/** IC phổ biến theo số chân — để AI / người xem biết nên chọn vỏ nào. */
+export const DIP_EXAMPLES: Record<number, string> = {
+  8: 'NE555, LM358, LM386',
+  14: 'CD4011, LM324, 74HC00',
+  16: 'CD4017, CD4060, ULN2003',
+  18: 'LM3914, LM3915, LM3916, ULN2803',
+  20: '74HC245, 74HC573, ATtiny2313',
+  24: 'CD4067, CD4514, MAX7219',
+  28: 'ATmega328P, ATmega8, PIC16F876A',
+  40: 'AT89S52, PIC16F877A, ICL7107',
+};
+export const DIP_SIZES = [8, 14, 16, 18, 20, 24, 28, 40] as const;
 
 function dipPackage(n: number): PartDef {
   const half = n / 2;
@@ -326,7 +338,7 @@ function dipPackage(n: number): PartDef {
     pins[String(n - i)] = { x, y: -80 }; // hàng trên: n → n/2+1 từ trái sang phải
   }
   return {
-    desc: `IC chân cắm DIP-${n} (${n} chân) — VD ${n === 8 ? 'NE555, LM358, LM386' : n === 14 ? 'CD4011, LM324, 74HC00' : 'CD4017, CD4060, ULN2003'}`,
+    desc: `IC chân cắm DIP-${n} (${n} chân) — VD ${DIP_EXAMPLES[n]}`,
     w: bodyW, h: 160,
     pins,
     pinNote: `nằm ngang, khấc chữ U ở cạnh TRÁI. Hàng chân DƯỚI chĩa xuống: chân 1 (trái) → ${half} (phải). Hàng chân TRÊN chĩa lên: chân ${n} (trái) → ${half + 1} (phải). Số chân in sẵn trên thân`,
@@ -394,9 +406,7 @@ export const PARTS: Record<string, PartDef> = {
   led,
   speaker,
   jack35,
-  dip8: dipPackage(8),
-  dip14: dipPackage(14),
-  dip16: dipPackage(16),
+  ...Object.fromEntries(DIP_SIZES.map((n) => [`dip${n}`, dipPackage(n)])),
   mic,
   terminal2,
   lead,

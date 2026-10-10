@@ -2,6 +2,7 @@ import { endPartId, resolvePoint } from './geometry';
 import { busCoord, busEnds, busPoint, busVertical } from './bus';
 import { followEnd, simplify } from './wireEdit';
 import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
+import { DIP_SIZES } from './parts';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, POWER_TYPES } from './powerParts';
 
 /**
@@ -12,8 +13,9 @@ import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, POWER_TYPES } fro
 const snap10 = (v: number) => Math.round(v / 10) * 10;
 
 const PREFIX: Record<string, string> = {
-  resistor: 'R', cap_elec: 'C', cap_ceramic: 'C', pot: 'VR', diode: 'D',
-  to92: 'Q', to220: 'Q', to3: 'Q', pentawatt: 'U', dip8: 'U', dip14: 'U', dip16: 'U',
+  resistor: 'R', cap_elec: 'C', cap_ceramic: 'C', pot: 'VR', trimpot: 'VR', diode: 'D',
+  to92: 'Q', to220: 'Q', to3: 'Q', pentawatt: 'U', ...Object.fromEntries(DIP_SIZES.map((n) => [`dip${n}`, 'U'])),
+  ir_tx: 'IR', ir_rx: 'IR', ldr: 'LDR', laser: 'LS', buzzer_active: 'BZ', buzzer_passive: 'BZ', sw_push: 'SW', mic_electret: 'MIC',
   led: 'LED', bulb: 'DEN', cob: 'COB', res_cement: 'R', res_power: 'R', probe_red: 'VOM', probe_black: 'VOM', fan: 'FAN', motor: 'M', mini_bulb: 'DEN', sw_rocker2: 'SW', sw_rocker3: 'SW', speaker: 'SP', jack35: 'J', mic: 'MIC', terminal2: 'PWR', lead: 'OUT', psu: 'PSU',
   ...Object.fromEntries(CELL_KINDS.flatMap((k) => [cellType(k), ...[1, 2, 3].map((n) => holderType(k, n))].map((t) => [t, 'BAT']))),
 };
@@ -24,6 +26,7 @@ const DEFAULTS: Record<string, Partial<PlacedPart>> = {
   cap_elec: { marking: '100µF', label: '100µF' },
   cap_ceramic: { marking: '104', label: '100nF' },
   pot: { marking: 'B10K', label: '10k' },
+  trimpot: { marking: '103', label: '10k' },
   diode: { marking: '1N4007', label: '1N4007' },
   to92: { marking: 'C1815', label: 'C1815' },
   to220: { marking: 'TIP41C', label: 'TIP41C' },
@@ -32,6 +35,19 @@ const DEFAULTS: Record<string, Partial<PlacedPart>> = {
   dip8: { marking: 'NE555', label: 'NE555' },
   dip14: { marking: 'IC', label: 'IC' },
   dip16: { marking: 'CD4017', label: 'CD4017' },
+  dip18: { marking: 'LM3914N-1', label: 'LM3914' },
+  dip20: { marking: '74HC245', label: '74HC245' },
+  dip24: { marking: 'MAX7219', label: 'MAX7219' },
+  dip28: { marking: 'ATMEGA328P', label: 'ATmega328P' },
+  dip40: { marking: 'AT89S52', label: 'AT89S52' },
+  ir_tx: { label: 'IR phát' },
+  ir_rx: { label: 'IR thu' },
+  ldr: { label: 'LDR' },
+  laser: { label: 'Laser 5V' },
+  buzzer_active: { label: 'Còi 5V' },
+  buzzer_passive: { label: 'Còi' },
+  sw_push: { label: 'SW' },
+  mic_electret: { label: 'MIC' },
   terminal2: { label: '12V' },
   lead: { label: 'OUT' },
   mic: { label: 'MIC' },

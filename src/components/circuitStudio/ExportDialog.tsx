@@ -4,7 +4,7 @@ import { writeFile } from '@tauri-apps/plugin-fs';
 import { renderExportSvg, subsetLayout } from '../../lib/circuit/exportImage';
 import { validateLayout } from '../../lib/circuit/render';
 import { svgToPngBase64 } from '../../lib/circuit/rasterize';
-import { fileSlug, type ExportAspect, type ExportBackground, type ExportSettings } from '../../lib/circuit/projectModel';
+import { fileSlug, type ExportAspect, type ExportBackground, type ExportSettings, type WatermarkPos } from '../../lib/circuit/projectModel';
 import { addBackground, deleteBackground, listBackgrounds, type BackgroundEntry } from '../../lib/circuit/backgroundStore';
 import { base64ToBytes } from '../../lib/assets';
 import type { RoutedWire } from '../../lib/circuit/route';
@@ -23,6 +23,15 @@ interface Props {
 }
 
 const ASPECTS: [ExportAspect, string][] = [['4:5', '4:5 — 1080×1350 (bài đăng)'], ['1:1', '1:1 — 1080×1080'], ['9:16', '9:16 — 1080×1920 (Reels/Story)']];
+const WM_POS: [WatermarkPos, string][] = [['corner', 'Góc dưới'], ['center', 'Chéo giữa (mờ)'], ['both', 'Cả hai']];
+// Tên kênh đã dùng — chung mọi mạch (có nhiều kênh), chỉ là gợi ý nhanh nên lỗi storage thì bỏ qua
+const WM_KEY = 'circuitStudio.watermarks';
+const loadRecentWm = (): string[] => {
+  try { const v = JSON.parse(localStorage.getItem(WM_KEY) ?? '[]'); return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []; } catch { return []; }
+};
+const saveRecentWm = (name: string) => {
+  try { localStorage.setItem(WM_KEY, JSON.stringify([name, ...loadRecentWm().filter((x) => x !== name)].slice(0, 8))); } catch { /* bỏ qua */ }
+};
 const seg = (on: boolean) => `rounded-md px-3 py-1.5 text-sm ${on ? 'bg-[#F1641E] text-white' : 'bg-white/5 text-white/70 hover:bg-white/10'}`;
 
 export default function ExportDialog({ layout, routed, selectedIds, projectName, settings, onClose, onSaved, onError }: Props) {
@@ -31,6 +40,9 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
   const [background, setBackground] = useState<ExportBackground>(settings?.background ?? { kind: 'wood' });
   const [color, setColor] = useState(settings?.background.kind === 'color' ? settings.background.color : '#f5f1e8');
   const [showIds, setShowIds] = useState(!!settings?.showIds);
+  const [watermark, setWatermark] = useState(settings?.watermark ?? '');
+  const [wmPos, setWmPos] = useState<WatermarkPos>(settings?.watermarkPos ?? 'corner');
+  const [recentWm, setRecentWm] = useState(loadRecentWm);
   const [titleTop, setTitleTop] = useState(layout.titleTop ?? '');
   const [titleBottom, setTitleBottom] = useState(layout.titleBottom ?? '');
   const [bgs, setBgs] = useState<BackgroundEntry[]>([]);
@@ -55,12 +67,13 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
   }, [busy, onClose]);
   const dTop = useDeferredValue(titleTop);
   const dBottom = useDeferredValue(titleBottom);
+  const dWm = useDeferredValue(watermark);
 
   const bgDataUrl = background.kind === 'image' ? bgs.find((b) => b.id === background.id)?.dataUrl : undefined;
   const ids = scope === 'selected' ? selectedIds : undefined;
   const result = useMemo(
-    () => renderExportSvg(layout, routed, { aspect, background, backgroundDataUrl: bgDataUrl, titleTop: dTop, titleBottom: dBottom, ids, showIds }),
-    [layout, routed, aspect, background, bgDataUrl, dTop, dBottom, scope, selectedIds, showIds],
+    () => renderExportSvg(layout, routed, { aspect, background, backgroundDataUrl: bgDataUrl, titleTop: dTop, titleBottom: dBottom, ids, showIds, watermark: dWm, watermarkPos: wmPos }),
+    [layout, routed, aspect, background, bgDataUrl, dTop, dBottom, scope, selectedIds, showIds, dWm, wmPos],
   );
   const preview = result ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(result.svg) : '';
 
@@ -101,7 +114,9 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
       const path = await save({ defaultPath: `${fileSlug(projectName)}${ids ? '_phan' : ''}.png`, filters: [{ name: 'PNG', extensions: ['png'] }] });
       if (!path) return;
       await writeFile(path, base64ToBytes(b64));
-      await onSaved({ aspect, background, showIds }, titleTop, titleBottom);
+      const wm = watermark.trim();
+      if (wm) { saveRecentWm(wm); setRecentWm(loadRecentWm()); }
+      await onSaved({ aspect, background, showIds, watermark: wm, watermarkPos: wmPos }, titleTop, titleBottom);
     } catch (e) {
       onError(`Lỗi xuất ảnh: ${(e as Error).message ?? e}`);
     } finally {
@@ -176,6 +191,25 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
             <input value={titleBottom} onChange={(e) => setTitleBottom(e.target.value)} placeholder="VD 12V · NE555 + CD4017"
               className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1.5 outline-none focus:border-[#F1641E]" />
           </label>
+
+          <div>
+            <span className="mb-1 block text-white/60">Watermark — tên kênh (để trống = không có)</span>
+            <input value={watermark} onChange={(e) => setWatermark(e.target.value)} placeholder="VD @tenkenh"
+              className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1.5 outline-none focus:border-[#F1641E]" />
+            {recentWm.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {recentWm.map((n) => (
+                  <button key={n} onClick={() => setWatermark(n)}
+                    className={`rounded-full px-2.5 py-0.5 text-xs ${watermark.trim() === n ? 'bg-[#F1641E] text-white' : 'bg-white/5 text-white/70 hover:bg-white/10'}`}>{n}</button>
+                ))}
+              </div>
+            )}
+            {watermark.trim() && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {WM_POS.map(([p, label]) => <button key={p} className={seg(wmPos === p)} onClick={() => setWmPos(p)}>{label}</button>)}
+              </div>
+            )}
+          </div>
 
           {result && result.scale < 0.6 && (
             <div className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-200">

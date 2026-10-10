@@ -1,9 +1,9 @@
-import { ID_SIZE, idPlacements, labelPlacements, renderScene, svgDefs, titleSvg } from './render';
+import { esc, FONT, ID_SIZE, idPlacements, labelPlacements, renderScene, svgDefs, titleSvg } from './render';
 import { woodPhotoBackground } from './woodPhoto';
 import type { RoutedWire } from './route';
 import { endPartId } from './geometry';
 import { contentBounds } from './world';
-import type { ExportAspect, ExportBackground } from './projectModel';
+import type { ExportAspect, ExportBackground, WatermarkPos } from './projectModel';
 import type { CircuitLayout } from './types';
 
 /** Dựng ảnh xuất: lấy (1 phần) mạch trên bàn vẽ, căn giữa + co vừa khung, thêm nền và tiêu đề. */
@@ -25,6 +25,28 @@ export interface ExportRenderOptions {
   ids?: string[];
   /** In ký hiệu linh kiện (R1, C2…) lên ảnh. */
   showIds?: boolean;
+  /** Tên kênh in mờ lên ảnh (để trống = không có). */
+  watermark?: string;
+  watermarkPos?: WatermarkPos;
+}
+
+/** Cao vùng chừa ở đáy cho watermark góc (đẩy tiêu đề dưới lên, không đè nhau). */
+const WM_CORNER_ZONE = 40;
+
+/** Watermark: góc dưới phải (chữ nhỏ rõ) và/hoặc chữ mảnh xoay chéo mờ giữa ảnh (khó cắt bỏ). */
+export function watermarkSvg(text: string | undefined, pos: WatermarkPos, W: number, H: number): string {
+  const t = text?.trim();
+  if (!t) return '';
+  let out = '';
+  if (pos === 'center' || pos === 'both') {
+    // Kiểu Huy chọn: chữ mảnh, trắng ~30%, xoay chéo 50°, dài ~60% bề ngang ảnh
+    const size = Math.round(Math.min(90, (W * 0.6) / (t.length * 0.55)));
+    out += `<text x="${W / 2}" y="${H / 2}" transform="rotate(-50 ${W / 2} ${H / 2})" font-family="${FONT}" font-size="${size}" font-weight="400" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" fill-opacity="0.3">${esc(t)}</text>`;
+  }
+  if (pos === 'corner' || pos === 'both') {
+    out += `<text x="${W - 24}" y="${H - 18}" font-family="${FONT}" font-size="30" font-weight="800" text-anchor="end" fill="#ffffff" fill-opacity="0.85" stroke="#000" stroke-opacity="0.6" stroke-width="6" stroke-linejoin="round" paint-order="stroke">${esc(t)}</text>`;
+  }
+  return out;
 }
 
 export function subsetLayout(layout: CircuitLayout, ids: string[]): { layout: CircuitLayout; wireIndex: number[] } {
@@ -58,7 +80,9 @@ export function renderExportSvg(
   }
   const bw = b.x2 - b.x1 + PAD * 2, bh = b.y2 - b.y1 + PAD * 2;
   const topZone = opts.titleTop?.trim() ? 150 : SIDE;
-  const bottomZone = opts.titleBottom?.trim() ? 130 : SIDE;
+  const wmPos = opts.watermarkPos ?? 'corner';
+  const wmCorner = !!opts.watermark?.trim() && wmPos !== 'center' ? WM_CORNER_ZONE : 0;
+  const bottomZone = (opts.titleBottom?.trim() ? 130 : SIDE) + wmCorner;
   const availW = W - SIDE * 2, availH = H - topZone - bottomZone;
   const scale = Math.min(availW / bw, availH / bh, MAX_SCALE);
   const tx = SIDE + (availW - bw * scale) / 2 - (b.x1 - PAD) * scale;
@@ -73,7 +97,8 @@ export function renderExportSvg(
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
     svgDefs() + bg +
     `<g transform="translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${scale.toFixed(4)})">${scene}</g>` +
-    titleSvg(opts.titleTop?.trim(), 92, W) + titleSvg(opts.titleBottom?.trim(), H - 40, W) +
+    titleSvg(opts.titleTop?.trim(), 92, W) + titleSvg(opts.titleBottom?.trim(), H - 40 - wmCorner, W) +
+    watermarkSvg(opts.watermark, wmPos, W, H) +
     `</svg>`;
   return { svg, width: W, height: H, scale };
 }

@@ -33,6 +33,25 @@ describe('exportImage', () => {
     expect(on).toMatch(/>R2<\/text>/);
   });
 
+  it('watermark: trống thì không in; góc / chéo giữa / cả hai', () => {
+    const none = renderExportSvg(l, routed, { aspect: '4:5', background: wood, watermark: '  ' })!.svg;
+    expect(none).not.toMatch(/fill-opacity="0.85"/);
+    const corner = renderExportSvg(l, routed, { aspect: '4:5', background: wood, watermark: '@kenh<A>' })!.svg;
+    expect(corner).toMatch(/text-anchor="end"[^>]*>@kenh&lt;A&gt;<\/text>/);
+    expect(corner).not.toMatch(/rotate\(-50/);
+    const center = renderExportSvg(l, routed, { aspect: '4:5', background: wood, watermark: '@kenh', watermarkPos: 'center' })!.svg;
+    expect(center).toMatch(/rotate\(-50[^>]*>@kenh<\/text>/);
+    expect(center).not.toMatch(/text-anchor="end"[^>]*>@kenh/);
+    const both = renderExportSvg(l, routed, { aspect: '4:5', background: wood, watermark: '@kenh', watermarkPos: 'both' })!.svg;
+    expect(both.match(/>@kenh<\/text>/g)).toHaveLength(2);
+  });
+
+  it('watermark góc đẩy tiêu đề dưới lên, không đè nhau', () => {
+    const base = { aspect: '4:5' as const, background: wood, titleBottom: 'DUOI' };
+    expect(renderExportSvg(l, routed, base)!.svg).toMatch(/y="1310"[^>]*>DUOI</);
+    expect(renderExportSvg(l, routed, { ...base, watermark: '@kenh' })!.svg).toMatch(/y="1270"[^>]*>DUOI</);
+  });
+
   it('kích thước theo khung', () => {
     expect(renderExportSvg(l, routed, { aspect: '4:5', background: wood })).toMatchObject({ width: 1080, height: 1350 });
     expect(renderExportSvg(l, routed, { aspect: '1:1', background: wood })!.height).toBe(1080);

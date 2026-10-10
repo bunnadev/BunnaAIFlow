@@ -2,8 +2,8 @@ import { PARTS } from './parts';
 import { pinDirection, routeWires, type RoutedWire } from './route';
 import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
 
-const FONT = 'Helvetica Neue, Arial, sans-serif';
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export const FONT = 'Helvetica Neue, Arial, sans-serif';
+export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export const WIRE_COLORS: Record<string, [string, string]> = {
   // [màu chính, màu viền tối]

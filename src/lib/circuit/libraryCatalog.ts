@@ -2,7 +2,7 @@
 
 export interface LibraryItem { type: string; name: string; group: string; idBase?: string }
 
-export const LIBRARY_GROUPS = ['Cơ bản', 'Bán dẫn / IC', 'Nguồn & đầu nối', 'Pin & máy nguồn', 'Của tôi'];
+export const LIBRARY_GROUPS = ['Cơ bản', 'Cảm biến & báo', 'Bán dẫn / IC', 'Nguồn & đầu nối', 'Pin & máy nguồn', 'Của tôi'];
 
 export const BUILTIN_LIBRARY: LibraryItem[] = [
   { type: 'resistor', name: 'Điện trở', group: 'Cơ bản' },
@@ -20,6 +20,7 @@ export const BUILTIN_LIBRARY: LibraryItem[] = [
   { type: 'cap_ceramic', name: 'Tụ gốm', group: 'Cơ bản' },
   { type: 'diode', name: 'Diode', group: 'Cơ bản' },
   { type: 'pot', name: 'Chiết áp', group: 'Cơ bản' },
+  { type: 'trimpot', name: 'Biến trở tinh chỉnh', group: 'Cơ bản' },
   { type: 'to92', name: 'Transistor TO-92', group: 'Bán dẫn / IC' },
   { type: 'to220', name: 'TO-220', group: 'Bán dẫn / IC' },
   { type: 'to3', name: 'Sò TO-3', group: 'Bán dẫn / IC' },
@@ -27,6 +28,19 @@ export const BUILTIN_LIBRARY: LibraryItem[] = [
   { type: 'dip8', name: 'IC 8 chân', group: 'Bán dẫn / IC' },
   { type: 'dip14', name: 'IC 14 chân', group: 'Bán dẫn / IC' },
   { type: 'dip16', name: 'IC 16 chân', group: 'Bán dẫn / IC' },
+  { type: 'dip18', name: 'IC 18 chân', group: 'Bán dẫn / IC' },
+  { type: 'dip20', name: 'IC 20 chân', group: 'Bán dẫn / IC' },
+  { type: 'dip24', name: 'IC 24 chân', group: 'Bán dẫn / IC' },
+  { type: 'dip28', name: 'IC 28 chân', group: 'Bán dẫn / IC' },
+  { type: 'dip40', name: 'IC 40 chân', group: 'Bán dẫn / IC' },
+  { type: 'ir_tx', name: 'LED phát hồng ngoại', group: 'Cảm biến & báo' },
+  { type: 'ir_rx', name: 'LED thu hồng ngoại', group: 'Cảm biến & báo' },
+  { type: 'ldr', name: 'Quang trở (cảm biến ánh sáng)', group: 'Cảm biến & báo' },
+  { type: 'mic_electret', name: 'Micro (cảm biến âm thanh)', group: 'Cảm biến & báo' },
+  { type: 'laser', name: 'Module laser', group: 'Cảm biến & báo' },
+  { type: 'buzzer_active', name: 'Còi chủ động', group: 'Cảm biến & báo' },
+  { type: 'buzzer_passive', name: 'Còi thụ động', group: 'Cảm biến & báo' },
+  { type: 'sw_push', name: 'Công tắc nút nhấn', group: 'Cảm biến & báo' },
   { type: 'terminal2', name: 'Cọc nguồn', group: 'Nguồn & đầu nối' },
   { type: 'bus', name: 'Thanh mass', group: 'Nguồn & đầu nối', idBase: 'GND' },
   { type: 'bus', name: 'Thanh nguồn +', group: 'Nguồn & đầu nối', idBase: 'VCC' },
