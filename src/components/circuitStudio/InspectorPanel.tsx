@@ -229,6 +229,13 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               <button className={`${btn} ml-auto`} title="Tạo thêm 1 cái giống hệt (không kèm dây) — phím tắt ⌘D" onClick={duplicate}>Nhân bản</button>
             </div>
           )}
+          {part.type !== 'bus' && part.type !== 'lead' && Object.keys(PARTS[part.type]?.pins ?? {}).length > 0 && (
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-white/50">Mối hàn</span>
+              <button {...pick(part.joint !== 'round')} title="Chân nằm ngang (điện trở, IC nhìn nghiêng…)" onClick={() => set({ joint: undefined })}>Dài</button>
+              <button {...pick(part.joint === 'round')} title="Nhìn từ trên xuống, chân cắm thẳng (relay, module…)" onClick={() => set({ joint: 'round' })}>Tròn</button>
+            </div>
+          )}
           {part.type !== 'bus' && part.type !== 'lead' && (
             <div className="mb-2 flex items-center gap-2">
               <span className="text-white/50">Cỡ</span>

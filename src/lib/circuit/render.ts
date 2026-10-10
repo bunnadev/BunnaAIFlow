@@ -399,6 +399,16 @@ function solderBlob(pt: Point, toward: Point, onBus = false): string {
     `</g>`;
 }
 
+/** Mối hàn tròn nhìn từ trên xuống: cục thiếc vồng quanh đầu chân cắm thẳng (relay, module nhìn mặt hàn). */
+function solderDot(pt: Point): string {
+  return `<g transform="translate(${pt.x} ${pt.y})">` +
+    `<ellipse cx="0.5" cy="1" rx="15" ry="14" fill="url(#gFlux)"/>` +
+    `<circle r="9.5" fill="url(#gSolderDome)" stroke="#4b5157" stroke-width="1"/>` +
+    `<circle cx="0.6" cy="0.6" r="2.4" fill="#8d949b" stroke="#565c62" stroke-width="0.8"/>` +
+    `<path d="M -6.2 -2.8 A 6.8 6.8 0 0 1 -1.8 -6.4" fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="1.6" stroke-linecap="round"/>` +
+    `</g>`;
+}
+
 const STRIP = 18; // vỏ dây dừng cách chân: lộ đoạn lõi tráng thiếc giữa vỏ và mối hàn // đoạn lõi tráng thiếc lộ ra giữa vỏ dây và cục hàn
 
 function renderWire(w: Wire, rw: RoutedWire | null, dashed = false, shadowId = 'fWireShadow', darkBg = false, real = false): { body: string; joints: string } {
@@ -486,7 +496,8 @@ function realWire(pts: Point[], rw: RoutedWire, main: string, dark: string, dash
         `<line x1="${pt.x}" y1="${pt.y}" x2="${x2}" y2="${y2}" stroke="#f2b97a" stroke-width="5" stroke-linecap="round"/>`;
       continue;
     }
-    joints += solderBlob(pt, next, busEnd[k]);
+    const end = k === 0 ? rw.from : rw.to;
+    joints += !end.bus && end.part.joint === 'round' ? solderDot(pt) : solderBlob(pt, next, busEnd[k]);
   }
   return { body, joints };
 }
@@ -730,6 +741,7 @@ function studioFilterDefs(r: Box): { defs: string; shadow: string; wireShadow: s
     // mối hàn Xưởng vẽ: thiếc xám bạc, sáng thành vệt dọc giữa thân
     // lõi dây tráng thiếc: bạc sáng, bóng theo chiều ngang thân lõi
     `<linearGradient id="gTinnedCore" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c838a"/><stop offset="0.3" stop-color="#d3d8dc"/><stop offset="0.45" stop-color="#f6f8f9"/><stop offset="0.7" stop-color="#b6bcc2"/><stop offset="1" stop-color="#737a81"/></linearGradient>` +
+    `<radialGradient id="gSolderDome" cx="0.4" cy="0.38" r="0.65"><stop offset="0" stop-color="#f6f8f9"/><stop offset="0.35" stop-color="#c3c9ce"/><stop offset="0.75" stop-color="#7d848b"/><stop offset="1" stop-color="#4b5157"/></radialGradient>` +
     `<linearGradient id="gSolderJoint" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4b5157"/><stop offset="0.22" stop-color="#9aa1a8"/><stop offset="0.4" stop-color="#eef1f3"/><stop offset="0.58" stop-color="#b4bac0"/><stop offset="0.82" stop-color="#737980"/><stop offset="1" stop-color="#454b51"/></linearGradient>` +
     // nhựa thông còn lại quanh mối hàn
     `<radialGradient id="gFlux" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#c9902f" stop-opacity="0.55"/><stop offset="0.6" stop-color="#b57a22" stop-opacity="0.3"/><stop offset="1" stop-color="#9a6418" stop-opacity="0"/></radialGradient>` +

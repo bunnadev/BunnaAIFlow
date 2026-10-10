@@ -42,6 +42,8 @@ export interface PlacedPart {
   view?: 'front' | 'back';
   /** Chỉ cho đế pin 2–3 viên: cách mắc các viên bên trong. Không có = nối tiếp. */
   wiring?: 'series' | 'parallel';
+  /** Kiểu mối hàn ở chân linh kiện này (Xưởng vẽ): dài (chân nằm ngang) hay tròn (nhìn từ trên xuống, chân cắm thẳng). Không có = dài. */
+  joint?: 'long' | 'round';
   /** Nhãn đã kéo tay: tâm nhãn = tâm linh kiện + (dx, dy). Không có = tự đặt. */
   labelPos?: { dx: number; dy: number };
 }
