@@ -1,5 +1,5 @@
 import { PARTS, partDef } from './parts';
-import { pinDirection, routeWires, type RoutedWire } from './route';
+import { jointOf, pinDirection, routeWires, type RoutedWire } from './route';
 import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
 
 export const FONT = 'Helvetica Neue, Arial, sans-serif';
@@ -427,12 +427,12 @@ function renderWire(w: Wire, rw: RoutedWire | null, dashed = false, shadowId = '
       `<path d="${d}" fill="none" stroke="url(#gLeg)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>` +
       `</g>`;
     const joints = real
-      ? solderBlob(pts[0], pts[1]) + solderBlob(pts[pts.length - 1], pts[pts.length - 2])
+      ? joint(w, rw, 'from', pts[0], pts[1]) + joint(w, rw, 'to', pts[pts.length - 1], pts[pts.length - 2])
       : [pts[0], pts[pts.length - 1]]
         .map((pt) => `<circle cx="${pt.x}" cy="${pt.y}" r="8" fill="url(#gSolder)" stroke="#6f767d" stroke-width="1.5"/>`).join('');
     return { body: legBody, joints };
   }
-  if (real) return realWire(pts, rw, main, dark, dashed, shadowId);
+  if (real) return realWire(w, pts, rw, main, dark, dashed, shadowId);
   const body =
     `<g filter="url(#${shadowId})">` +
     `<path d="${d}" fill="none" stroke="${dark}" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"${dashed ? ' stroke-dasharray="20 14"' : ''}/>` +
@@ -463,7 +463,14 @@ function renderWire(w: Wire, rw: RoutedWire | null, dashed = false, shadowId = '
  * Dây bọc nhựa kiểu thật (Xưởng vẽ): vỏ dây dừng cách chân một đoạn, lộ lõi tráng
  * thiếc, mối hàn ôm chân. Đầu dây tự do giữ kiểu lõi đồng như cũ.
  */
-function realWire(pts: Point[], rw: RoutedWire, main: string, dark: string, dashed: boolean, shadowId: string): { body: string; joints: string } {
+/** Mối hàn ở 1 đầu dây: tròn hay dài theo lựa chọn của đầu dây (thanh mass luôn dài). */
+function joint(w: Wire, rw: RoutedWire, which: 'from' | 'to', pt: Point, next: Point): string {
+  const end = which === 'from' ? rw.from : rw.to;
+  if (!end.bus && jointOf(w, which, end.part) === 'round') return solderDot(pt);
+  return solderBlob(pt, next, !!end.bus);
+}
+
+function realWire(w: Wire, pts: Point[], rw: RoutedWire, main: string, dark: string, dashed: boolean, shadowId: string): { body: string; joints: string } {
   const fromLead = rw.from.isLead, toLead = rw.to.isLead;
   const ins = trimEnds(pts, fromLead ? 0 : STRIP, toLead ? 0 : STRIP);
   const d = roundedPath(ins);
@@ -487,7 +494,6 @@ function realWire(pts: Point[], rw: RoutedWire, main: string, dark: string, dash
     `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="0.38" stroke-width="2" stroke-linecap="butt" stroke-linejoin="round" transform="translate(-1.5 -1.8)"${dash}/>` +
     `</g>`;
   let joints = '';
-  const busEnd = [!!rw.from.bus, !!rw.to.bus];
   for (const [k, [pt, , next, isLead]] of ends.entries()) {
     if (isLead) {
       const dx = pt.x - next.x, dy = pt.y - next.y, len = Math.hypot(dx, dy) || 1;
@@ -496,8 +502,7 @@ function realWire(pts: Point[], rw: RoutedWire, main: string, dark: string, dash
         `<line x1="${pt.x}" y1="${pt.y}" x2="${x2}" y2="${y2}" stroke="#f2b97a" stroke-width="5" stroke-linecap="round"/>`;
       continue;
     }
-    const end = k === 0 ? rw.from : rw.to;
-    joints += !end.bus && end.part.joint === 'round' ? solderDot(pt) : solderBlob(pt, next, busEnd[k]);
+    joints += joint(w, rw, k === 0 ? 'from' : 'to', pt, next);
   }
   return { body, joints };
 }

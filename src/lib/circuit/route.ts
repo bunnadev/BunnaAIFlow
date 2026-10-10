@@ -1,6 +1,6 @@
 import { busCenter, busPoint, busVertical } from './bus';
 import { PARTS, partDef } from './parts';
-import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
+import type { CircuitLayout, JointStyle, PlacedPart, Point, Rotation, Wire } from './types';
 
 /**
  * Tự đi dây (kiểu phần mềm vẽ mạch): tìm đường A* trên lưới, chỉ đi ngang/dọc,
@@ -67,7 +67,12 @@ export interface End {
   interior?: boolean;
 }
 
-function parseEnd(layout: CircuitLayout, ref: string, H: number): End | null {
+/** Kiểu mối hàn thực tế ở 1 đầu dây: chọn riêng cho đầu dây, không thì theo linh kiện, mặc định dài. */
+export function jointOf(w: Wire, which: 'from' | 'to', part?: PlacedPart): JointStyle {
+  return w.joints?.[which] ?? part?.joint ?? 'long';
+}
+
+function parseEnd(layout: CircuitLayout, ref: string, H: number, round = false): End | null {
   const at = ref.indexOf('@');
   const busId = (at > 0 ? ref.slice(0, at) : ref).trim();
   const busPart = layout.parts.find((p) => p.id === busId && p.type === 'bus');
@@ -84,7 +89,8 @@ function parseEnd(layout: CircuitLayout, ref: string, H: number): End | null {
   const local = def.pins[pinName];
   if (!local) return null;
   const r = rotate(local, part.rotation ?? 0);
-  const interior = part.type !== 'lead' && !def.straightOut && Math.abs(local.x) < def.w / 2 - 30 && Math.abs(local.y) < def.h / 2 - 30;
+  // Mối hàn tròn (chân cắm thẳng, nhìn từ trên): dây đi ra hướng nào cũng được, như chân nằm giữa thân
+  const interior = part.type !== 'lead' && (round || (!def.straightOut && Math.abs(local.x) < def.w / 2 - 30 && Math.abs(local.y) < def.h / 2 - 30));
   return { point: { x: part.x + r.x, y: part.y + r.y }, dir: pinDir(part, local, H, pinName), part, isLead: part.type === 'lead', interior };
 }
 
@@ -243,7 +249,11 @@ export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean; 
     return { x, y };
   };
 
-  const ends = layout.wires.map((w) => [parseEnd(layout, w.from, H), parseEnd(layout, w.to, H)] as const);
+  const partOf = (ref: string) => layout.parts.find((p) => p.id === ref.slice(0, ref.lastIndexOf('.')).trim());
+  const ends = layout.wires.map((w) => [
+    parseEnd(layout, w.from, H, jointOf(w, 'from', partOf(w.from)) === 'round'),
+    parseEnd(layout, w.to, H, jointOf(w, 'to', partOf(w.to)) === 'round'),
+  ] as const);
   const out: (RoutedWire | null)[] = layout.wires.map(() => null);
 
   // Dây chạm (2 cực pin chạm nhau) → nối thẳng, không đi dây, không chiếm ô

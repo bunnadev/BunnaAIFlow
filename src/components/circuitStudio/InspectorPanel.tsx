@@ -7,8 +7,10 @@ import { ledHex } from '../../lib/circuit/parts';
 import { SENSOR_LIT_LABEL, SENSOR_PARTS } from '../../lib/circuit/sensorParts';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, parseCellType, parseHolderType, type CellKind, type HolderWiring } from '../../lib/circuit/powerParts';
 import { WIRE_COLORS } from '../../lib/circuit/render';
-import { deleteWire, duplicateParts, resetWire, rotateParts, updatePart, updateWire } from '../../lib/circuit/ops';
-import type { CircuitLayout, PlacedPart } from '../../lib/circuit/types';
+import { deleteWire, duplicateParts, resetWire, rotateParts, trimBacktrack, updatePart, updateWire } from '../../lib/circuit/ops';
+import type { CircuitLayout, JointStyle, PlacedPart } from '../../lib/circuit/types';
+import { jointOf } from '../../lib/circuit/route';
+import { endPartId } from '../../lib/circuit/geometry';
 import { clampScale, type Selection } from './StudioCanvas';
 import { isBuiltinPart } from '../../lib/circuit/registry';
 
@@ -229,13 +231,6 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               <button className={`${btn} ml-auto`} title="Tạo thêm 1 cái giống hệt (không kèm dây) — phím tắt ⌘D" onClick={duplicate}>Nhân bản</button>
             </div>
           )}
-          {part.type !== 'bus' && part.type !== 'lead' && Object.keys(PARTS[part.type]?.pins ?? {}).length > 0 && (
-            <div className="mb-2 flex items-center gap-2">
-              <span className="text-white/50">Mối hàn</span>
-              <button {...pick(part.joint !== 'round')} title="Chân nằm ngang (điện trở, IC nhìn nghiêng…)" onClick={() => set({ joint: undefined })}>Dài</button>
-              <button {...pick(part.joint === 'round')} title="Nhìn từ trên xuống, chân cắm thẳng (relay, module…)" onClick={() => set({ joint: 'round' })}>Tròn</button>
-            </div>
-          )}
           {part.type !== 'bus' && part.type !== 'lead' && (
             <div className="mb-2 flex items-center gap-2">
               <span className="text-white/50">Cỡ</span>
@@ -279,6 +274,23 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
                 className="h-6 w-6 rounded-full border-2" style={{ background: main, borderColor: wire.color === c ? '#F1641E' : 'transparent' }} />
             ))}
           </div>
+          {(['from', 'to'] as const).map((which) => {
+            const ref = wire[which];
+            const end = layout.parts.find((p) => p.id === endPartId(ref));
+            if (!end || end.type === 'bus' || end.type === 'lead' || ref.includes('@')) return null;
+            const cur = jointOf(wire, which, end);
+            const setJoint = (j: JointStyle) => {
+              const l = updateWire(layout, wireIdx, { joints: { ...wire.joints, [which]: j } });
+              onCommit(j === 'round' ? trimBacktrack(l, wireIdx, which) : l);
+            };
+            return (
+              <div key={which} className="mb-2 flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-white/50" title={ref}>Mối hàn {ref}</span>
+                <button {...pick(cur === 'long')} title="Chân nằm ngang (điện trở, IC nhìn nghiêng…)" onClick={() => setJoint('long')}>Dài</button>
+                <button {...pick(cur === 'round')} title="Nhìn từ trên xuống, chân cắm thẳng (relay, module…) — dây đi ra hướng nào cũng được" onClick={() => setJoint('round')}>Tròn</button>
+              </div>
+            );
+          })}
           <button className={`${btn} mb-3 w-full`}
             style={wire.color === 'silver' ? { borderColor: '#F1641E', background: 'rgba(241,100,30,0.28)', color: '#fff' } : undefined}
             onClick={() => onCommit(updateWire(layout, wireIdx, { color: 'silver' }))}>Chân trần / dây thiếc (hàn thẳng, không vỏ)</button>

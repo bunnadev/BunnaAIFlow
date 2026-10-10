@@ -6,6 +6,7 @@
  */
 
 export type Rotation = 0 | 90 | 180 | 270;
+export type JointStyle = 'long' | 'round';
 export type LabelSide = 'left' | 'right' | 'top' | 'bottom';
 
 export interface PlacedPart {
@@ -42,8 +43,8 @@ export interface PlacedPart {
   view?: 'front' | 'back';
   /** Chỉ cho đế pin 2–3 viên: cách mắc các viên bên trong. Không có = nối tiếp. */
   wiring?: 'series' | 'parallel';
-  /** Kiểu mối hàn ở chân linh kiện này (Xưởng vẽ): dài (chân nằm ngang) hay tròn (nhìn từ trên xuống, chân cắm thẳng). Không có = dài. */
-  joint?: 'long' | 'round';
+  /** Kiểu mối hàn mặc định cho các đầu dây nối vào linh kiện này (bản cũ; nay chọn theo từng đầu dây — Wire.joints). Không có = dài. */
+  joint?: JointStyle;
   /** Nhãn đã kéo tay: tâm nhãn = tâm linh kiện + (dx, dy). Không có = tự đặt. */
   labelPos?: { dx: number; dy: number };
 }
@@ -59,6 +60,11 @@ export interface Wire {
   via?: [number, number][];
   /** Đường dây do người dùng tự chỉnh (giữ nguyên via, không tự đi lại). */
   manual?: boolean;
+  /**
+   * Kiểu mối hàn từng đầu (Xưởng vẽ): dài = chân nằm ngang; tròn = nhìn từ trên xuống, chân cắm thẳng
+   * (dây đi ra hướng nào cũng được). Không có = theo linh kiện (PlacedPart.joint), mặc định dài.
+   */
+  joints?: { from?: JointStyle; to?: JointStyle };
 }
 
 export interface CircuitLayout {

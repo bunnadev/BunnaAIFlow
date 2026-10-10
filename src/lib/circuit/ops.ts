@@ -324,3 +324,28 @@ export function resizeBus(layout: CircuitLayout, id: string, side: -1 | 1, endX:
 
   return after;
 }
+
+/**
+ * Dây sửa tay: bỏ đoạn "chuôi" ở 1 đầu — dây đi thẳng ra theo hướng chân rồi quay ngược lại
+ * trên cùng đường (cần cho mối hàn dài, thừa khi đổi sang mối hàn tròn).
+ */
+export function trimBacktrack(layout: CircuitLayout, i: number, which: 'from' | 'to'): CircuitLayout {
+  const w = layout.wires[i];
+  if (!w?.via?.length) return layout;
+  const a = resolvePoint(layout, w.from), b = resolvePoint(layout, w.to);
+  if (!a || !b) return layout;
+  let pts: Point[] = [a, ...w.via.map(([x, y]) => ({ x, y })), b];
+  if (which === 'to') pts = pts.reverse();
+  // pts[1] là góc ngay sau chân: bỏ nếu pts[0], pts[1], pts[2] thẳng hàng và pts[1] không nằm giữa (= đi ra rồi quay lại)
+  const backtracks = (p0: Point, p1: Point, p2: Point) => {
+    const cross = (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x);
+    const dot = (p1.x - p0.x) * (p2.x - p1.x) + (p1.y - p0.y) * (p2.y - p1.y);
+    return Math.abs(cross) < 1e-6 && dot < 0;
+  };
+  let changed = false;
+  while (pts.length > 2 && backtracks(pts[0], pts[1], pts[2])) { pts.splice(1, 1); changed = true; }
+  if (!changed) return layout;
+  if (which === 'to') pts = pts.reverse();
+  const via = pts.slice(1, -1).map((p) => [p.x, p.y] as [number, number]);
+  return { ...layout, wires: layout.wires.map((x, k) => (k === i ? { ...x, via: via.length ? via : undefined, manual: via.length ? x.manual : undefined } : x)) };
+}
