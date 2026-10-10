@@ -159,12 +159,58 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
     }
   };
 
+  const [activePin, setActivePin] = useState<number | null>(null); // chân đang chọn: kéo / phím mũi tên để chỉnh
+  const pinBoxRef = useRef<HTMLDivElement>(null);
+  const justDragged = useRef(false);
+
+  /** Giữ chuột trên chấm chân và kéo để dời chân (không đổi hướng dây đã chọn). */
+  const startPinDrag = (e: React.PointerEvent<HTMLDivElement>, i: number) => {
+    e.preventDefault(); e.stopPropagation();
+    setActivePin(i);
+    const r = pinBoxRef.current!.getBoundingClientRect();
+    const p0 = pins[i], x0 = e.clientX, y0 = e.clientY;
+    let moved = false;
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - x0, dy = ev.clientY - y0;
+      if (!moved && Math.hypot(dx, dy) < 2) return;
+      moved = true;
+      const fx = Math.min(1, Math.max(0, p0.fx + dx / r.width)), fy = Math.min(1, Math.max(0, p0.fy + dy / r.height));
+      setPins((ps) => ps.map((q, k) => (k === i ? { ...q, fx, fy } : q)));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      if (moved) { justDragged.current = true; setTimeout(() => { justDragged.current = false; }, 0); }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  // Phím mũi tên dời chân đang chọn 1px màn hình (Shift: 10px)
+  useEffect(() => {
+    if (step !== 'pins' || activePin === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+      const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+      if (!d) return;
+      e.preventDefault();
+      const k = e.shiftKey ? 10 : 1;
+      setPins((ps) => ps.map((q, j) => (j === activePin
+        ? { ...q, fx: Math.min(1, Math.max(0, q.fx + (d[0] * k) / disp.w)), fy: Math.min(1, Math.max(0, q.fy + (d[1] * k) / disp.h)) }
+        : q)));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [step, activePin, disp.w, disp.h]);
+
   const addPin = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (justDragged.current) return;
     const r = e.currentTarget.getBoundingClientRect();
     const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
     let n = pins.length + 1;
     while (pins.some((p) => p.name === String(n))) n++;
     setPins([...pins, { name: String(n), fx, fy, dir: guessDir(fx, fy, drawW, drawH) }]);
+    setActivePin(pins.length);
   };
 
   const pinError = (() => {
@@ -260,19 +306,22 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
                 <span className="text-white/40">{box}px · hoặc kéo góc ↘ của ảnh</span>
               </div>
               <div className="max-h-[78vh] max-w-[calc(96vw-400px)] overflow-auto">
-                <div className="relative cursor-crosshair" style={{ width: disp.w, height: disp.h, ...checker }} onClick={addPin}>
+                <div ref={pinBoxRef} className="relative cursor-crosshair" style={{ width: disp.w, height: disp.h, ...checker }} onClick={addPin}>
                   <img src={img} alt="" draggable={false} style={{ width: disp.w, height: disp.h }} />
                   {pins.map((p, i) => (
-                    <div key={i} className="pointer-events-none absolute" style={{ left: p.fx * disp.w - dot / 2, top: p.fy * disp.h - dot / 2 }}>
-                      <div className="rounded-full border-2 border-white bg-red-500" style={{ width: dot, height: dot }} />
-                      <div className="mt-0.5 whitespace-nowrap text-xs font-bold text-yellow-300 [text-shadow:0_0_3px_#000]">{p.name}</div>
+                    <div key={i} className="absolute" style={{ left: p.fx * disp.w - dot / 2 - 4, top: p.fy * disp.h - dot / 2 - 4 }}>
+                      <div title="Kéo để dời chân" onPointerDown={(e) => startPinDrag(e, i)} onClick={(e) => e.stopPropagation()}
+                        className="cursor-move p-1">
+                        <div className={`rounded-full border-2 ${activePin === i ? 'border-yellow-300 bg-cyan-400' : 'border-white bg-red-500'}`} style={{ width: dot, height: dot }} />
+                      </div>
+                      <div className="pointer-events-none -mt-0.5 ml-1 whitespace-nowrap text-xs font-bold text-yellow-300 [text-shadow:0_0_3px_#000]">{p.name}</div>
                     </div>
                   ))}
                   <div title="Kéo để phóng to / thu nhỏ" onPointerDown={startResize} onClick={(e) => e.stopPropagation()}
                     className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-tl bg-[#F1641E]/80 text-center text-[11px] leading-5 text-white">↘</div>
                 </div>
               </div>
-              <div className="mt-2 text-xs text-white/50">Bấm vào ĐẦU từng chân trên ảnh để thêm chân.</div>
+              <div className="mt-2 text-xs text-white/50">Bấm vào ĐẦU từng chân trên ảnh để thêm chân. Giữ chuột trên chấm để kéo dời; chân đang chọn (xanh) dời bằng phím mũi tên (Shift = 10px).</div>
             </div>
             <div className="w-[320px] shrink-0 space-y-3 text-sm">
               <div>
@@ -286,14 +335,14 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
               </div>
               <div className="max-h-[60vh] space-y-1.5 overflow-y-auto">
                 {pins.map((p, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className={`flex items-center gap-2 rounded px-1 ${activePin === i ? 'bg-cyan-400/15' : ''}`} onPointerDown={() => setActivePin(i)}>
                     <input value={p.name} onChange={(e) => setPins(pins.map((q, k) => (k === i ? { ...q, name: e.target.value } : q)))}
                       className="w-24 rounded-md border border-white/10 bg-white/5 px-2 py-1 outline-none focus:border-[#F1641E]" />
                     <select value={p.dir} onChange={(e) => setPins(pins.map((q, k) => (k === i ? { ...q, dir: Number(e.target.value) as Dir } : q)))}
                       className="rounded-md border border-white/10 bg-[#222] px-1 py-1">
                       {DIR_NAMES.map((d, k) => <option key={k} value={k}>{d}</option>)}
                     </select>
-                    <button className="text-red-400" onClick={() => setPins(pins.filter((_, k) => k !== i))}>✕</button>
+                    <button className="text-red-400" onClick={() => { setPins(pins.filter((_, k) => k !== i)); setActivePin(null); }}>✕</button>
                   </div>
                 ))}
               </div>

@@ -32,6 +32,11 @@ export interface PartDef {
   straightOut?: boolean;
   /** Quầng sáng (đèn đang sáng): vẽ trên lớp dây, không đổ bóng — tuỳ chọn. */
   renderGlow?: (p: PlacedPart) => string;
+  /**
+   * Ảnh bitmap: WebKit vẽ nhóm có filter (đổ bóng) ở độ phân giải gốc rồi phóng lên → ảnh vỡ khi zoom.
+   * Bật cờ này: bản có filter chỉ còn làm bóng, vẽ thêm 1 bản không filter đè lên cho nét.
+   */
+  crisp?: boolean;
   /** Vẽ phía sau linh kiện (tản nhiệt) — tuỳ chọn. */
   renderBehind?: (p: PlacedPart) => string;
 }

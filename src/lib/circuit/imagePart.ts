@@ -30,6 +30,7 @@ function basePart(file: CustomPartFile): Omit<PartDef, 'render'> {
 export function imagePartDef(file: CustomPartFile, dataUrl: string): PartDef {
   return {
     ...basePart(file),
+    crisp: true,
     render: () => `<image href="${dataUrl}" x="${-file.w / 2}" y="${-file.h / 2}" width="${file.w}" height="${file.h}" preserveAspectRatio="none"/>`,
   };
 }

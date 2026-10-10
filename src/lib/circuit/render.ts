@@ -753,7 +753,10 @@ export function renderScene(layout: CircuitLayout, opts: SceneOptions = {}): str
     return s ? `<g transform="${tf(p)}" filter="url(#${fShadow})">${s}</g>` : '';
   }).join('');
   const busSvg = buses.map((p) => `<g transform="${tf(p)}" filter="url(#${fWire})">${PARTS.bus.render(p)}</g>`).join('');
-  const partsSvg = others.map((p) => `<g transform="${tf(p)}" filter="url(#${fShadow})">${PARTS[p.type].render(p)}</g>`).join('');
+  const partsSvg = others.map((p) => {
+    const def = PARTS[p.type], body = def.render(p);
+    return `<g transform="${tf(p)}" filter="url(#${fShadow})">${body}</g>` + (def.crisp ? `<g transform="${tf(p)}">${body}</g>` : '');
+  }).join('');
   const wires = layout.wires.map((w, i) => renderWire(w, routed[i], opts.dashed?.has(i), fWire, opts.darkBg, frame === null));
   // Quầng sáng đèn đang sáng: trên lớp dây (ánh sáng tràn lên dây quanh đèn), dưới nhãn
   const glows = others.map((p) => {
