@@ -17,7 +17,11 @@ interface Props {
 type Dir = 0 | 1 | 2 | 3;
 interface PinMark { name: string; fx: number; fy: number; dir: Dir }
 
-const BOX = 360; // khung hiển thị ảnh khi chấm chân (px màn hình)
+const BOX_MIN = 300, BOX_MAX = 1600, BOX_KEY = 'circuitStudio.pinBox'; // khung hiển thị ảnh khi chấm chân (px màn hình)
+const loadBox = () => {
+  try { const v = Number(localStorage.getItem(BOX_KEY)); if (v >= BOX_MIN && v <= BOX_MAX) return v; } catch { /* bỏ qua */ }
+  return Math.max(BOX_MIN, Math.min(900, Math.round(window.innerHeight * 0.6)));
+};
 const DIR_NAMES = ['→ phải', '↓ xuống', '← trái', '↑ lên'];
 const btn = 'rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10 disabled:opacity-30';
 const primary = 'rounded-md bg-[#F1641E] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#F1641E]/90 disabled:opacity-30';
@@ -48,6 +52,12 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
   const [group, setGroup] = useState(existing?.file.group ?? 'Của tôi');
   const [desc, setDesc] = useState(existing?.file.desc ?? '');
   const [busy, setBusy] = useState(false);
+  const [box, setBoxRaw] = useState(loadBox); // người dùng phóng to/thu nhỏ khung chấm chân
+  const setBox = (v: number) => {
+    const b = Math.round(Math.max(BOX_MIN, Math.min(BOX_MAX, v)));
+    setBoxRaw(b);
+    try { localStorage.setItem(BOX_KEY, String(b)); } catch { /* bỏ qua */ }
+  };
   const [error, setError] = useState<string | null>(null);
 
   const [genDesc, setGenDesc] = useState('');
@@ -106,7 +116,19 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
   };
 
   const drawH = natural ? Math.round((drawW * natural.h) / natural.w) : drawW;
-  const disp = natural ? (natural.w >= natural.h ? { w: BOX, h: (BOX * natural.h) / natural.w } : { w: (BOX * natural.w) / natural.h, h: BOX }) : { w: BOX, h: BOX };
+  const disp = natural ? (natural.w >= natural.h ? { w: box, h: (box * natural.h) / natural.w } : { w: (box * natural.w) / natural.h, h: box }) : { w: box, h: box };
+  const dot = Math.round(Math.max(10, Math.min(18, box / 40))); // chấm chân nhỏ lại khi khung nhỏ để chân sát nhau không đè
+
+  // Kéo góc dưới-phải của ảnh để đổi cỡ khung (box = cạnh dài của ảnh)
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault(); e.stopPropagation();
+    const x0 = e.clientX, y0 = e.clientY, b0 = box;
+    const sx = box / disp.w, sy = box / disp.h; // đổi px kéo theo cạnh → px cạnh dài
+    const move = (ev: PointerEvent) => setBox(b0 + Math.max((ev.clientX - x0) * sx, (ev.clientY - y0) * sy));
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
   const resistorThumb = PARTS.resistor;
 
   const applyImage = async (url: string, removeBg: boolean) => {
@@ -179,7 +201,7 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="max-h-[92vh] w-[760px] overflow-y-auto rounded-xl border border-white/10 bg-[#1b1b1b] p-5 text-white shadow-2xl">
+      <div className={`max-h-[94vh] ${step === 'pins' ? 'w-max min-w-[760px] max-w-[96vw]' : 'w-[760px]'} overflow-y-auto rounded-xl border border-white/10 bg-[#1b1b1b] p-5 text-white shadow-2xl`}>
         <div className="mb-4 flex items-center justify-between">
           <div className="text-base font-semibold">{existing ? `Sửa linh kiện: ${existing.file.name}` : 'Thêm linh kiện mới'}</div>
           <div className="text-xs text-white/50">{step === 'source' ? 'Bước 1/3 — Lấy ảnh' : step === 'pins' ? 'Bước 2/3 — Đánh dấu chân' : 'Bước 3/3 — Đặt tên & lưu'}</div>
@@ -229,19 +251,30 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
 
         {step === 'pins' && img && natural && (
           <div className="flex gap-5">
-            <div>
-              <div className="relative cursor-crosshair" style={{ width: disp.w, height: disp.h, ...checker }} onClick={addPin}>
-                <img src={img} alt="" draggable={false} style={{ width: disp.w, height: disp.h }} />
-                {pins.map((p, i) => (
-                  <div key={i} className="pointer-events-none absolute" style={{ left: p.fx * disp.w - 9, top: p.fy * disp.h - 9 }}>
-                    <div className="h-[18px] w-[18px] rounded-full border-2 border-white bg-red-500" />
-                    <div className="mt-0.5 whitespace-nowrap text-xs font-bold text-yellow-300 [text-shadow:0_0_3px_#000]">{p.name}</div>
-                  </div>
-                ))}
+            <div className="min-w-0 shrink">
+              <div className="mb-2 flex items-center gap-2 text-xs text-white/60">
+                <span>Cỡ ảnh</span>
+                <button className="rounded border border-white/10 bg-white/5 px-2 hover:bg-white/10" onClick={() => setBox(box - 100)}>−</button>
+                <input type="range" min={BOX_MIN} max={BOX_MAX} step={20} value={box} onChange={(e) => setBox(Number(e.target.value))} className="w-40" />
+                <button className="rounded border border-white/10 bg-white/5 px-2 hover:bg-white/10" onClick={() => setBox(box + 100)}>+</button>
+                <span className="text-white/40">{box}px · hoặc kéo góc ↘ của ảnh</span>
+              </div>
+              <div className="max-h-[78vh] max-w-[calc(96vw-400px)] overflow-auto">
+                <div className="relative cursor-crosshair" style={{ width: disp.w, height: disp.h, ...checker }} onClick={addPin}>
+                  <img src={img} alt="" draggable={false} style={{ width: disp.w, height: disp.h }} />
+                  {pins.map((p, i) => (
+                    <div key={i} className="pointer-events-none absolute" style={{ left: p.fx * disp.w - dot / 2, top: p.fy * disp.h - dot / 2 }}>
+                      <div className="rounded-full border-2 border-white bg-red-500" style={{ width: dot, height: dot }} />
+                      <div className="mt-0.5 whitespace-nowrap text-xs font-bold text-yellow-300 [text-shadow:0_0_3px_#000]">{p.name}</div>
+                    </div>
+                  ))}
+                  <div title="Kéo để phóng to / thu nhỏ" onPointerDown={startResize} onClick={(e) => e.stopPropagation()}
+                    className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-tl bg-[#F1641E]/80 text-center text-[11px] leading-5 text-white">↘</div>
+                </div>
               </div>
               <div className="mt-2 text-xs text-white/50">Bấm vào ĐẦU từng chân trên ảnh để thêm chân.</div>
             </div>
-            <div className="flex-1 space-y-3 text-sm">
+            <div className="w-[320px] shrink-0 space-y-3 text-sm">
               <div>
                 <div className="mb-1 text-white/60">Kích thước trên ảnh mạch: {drawW}×{drawH}px</div>
                 <input type="range" min={40} max={600} step={10} value={drawW} onChange={(e) => setDrawW(Number(e.target.value))} className="w-full" />
@@ -251,7 +284,7 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
                   <div className="h-3 rounded bg-white/40" style={{ width: drawW / 3 }} title="linh kiện này" />
                 </div>
               </div>
-              <div className="max-h-[260px] space-y-1.5 overflow-y-auto">
+              <div className="max-h-[60vh] space-y-1.5 overflow-y-auto">
                 {pins.map((p, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <input value={p.name} onChange={(e) => setPins(pins.map((q, k) => (k === i ? { ...q, name: e.target.value } : q)))}
