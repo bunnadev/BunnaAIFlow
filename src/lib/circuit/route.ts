@@ -80,7 +80,7 @@ function parseEnd(layout: CircuitLayout, ref: string, H: number, round = false):
     const c = at > 0 ? parseFloat(ref.slice(at + 1)) : busCenter(busPart);
     return { point: busPoint(busPart, Number.isNaN(c) ? busCenter(busPart) : c), dir: busVertical(busPart) ? 2 : 3, part: busPart, isLead: false, bus: busPart };
   }
-  const dot = ref.lastIndexOf('.');
+  const dot = ref.indexOf('.'); // dấu chấm đầu: tên chân có thể chứa dấu chấm (VD "3.3V")
   if (dot <= 0) return null;
   const part = layout.parts.find((p) => p.id === ref.slice(0, dot).trim());
   if (!part || !PARTS[part.type]) return null;
@@ -251,7 +251,7 @@ export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean; 
     return { x, y };
   };
 
-  const partOf = (ref: string) => layout.parts.find((p) => p.id === ref.slice(0, ref.lastIndexOf('.')).trim());
+  const partOf = (ref: string) => layout.parts.find((p) => p.id === ref.slice(0, ref.indexOf('.')).trim());
   const ends = layout.wires.map((w) => [
     parseEnd(layout, w.from, H, jointOf(w, 'from', partOf(w.from)) === 'round'),
     parseEnd(layout, w.to, H, jointOf(w, 'to', partOf(w.to)) === 'round'),

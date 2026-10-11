@@ -71,7 +71,8 @@ export function resolveEndpoint(layout: CircuitLayout, ref: string): ResolvedEnd
   }
   const busOnly = layout.parts.find((p) => p.id === ref.trim() && p.type === 'bus');
   if (busOnly) return { point: { x: busOnly.x, y: busOnly.y }, part: busOnly, isLead: false };
-  const dot = ref.lastIndexOf('.');
+  // Tách ở dấu chấm ĐẦU: ký hiệu linh kiện không có dấu chấm, tên chân thì có thể có (VD "3.3V")
+  const dot = ref.indexOf('.');
   if (dot <= 0) return `"${ref}": sai cú pháp, phải là "Linh_kiện.chân"`;
   const id = ref.slice(0, dot).trim();
   const pin = ref.slice(dot + 1).trim();
@@ -131,7 +132,7 @@ export function validateLayout(layout: CircuitLayout, expectedWireCount?: number
     }
   });
   for (const [pin, n] of pinUse) {
-    const isLead = layout.parts.find((p) => p.id === pin.slice(0, pin.lastIndexOf('.')))?.type === 'lead';
+    const isLead = layout.parts.find((p) => p.id === pin.slice(0, pin.indexOf('.')))?.type === 'lead';
     if (n > (isLead ? 1 : 2)) warnings.push(`Chân ${pin} có ${n} đầu dây (khó hàn, ảnh rối).`);
   }
 

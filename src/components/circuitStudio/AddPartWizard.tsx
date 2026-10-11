@@ -234,6 +234,7 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
     const names = pins.map((p) => p.name.trim());
     if (names.some((n) => !n)) return 'Có chân chưa đặt tên.';
     if (new Set(names).size !== names.length) return 'Tên chân bị trùng.';
+    if (names.some((n) => n.includes('@'))) return 'Tên chân không được có ký tự @ (dùng cho điểm nối thanh mass).';
     return null;
   })();
 
