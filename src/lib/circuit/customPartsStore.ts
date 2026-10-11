@@ -23,8 +23,9 @@ export function listCustomParts(): CustomPartEntry[] {
 }
 
 export async function loadCustomParts(): Promise<string[]> {
-  for (const c of cache) unregisterPart(c.file.code);
-  cache = [];
+  // Gom vào danh sách riêng rồi mới thay cache: 2 lần nạp chạy chồng nhau (React dev chạy effect 2 lần,
+  // HMR…) mà cùng đẩy vào cache chung thì mỗi linh kiện hiện 2 lần trong thư viện
+  const next: CustomPartEntry[] = [];
   const d = await partsDir();
   const errors: string[] = [];
   for (const e of await readDir(d)) {
@@ -34,17 +35,18 @@ export async function loadCustomParts(): Promise<string[]> {
       const png = await join(d, `${file.code}.png`);
       if (await exists(png)) {
         const dataUrl = 'data:image/png;base64,' + bytesToBase64(await readFile(png));
-        registerPart(file.code, imagePartDef(file, dataUrl));
-        cache.push({ file, dataUrl });
+        next.push({ file, dataUrl });
       } else {
-        registerPart(file.code, missingPartDef(file));
-        cache.push({ file, dataUrl: '' });
+        next.push({ file, dataUrl: '' });
         errors.push(`Thiếu ảnh của "${file.name}".`);
       }
     } catch (err) {
       errors.push(`${e.name}: ${(err as Error).message ?? err}`);
     }
   }
+  for (const c of cache) unregisterPart(c.file.code);
+  cache = next.filter((c, i) => next.findIndex((x) => x.file.code === c.file.code) === i);
+  for (const c of cache) registerPart(c.file.code, c.dataUrl ? imagePartDef(c.file, c.dataUrl) : missingPartDef(c.file));
   return errors;
 }
 
