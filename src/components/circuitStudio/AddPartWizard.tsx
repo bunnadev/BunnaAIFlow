@@ -15,7 +15,10 @@ interface Props {
   onSaved(code: string): void;
 }
 
-interface PinMark { name: string; fx: number; fy: number; dir: Dir }
+type PinLabelSide = 'top' | 'bottom' | 'left' | 'right';
+/** label: chỗ tên chân riêng của chân này (không có = theo lựa chọn chung ở trên ảnh). */
+interface PinMark { name: string; fx: number; fy: number; dir: Dir; label?: PinLabelSide }
+const PIN_LABEL_OPTS: [PinLabelSide | '', string][] = [['', 'Tên: chung'], ['top', 'Tên ↑'], ['bottom', 'Tên ↓'], ['left', 'Tên ←'], ['right', 'Tên →']];
 
 const BOX_MIN = 300, BOX_MAX = 1600, BOX_KEY = 'circuitStudio.pinBox'; // khung hiển thị ảnh khi chấm chân (px màn hình)
 const loadBox = () => {
@@ -53,7 +56,7 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
   const [pins, setPins] = useState<PinMark[]>(() => existing
     ? Object.entries(existing.file.pins).map(([name, p]) => {
       const fx = p.x / existing.file.w + 0.5, fy = p.y / existing.file.h + 0.5;
-      return { name, fx, fy, dir: p.dir ?? guessDir(fx, fy, existing.file.w, existing.file.h) };
+      return { name, fx, fy, dir: p.dir ?? guessDir(fx, fy, existing.file.w, existing.file.h), label: p.label };
     })
     : []);
   const [name, setName] = useState(existing?.file.name ?? '');
@@ -241,7 +244,7 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
       const code = existing?.file.code ?? makePartCode(name, new Set(Object.keys(PARTS)));
       const file: CustomPartFile = {
         version: 1, code, name: name.trim(), group: group.trim() || 'Của tôi', desc: desc.trim(), w: drawW, h: drawH,
-        pins: Object.fromEntries(pins.map((p) => [p.name.trim(), { x: Math.round((p.fx - 0.5) * drawW), y: Math.round((p.fy - 0.5) * drawH), dir: p.dir }])),
+        pins: Object.fromEntries(pins.map((p) => [p.name.trim(), { x: Math.round((p.fx - 0.5) * drawW), y: Math.round((p.fy - 0.5) * drawH), dir: p.dir, ...(p.label ? { label: p.label } : {}) }])),
       };
       await saveCustomPart(file, dataUrlToBytes(img), img);
       onSaved(code);
@@ -325,7 +328,7 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
                     className={`rounded border px-2 py-0.5 ${labelPos === k ? 'border-[#F1641E] bg-[#F1641E]/30 text-white' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>{t}</button>
                 ))}
               </div>
-              <div className="max-h-[78vh] max-w-[calc(96vw-400px)] overflow-auto px-16 py-6">
+              <div className="max-h-[78vh] max-w-[calc(96vw-440px)] overflow-auto px-16 py-6">
                 <div ref={pinBoxRef} className="relative cursor-crosshair" style={{ width: disp.w, height: disp.h, ...checker }} onClick={addPin}>
                   <img src={img} alt="" draggable={false} style={{ width: disp.w, height: disp.h }} />
                   {pins.map((p, i) => (
@@ -334,9 +337,9 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
                         className="absolute cursor-move p-1" style={{ left: -dot / 2 - 4, top: -dot / 2 - 4 }}>
                         <div className={`rounded-full border-2 ${activePin === i ? 'border-yellow-300 bg-cyan-400' : 'border-white bg-red-500'}`} style={{ width: dot, height: dot }} />
                       </div>
-                      {labelPos !== 'hide' && (
+                      {(labelPos !== 'hide' || p.label) && (
                         <div className={`pointer-events-none absolute whitespace-nowrap rounded bg-black/60 px-1 text-xs font-bold leading-4 ${activePin === i ? 'text-cyan-300' : 'text-yellow-300'}`}
-                          style={labelStyle(labelPos === 'auto' ? SIDE_OF_DIR[p.dir] : labelPos, dot / 2 + 4)}>{p.name}</div>
+                          style={labelStyle(p.label ?? (labelPos === 'auto' ? SIDE_OF_DIR[p.dir] : labelPos), dot / 2 + 4)}>{p.name}</div>
                       )}
                     </div>
                   ))}
@@ -346,7 +349,7 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
               </div>
               <div className="mt-2 text-xs text-white/50">Bấm vào ĐẦU từng chân trên ảnh để thêm chân. Giữ chuột trên chấm để kéo dời; chân đang chọn (xanh) dời bằng phím mũi tên (Shift = 10px).</div>
             </div>
-            <div className="w-[320px] shrink-0 space-y-3 text-sm">
+            <div className="w-[360px] shrink-0 space-y-3 text-sm">
               <div>
                 <div className="mb-1 text-white/60">Kích thước trên ảnh mạch: {drawW}×{drawH}px</div>
                 <input type="range" min={40} max={600} step={10} value={drawW} onChange={(e) => setDrawW(Number(e.target.value))} className="w-full" />
@@ -360,10 +363,14 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
                 {pins.map((p, i) => (
                   <div key={i} className={`flex items-center gap-2 rounded px-1 ${activePin === i ? 'bg-cyan-400/15' : ''}`} onPointerDown={() => setActivePin(i)}>
                     <input value={p.name} onChange={(e) => setPins(pins.map((q, k) => (k === i ? { ...q, name: e.target.value } : q)))}
-                      className="w-24 rounded-md border border-white/10 bg-white/5 px-2 py-1 outline-none focus:border-[#F1641E]" />
+                      className="w-20 rounded-md border border-white/10 bg-white/5 px-2 py-1 outline-none focus:border-[#F1641E]" />
                     <select value={p.dir} onChange={(e) => setPins(pins.map((q, k) => (k === i ? { ...q, dir: Number(e.target.value) as Dir } : q)))}
                       className="rounded-md border border-white/10 bg-[#222] px-1 py-1">
                       {DIR_NAMES.map((d, k) => <option key={k} value={k}>{d}</option>)}
+                    </select>
+                    <select value={p.label ?? ''} title="Chỗ hiện tên chân này trên ảnh" onChange={(e) => setPins(pins.map((q, k) => (k === i ? { ...q, label: (e.target.value || undefined) as PinLabelSide | undefined } : q)))}
+                      className="rounded-md border border-white/10 bg-[#222] px-1 py-1">
+                      {PIN_LABEL_OPTS.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
                     </select>
                     <button className="text-red-400" onClick={() => { setPins(pins.filter((_, k) => k !== i)); setActivePin(null); }}>✕</button>
                   </div>

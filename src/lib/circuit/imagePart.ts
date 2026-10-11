@@ -12,7 +12,8 @@ export interface CustomPartFile {
   w: number;
   h: number;
   /** Toạ độ chân tính từ tâm ảnh (chưa xoay). */
-  pins: Record<string, { x: number; y: number; dir?: 0 | 1 | 2 | 3 }>;
+  /** label: chỗ hiện tên chân cạnh chấm trong cửa sổ chấm chân (chỉ để dễ nhìn khi sửa, không ảnh hưởng ảnh mạch). */
+  pins: Record<string, { x: number; y: number; dir?: 0 | 1 | 2 | 3; label?: 'top' | 'bottom' | 'left' | 'right' }>;
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
