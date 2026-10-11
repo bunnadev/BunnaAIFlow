@@ -13,7 +13,7 @@ import { initialStudioState, pruneSelection, studioReducer } from '../../lib/cir
 import { duplicateProject, emptyLayout, newProject, type CircuitProject, type ProjectMeta } from '../../lib/circuit/projectModel';
 import { deleteProject, listProjects, loadProject, saveProject } from '../../lib/circuit/circuitStore';
 import { partBox, partPreviewSvg, validateLayout } from '../../lib/circuit/render';
-import { routeWorld, routingSignature } from '../../lib/circuit/world';
+import { pinAutoWires, routeWorld, routingSignature } from '../../lib/circuit/world';
 import { addPart, deleteParts, duplicateParts, resetAllWires, rotateParts, deleteWire, movePartsBy } from '../../lib/circuit/ops';
 import { contactSnap, syncContacts } from '../../lib/circuit/contacts';
 import { alignParts, distributeParts, type AlignMode } from '../../lib/circuit/arrange';
@@ -74,8 +74,9 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
     setToast({ msg, error });
     setTimeout(() => setToast((t) => (t?.msg === msg ? null : t)), 4000);
   }, []);
-  // Mọi thay đổi đều đồng bộ dây chạm (pin rời đặt chạm đầu nhau thì tự nối, kéo ra thì tự bỏ)
-  const commit = useCallback((l: CircuitLayout) => dispatch({ type: 'commit', layout: syncContacts(l) }), []);
+  // Mọi thay đổi đều đồng bộ dây chạm (pin rời đặt chạm đầu nhau thì tự nối, kéo ra thì tự bỏ),
+  // rồi ghim dây: chỉ dây mới nối / vừa bấm "tự đi lại" được đi dây, dây khác đứng yên
+  const commit = useCallback((l: CircuitLayout) => dispatch({ type: 'commit', layout: pinAutoWires(syncContacts(l)) }), []);
 
   // Ghi file lần lượt theo thứ tự gọi: bản ghi sau luôn đè bản trước (tự lưu đang chạy không đè tên vừa đổi)
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
@@ -136,7 +137,8 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
       projectRef.current = p;
       setProject(p);
       setOpenError(null);
-      dispatch({ type: 'load', layout: p.layout });
+      // Mạch cũ còn dây tự đi → ghim đúng đường đang thấy, lần nối dây sau chúng không nhảy
+      dispatch({ type: 'load', layout: pinAutoWires(p.layout) });
       setSelection({ parts: [], wire: null });
       fitPending.current = true;
       return true;

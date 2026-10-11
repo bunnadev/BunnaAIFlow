@@ -1,5 +1,6 @@
 import { busVertical } from './bus';
 import { partBox, type Box } from './render';
+import { setWirePoints } from './ops';
 import { routeWires, type End, type RoutedWire } from './route';
 import type { CircuitLayout, Point } from './types';
 
@@ -73,4 +74,20 @@ export function routingSignature(layout: CircuitLayout, partsVersion = 0): strin
     layout.parts.map((p) => [p.id, p.type, p.x, p.y, p.rotation ?? 0, p.length ?? null, !!p.heatsink, p.scale ?? 1, p.joint ?? null]),
     layout.wires.map((w) => [w.from, w.to, w.via ?? null, !!w.manual, w.joints ?? null]),
   ]);
+}
+
+/**
+ * Ghim mọi dây đang tự đi vào đúng đường hiện tại (thành dây chỉnh tay). Gọi sau
+ * mỗi thao tác của Xưởng vẽ: dây cũ đều đã ghim nên chỉ dây mới nối / dây vừa bấm
+ * "tự đi lại" được bộ đi dây tính đường (né các dây đang đứng yên) — nối hay kéo
+ * 1 dây không làm các dây khác nhảy. Dây chạm và dây không tìm được đường thì để tự đi.
+ */
+export function pinAutoWires(layout: CircuitLayout, routed: (RoutedWire | null)[] = routeWorld(layout)): CircuitLayout {
+  let out = layout;
+  layout.wires.forEach((w, i) => {
+    const r = routed[i];
+    if (w.manual || w.via?.length || w.color === 'contact' || !r || r.hidden || r.failed) return;
+    out = setWirePoints(out, i, r.points);
+  });
+  return out;
 }

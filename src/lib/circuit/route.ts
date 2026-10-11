@@ -268,8 +268,9 @@ export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean; 
   layout.wires.forEach((w, i) => {
     if (out[i]) return;
     const [a, b] = ends[i];
-    if (!a || !b || !w.via?.length) return;
-    const pts = [a.point, ...w.via.map(([x, y]) => ({ x, y })), b.point];
+    // Dây đã ghim mà đi thẳng (via rỗng) cũng giữ nguyên
+    if (!a || !b || (!w.via?.length && !w.manual)) return;
+    const pts = [a.point, ...(w.via ?? []).map(([x, y]) => ({ x, y })), b.point];
     out[i] = { points: pts, from: a, to: b, auto: false };
     markWire(pts, i);
   });
