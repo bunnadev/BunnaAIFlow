@@ -2,7 +2,9 @@ import { v4 as uuidv4 } from 'uuid';
 import type { CircuitLayout } from './types';
 
 export type ExportAspect = '4:5' | '1:1' | '9:16';
-export type ExportBackground = { kind: 'wood' } | { kind: 'color'; color: string } | { kind: 'image'; id: string };
+export type ExportBackground = { kind: 'blackWood' } | { kind: 'wood' } | { kind: 'color'; color: string } | { kind: 'image'; id: string };
+/** Nền khi xuất ảnh của mạch chưa chọn nền nào: ảnh gỗ đen. */
+export const DEFAULT_EXPORT_BACKGROUND: ExportBackground = { kind: 'blackWood' };
 /** Lựa chọn xuất ảnh lần trước của mạch (khung + nền). Tiêu đề nằm trong layout.titleTop/titleBottom. */
 export type WatermarkPos = 'corner' | 'center' | 'both';
 export interface ExportSettings { aspect: ExportAspect; background: ExportBackground; showIds?: boolean; watermark?: string; watermarkPos?: WatermarkPos }

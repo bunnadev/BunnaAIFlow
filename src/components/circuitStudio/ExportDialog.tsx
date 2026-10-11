@@ -4,7 +4,7 @@ import { writeFile } from '@tauri-apps/plugin-fs';
 import { renderExportSvg, subsetLayout } from '../../lib/circuit/exportImage';
 import { validateLayout } from '../../lib/circuit/render';
 import { svgToPngBase64 } from '../../lib/circuit/rasterize';
-import { fileSlug, type ExportAspect, type ExportBackground, type ExportSettings, type WatermarkPos } from '../../lib/circuit/projectModel';
+import { DEFAULT_EXPORT_BACKGROUND, fileSlug, type ExportAspect, type ExportBackground, type ExportSettings, type WatermarkPos } from '../../lib/circuit/projectModel';
 import { addBackground, deleteBackground, listBackgrounds, type BackgroundEntry } from '../../lib/circuit/backgroundStore';
 import { base64ToBytes } from '../../lib/assets';
 import type { RoutedWire } from '../../lib/circuit/route';
@@ -37,7 +37,7 @@ const seg = (on: boolean) => `rounded-md px-3 py-1.5 text-sm ${on ? 'bg-[#F1641E
 export default function ExportDialog({ layout, routed, selectedIds, projectName, settings, onClose, onSaved, onError }: Props) {
   const [scope, setScope] = useState<'all' | 'selected'>(selectedIds.length ? 'selected' : 'all');
   const [aspect, setAspect] = useState<ExportAspect>(settings?.aspect ?? '4:5');
-  const [background, setBackground] = useState<ExportBackground>(settings?.background ?? { kind: 'wood' });
+  const [background, setBackground] = useState<ExportBackground>(settings?.background ?? DEFAULT_EXPORT_BACKGROUND);
   const [color, setColor] = useState(settings?.background.kind === 'color' ? settings.background.color : '#f5f1e8');
   const [showIds, setShowIds] = useState(!!settings?.showIds);
   const [watermark, setWatermark] = useState(settings?.watermark ?? '');
@@ -57,7 +57,7 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
   }, []);
   // Ảnh nền đã lưu bị mất (xoá ngoài app…): quay về nền gỗ
   useEffect(() => {
-    if (bgsLoaded && background.kind === 'image' && !bgs.some((b) => b.id === background.id)) setBackground({ kind: 'wood' });
+    if (bgsLoaded && background.kind === 'image' && !bgs.some((b) => b.id === background.id)) setBackground(DEFAULT_EXPORT_BACKGROUND);
   }, [bgsLoaded, bgs, background]);
   // Esc đóng cửa sổ (trừ khi đang xuất)
   useEffect(() => {
@@ -99,7 +99,7 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
       return;
     }
     setBgs((prev) => prev.filter((b) => b.id !== id));
-    setBackground((cur) => (cur.kind === 'image' && cur.id === id ? { kind: 'wood' } : cur));
+    setBackground((cur) => (cur.kind === 'image' && cur.id === id ? DEFAULT_EXPORT_BACKGROUND : cur));
   };
 
   const doExport = async () => {
@@ -153,6 +153,7 @@ export default function ExportDialog({ layout, routed, selectedIds, projectName,
           <div>
             <div className="mb-1 text-white/60">Nền</div>
             <div className="flex flex-wrap items-center gap-2">
+              <button className={seg(background.kind === 'blackWood')} onClick={() => setBackground({ kind: 'blackWood' })}>Gỗ đen</button>
               <button className={seg(background.kind === 'wood')} onClick={() => setBackground({ kind: 'wood' })}>Gỗ</button>
               <button className={seg(background.kind === 'color')} onClick={() => setBackground({ kind: 'color', color })}>Màu</button>
               {background.kind === 'color' && (

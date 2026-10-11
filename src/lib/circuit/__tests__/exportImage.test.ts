@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CircuitLayout } from '../types';
 import { routeWorld } from '../world';
 import { renderExportSvg, subsetLayout } from '../exportImage';
+import { DEFAULT_EXPORT_BACKGROUND } from '../projectModel';
 
 const l: CircuitLayout = {
   parts: [
@@ -18,6 +19,14 @@ const routed = routeWorld(l);
 const wood = { kind: 'wood' } as const;
 
 describe('exportImage', () => {
+  it('nền mặc định khi xuất là ảnh gỗ đen (khác ảnh ván gỗ cũ)', () => {
+    expect(DEFAULT_EXPORT_BACKGROUND).toEqual({ kind: 'blackWood' });
+    const black = renderExportSvg(l, routed, { aspect: '4:5', background: DEFAULT_EXPORT_BACKGROUND })!.svg;
+    const planks = renderExportSvg(l, routed, { aspect: '4:5', background: wood })!.svg;
+    expect(black).toMatch(/<image href="data:image\/jpeg;base64,[^"]+" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice"\/>/);
+    expect(planks).not.toContain('data:image/jpeg');
+  });
+
   it('subsetLayout giữ dây có cả 2 đầu trong phần chọn', () => {
     const s = subsetLayout(l, ['R1', 'LED1']);
     expect(s.layout.parts.map((p) => p.id)).toEqual(['R1', 'LED1']);
