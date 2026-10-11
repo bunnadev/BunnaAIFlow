@@ -5,6 +5,7 @@ import { GeminiImageProvider } from '../../lib/providers/geminiImageProvider';
 import { resolveImageModelId } from '../../lib/models';
 import { saveCustomPart } from '../../lib/circuit/customPartsStore';
 import { PARTS } from '../../lib/circuit/parts';
+import { guessDir, guessDirFromNeighbours, type Dir } from '../../lib/circuit/pinGuess';
 import { dataUrlToBytes, dataUrlToRGBA, fileToDataUrl, rgbaToDataUrl } from './imageUtils';
 
 interface Props {
@@ -14,7 +15,6 @@ interface Props {
   onSaved(code: string): void;
 }
 
-type Dir = 0 | 1 | 2 | 3;
 interface PinMark { name: string; fx: number; fy: number; dir: Dir }
 
 const BOX_MIN = 300, BOX_MAX = 1600, BOX_KEY = 'circuitStudio.pinBox'; // khung hiển thị ảnh khi chấm chân (px màn hình)
@@ -41,12 +41,6 @@ const btn = 'rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm ho
 const primary = 'rounded-md bg-[#F1641E] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#F1641E]/90 disabled:opacity-30';
 const checker = { backgroundImage: 'repeating-conic-gradient(#3a3a3a 0% 25%, #2a2a2a 0% 50%)', backgroundSize: '20px 20px' };
 
-function guessDir(fx: number, fy: number, w: number, h: number): Dir {
-  const d = [(1 - fx) * w, (1 - fy) * h, fx * w, fy * h];
-  let best = 0;
-  for (let i = 1; i < 4; i++) if (d[i] < d[best]) best = i;
-  return best as Dir;
-}
 
 export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved }: Props) {
   // Sửa linh kiện bị mất ảnh (dataUrl rỗng): bắt đầu từ bước lấy ảnh
@@ -228,7 +222,7 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
     const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
     let n = pins.length + 1;
     while (pins.some((p) => p.name === String(n))) n++;
-    setPins([...pins, { name: String(n), fx, fy, dir: guessDir(fx, fy, drawW, drawH) }]);
+    setPins([...pins, { name: String(n), fx, fy, dir: guessDirFromNeighbours(fx, fy, drawW, drawH, pins) }]);
     setActivePin(pins.length);
   };
 
