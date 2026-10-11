@@ -219,6 +219,7 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
   // ─── Kéo linh kiện từ thư viện vào bàn vẽ ───
   useEffect(() => {
     if (!placing) return;
+    window.getSelection()?.removeAllRanges();
     const move = (e: PointerEvent) => setPlacing((p) => p && { ...p, x: e.clientX, y: e.clientY });
     const up = (e: PointerEvent) => {
       const item = placing.item;
@@ -305,7 +306,7 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
   const hasSelection = selParts > 0 || selection.wire !== null;
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-hidden bg-[#141414] text-white">
+    <div className="circuit-studio fixed inset-0 z-[100] overflow-hidden bg-[#141414] text-white">
       <div ref={canvasWrapRef} className="absolute inset-0">
         <StudioCanvas
           layout={layout}

@@ -50,3 +50,8 @@ body {
 @utility animate-shimmer {
   animation: shimmer 1.5s infinite;
 }
+
+/* Xưởng vẽ mạch: kéo linh kiện / dây lướt qua thư viện, thanh công cụ… không bôi đen chữ.
+   Ô nhập vẫn chọn/sửa chữ bình thường. */
+.circuit-studio { -webkit-user-select: none; user-select: none; }
+.circuit-studio input, .circuit-studio textarea, .circuit-studio [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
