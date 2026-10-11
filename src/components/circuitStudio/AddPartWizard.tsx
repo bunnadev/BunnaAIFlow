@@ -23,6 +23,20 @@ const loadBox = () => {
   return Math.max(BOX_MIN, Math.min(900, Math.round(window.innerHeight * 0.6)));
 };
 const DIR_NAMES = ['→ phải', '↓ xuống', '← trái', '↑ lên'];
+/** Chỗ hiện tên chân cạnh chấm: tự động = phía hướng chân (ra ngoài, không đè chân kế bên trong cùng hàng). */
+type LabelPos = 'auto' | 'right' | 'bottom' | 'left' | 'top' | 'hide';
+const LABEL_POS: [LabelPos, string][] = [['auto', 'Tự động'], ['top', 'Trên'], ['bottom', 'Dưới'], ['left', 'Trái'], ['right', 'Phải'], ['hide', 'Ẩn']];
+const LABEL_KEY = 'circuitStudio.pinLabelPos';
+const SIDE_OF_DIR: LabelPos[] = ['right', 'bottom', 'left', 'top'];
+/** Vị trí chữ so với tâm chấm (translate theo % cỡ chữ để chữ nằm gọn 1 phía). */
+const labelStyle = (side: LabelPos, gap: number): React.CSSProperties => {
+  switch (side) {
+    case 'left': return { right: gap, top: 0, transform: 'translateY(-50%)' };
+    case 'top': return { left: 0, bottom: gap, transform: 'translateX(-50%)' };
+    case 'bottom': return { left: 0, top: gap, transform: 'translateX(-50%)' };
+    default: return { left: gap, top: 0, transform: 'translateY(-50%)' };
+  }
+};
 const btn = 'rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10 disabled:opacity-30';
 const primary = 'rounded-md bg-[#F1641E] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#F1641E]/90 disabled:opacity-30';
 const checker = { backgroundImage: 'repeating-conic-gradient(#3a3a3a 0% 25%, #2a2a2a 0% 50%)', backgroundSize: '20px 20px' };
@@ -159,6 +173,11 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
     }
   };
 
+  const [labelPos, setLabelPosRaw] = useState<LabelPos>(() => {
+    try { const v = localStorage.getItem(LABEL_KEY) as LabelPos | null; if (v && LABEL_POS.some(([k]) => k === v)) return v; } catch { /* bỏ qua */ }
+    return 'auto';
+  });
+  const setLabelPos = (v: LabelPos) => { setLabelPosRaw(v); try { localStorage.setItem(LABEL_KEY, v); } catch { /* bỏ qua */ } };
   const [activePin, setActivePin] = useState<number | null>(null); // chân đang chọn: kéo / phím mũi tên để chỉnh
   const pinBoxRef = useRef<HTMLDivElement>(null);
   const justDragged = useRef(false);
@@ -305,16 +324,26 @@ export default function AddPartWizard({ existing, geminiApiKey, onClose, onSaved
                 <button className="rounded border border-white/10 bg-white/5 px-2 hover:bg-white/10" onClick={() => setBox(box + 100)}>+</button>
                 <span className="text-white/40">{box}px · hoặc kéo góc ↘ của ảnh</span>
               </div>
-              <div className="max-h-[78vh] max-w-[calc(96vw-400px)] overflow-auto">
+              <div className="mb-2 flex items-center gap-1 text-xs text-white/60">
+                <span className="mr-1">Tên chân</span>
+                {LABEL_POS.map(([k, t]) => (
+                  <button key={k} onClick={() => setLabelPos(k)} title={k === 'auto' ? 'Đặt tên về phía hướng chân (ra ngoài linh kiện)' : undefined}
+                    className={`rounded border px-2 py-0.5 ${labelPos === k ? 'border-[#F1641E] bg-[#F1641E]/30 text-white' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>{t}</button>
+                ))}
+              </div>
+              <div className="max-h-[78vh] max-w-[calc(96vw-400px)] overflow-auto px-16 py-6">
                 <div ref={pinBoxRef} className="relative cursor-crosshair" style={{ width: disp.w, height: disp.h, ...checker }} onClick={addPin}>
                   <img src={img} alt="" draggable={false} style={{ width: disp.w, height: disp.h }} />
                   {pins.map((p, i) => (
-                    <div key={i} className="absolute" style={{ left: p.fx * disp.w - dot / 2 - 4, top: p.fy * disp.h - dot / 2 - 4 }}>
+                    <div key={i} className="absolute" style={{ left: p.fx * disp.w, top: p.fy * disp.h, zIndex: activePin === i ? 2 : 1 }}>
                       <div title="Kéo để dời chân" onPointerDown={(e) => startPinDrag(e, i)} onClick={(e) => e.stopPropagation()}
-                        className="cursor-move p-1">
+                        className="absolute cursor-move p-1" style={{ left: -dot / 2 - 4, top: -dot / 2 - 4 }}>
                         <div className={`rounded-full border-2 ${activePin === i ? 'border-yellow-300 bg-cyan-400' : 'border-white bg-red-500'}`} style={{ width: dot, height: dot }} />
                       </div>
-                      <div className="pointer-events-none -mt-0.5 ml-1 whitespace-nowrap text-xs font-bold text-yellow-300 [text-shadow:0_0_3px_#000]">{p.name}</div>
+                      {labelPos !== 'hide' && (
+                        <div className={`pointer-events-none absolute whitespace-nowrap rounded bg-black/60 px-1 text-xs font-bold leading-4 ${activePin === i ? 'text-cyan-300' : 'text-yellow-300'}`}
+                          style={labelStyle(labelPos === 'auto' ? SIDE_OF_DIR[p.dir] : labelPos, dot / 2 + 4)}>{p.name}</div>
+                      )}
                     </div>
                   ))}
                   <div title="Kéo để phóng to / thu nhỏ" onPointerDown={startResize} onClick={(e) => e.stopPropagation()}
