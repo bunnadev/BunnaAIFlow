@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SectionLabel } from './UI';
 import { DEFAULT_PSU, type AppSettings } from '../lib/settings';
+import { createBackup, restoreBackup } from '../lib/backup';
 
 interface Props {
 settings: AppSettings;
@@ -20,6 +21,21 @@ const [anthropicApiKey, setAnthropicApiKey] = useState(settings.anthropicApiKey 
 const [psuName, setPsuName] = useState(settings.psuName ?? DEFAULT_PSU.name);
 const [psuMaxVoltage, setPsuMaxVoltage] = useState(String(settings.psuMaxVoltage ?? DEFAULT_PSU.maxVoltage));
 const [psuMaxCurrent, setPsuMaxCurrent] = useState(String(settings.psuMaxCurrent ?? DEFAULT_PSU.maxCurrent));
+
+const [backupBusy, setBackupBusy] = useState<'backup' | 'restore' | null>(null);
+const [backupMsg, setBackupMsg] = useState<{ text: string; error?: boolean } | null>(null);
+const runBackup = async (kind: 'backup' | 'restore') => {
+setBackupBusy(kind);
+setBackupMsg(null);
+try {
+const msg = kind === 'backup' ? await createBackup() : await restoreBackup();
+if (msg) setBackupMsg({ text: msg });
+} catch (e) {
+setBackupMsg({ text: String((e as Error)?.message ?? e), error: true });
+} finally {
+setBackupBusy(null);
+}
+};
 
 const handleSave = () => {
 onSave({
@@ -160,6 +176,35 @@ className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 r
 />
 <p className="text-[10px] text-[#94a3b8] leading-relaxed">
 Dùng cho node "Vbee TTS". Lấy tại tài khoản Vbee của bạn (vbee.vn) — mục tích hợp API.
+</p>
+</div>
+
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Sao lưu dữ liệu</SectionLabel>
+<div className="flex gap-2">
+<button
+onClick={() => runBackup('backup')}
+disabled={!!backupBusy}
+className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-[#F1641E]/40 bg-[#F1641E]/10 hover:bg-[#F1641E]/20 text-[11px] font-bold text-white transition-all disabled:opacity-40"
+>
+<span className="material-symbols-outlined text-[16px]">download</span>
+{backupBusy === 'backup' ? 'Đang sao lưu…' : 'Sao lưu'}
+</button>
+<button
+onClick={() => runBackup('restore')}
+disabled={!!backupBusy}
+className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[11px] font-bold text-white transition-all disabled:opacity-40"
+>
+<span className="material-symbols-outlined text-[16px]">upload</span>
+{backupBusy === 'restore' ? 'Đang khôi phục…' : 'Khôi phục'}
+</button>
+</div>
+{backupMsg && (
+<p className={`text-[10px] leading-relaxed break-all ${backupMsg.error ? 'text-red-400' : 'text-emerald-400'}`}>{backupMsg.text}</p>
+)}
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Gom mọi thứ (workflow, mạch đã vẽ, linh kiện tự thêm, media, cài đặt) vào 1 file .zip — dùng khi cài lại máy hoặc chuyển sang Mac khác.
+File có chứa license và API key: cất ở chỗ riêng tư.
 </p>
 </div>
 </div>

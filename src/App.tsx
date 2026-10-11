@@ -62,6 +62,7 @@ import { QuickPreviewModal } from './components/UI';
 import type { Workspace, LogEntry, MediaAsset } from './types';
 import { loadSettings, saveSettings, DEFAULT_PSU, type AppSettings } from './lib/settings';
 import { loadWorkspaceState, saveWorkspaceState } from './lib/workspaceStore';
+import { takeRestoreNotice } from './lib/backup';
 import { exportSingleWorkspace, exportAllWorkspaces, importWorkspaces, type ImportedBundle } from './lib/exportImport';
 import { saveAssetFromBase64, saveAssetFromBytes, readAssetAsBase64, deleteAsset, mimeTypeFromExtension } from './lib/assets';
 import { GeminiImageProvider, buildImageRequestPayload } from './lib/providers/geminiImageProvider';
@@ -150,6 +151,8 @@ const [menuState, setMenuState] = useState<{ x: number, y: number, flowPos: { x:
 const [isNodeLibraryOpen, setIsNodeLibraryOpen] = useState(false);
 const [isLogPanelOpen, setIsLogPanelOpen] = useState(false);
 const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+// Câu báo sau khi khôi phục bản sao lưu (app vừa tự tải lại)
+const [restoreNotice, setRestoreNotice] = useState<string | null>(() => takeRestoreNotice());
 const [isCircuitStudioOpen, setIsCircuitStudioOpen] = useState(false);
 const [executionLogs, setExecutionLogs] = useState<LogEntry[]>([]);
 
@@ -1792,6 +1795,13 @@ await saveSettings(next);
 return (
 <div className={`w-full h-full bg-[#070b14] flex flex-col mode-${interactionMode} text-white relative p-1 overflow-hidden`}>
 <div className="absolute inset-0 pointer-events-none border border-[#F1641E]/20 z-[60]" />
+{restoreNotice && (
+<div className="absolute left-1/2 top-4 z-[200] flex max-w-[640px] -translate-x-1/2 items-start gap-3 rounded-xl border border-emerald-400/40 bg-[#0b1019] px-4 py-3 text-[12px] text-white shadow-2xl">
+<span className="material-symbols-outlined text-[18px] text-emerald-400">check_circle</span>
+<span className="break-all leading-relaxed">{restoreNotice}</span>
+<button onClick={() => setRestoreNotice(null)} className="text-white/50 hover:text-white"><span className="material-symbols-outlined text-[16px]">close</span></button>
+</div>
+)}
 <div className="absolute inset-0 pointer-events-none border-[8px] border-[#0b1019] z-[55]" />
 <div className="flex-1 flex flex-col bg-[#0a0e17] overflow-hidden relative shadow-2xl">
 <WorkspaceManager

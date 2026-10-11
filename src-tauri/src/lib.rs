@@ -1,4 +1,5 @@
 mod audio_master;
+mod backup;
 mod license;
 mod vectorize;
 
@@ -19,7 +20,9 @@ pub fn run() {
             license::encrypt_aiflow_file,
             license::decrypt_aiflow_file,
             vectorize::vectorize_image_to_svg,
-            audio_master::master_audio
+            audio_master::master_audio,
+            backup::backup_create,
+            backup::backup_restore
         ])
         .setup(|app| {
             let handle = app.handle();

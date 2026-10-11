@@ -1,6 +1,7 @@
 import { readTextFile, writeTextFile, exists, mkdir } from '@tauri-apps/plugin-fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
 import type { Workspace } from '../types';
+import { savesSuspended } from './saveGate';
 
 const STORE_FILENAME = 'workspaces.json';
 
@@ -33,6 +34,7 @@ export async function loadWorkspaceState(): Promise<StoredState | null> {
 }
 
 export async function saveWorkspaceState(state: StoredState): Promise<void> {
+  if (savesSuspended()) return;
   const path = await storePath();
   await writeTextFile(path, JSON.stringify(state));
 }

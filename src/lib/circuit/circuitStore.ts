@@ -1,6 +1,7 @@
 import { exists, mkdir, readDir, readTextFile, remove, rename, writeTextFile } from '@tauri-apps/plugin-fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
 import { parseProject, type CircuitProject, type ProjectMeta } from './projectModel';
+import { savesSuspended } from '../saveGate';
 
 /** Mỗi mạch 1 file circuits/<id>.json trong thư mục dữ liệu app (tách khỏi workspaces.json). */
 
@@ -35,6 +36,7 @@ export async function loadProject(id: string): Promise<CircuitProject> {
 
 /** Ghi ra file tạm rồi đổi tên — mất điện giữa chừng không làm hỏng file cũ. */
 export async function saveProject(p: CircuitProject): Promise<void> {
+  if (savesSuspended()) return;
   const d = await circuitsDir();
   const tmp = await join(d, `${p.id}.json.tmp`);
   await writeTextFile(tmp, JSON.stringify(p));

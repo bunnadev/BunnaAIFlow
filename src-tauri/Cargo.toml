@@ -31,4 +31,5 @@ sha2 = "0.10"
 hex = "0.4"
 vtracer = "0.6"
 image = "0.25"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 

@@ -1,5 +1,6 @@
 import { readTextFile, writeTextFile, exists, mkdir } from '@tauri-apps/plugin-fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
+import { savesSuspended } from './saveGate';
 
 export interface AppSettings {
   geminiApiKey?: string;
@@ -46,6 +47,7 @@ export async function loadSettings(): Promise<AppSettings> {
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
+  if (savesSuspended()) return;
   const path = await settingsPath();
   await writeTextFile(path, JSON.stringify(settings, null, 2));
 }
