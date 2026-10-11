@@ -6,8 +6,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 type HmacSha256 = Hmac<Sha256>;
 
-// Đổi sang URL production khi phát hành chính thức.
-const LICENSE_API_BASE: &str = "https://dev_api_mac.bunna.dev";
+// `tauri dev` (debug) → dev API, `tauri build` (release) → production API.
+// Ghi đè lúc build bằng biến môi trường BUNNA_LICENSE_API, ví dụ build bản
+// release nhưng vẫn trỏ về dev để test:
+//   BUNNA_LICENSE_API=https://dev_api_mac.bunna.dev npm run tauri build
+const LICENSE_API_BASE: &str = match option_env!("BUNNA_LICENSE_API") {
+    Some(url) => url,
+    None if cfg!(debug_assertions) => "https://dev_api_mac.bunna.dev",
+    None => "https://api.bunna.dev",
+};
 
 #[derive(Serialize)]
 pub struct LicenseResult {
