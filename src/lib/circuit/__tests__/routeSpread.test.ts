@@ -28,9 +28,9 @@ function parallelLength(routes: Point[][], gap: number): number {
 }
 
 describe('routeWires spread', () => {
-  it('dây song song không chồng / không dính sát nhau (cách ≥ 20px)', () => {
+  it('dây song song không chồng lên nhau (được chạy sát cạnh, cách ≥ 10px)', () => {
     const r = routeWires(layout, { titleZones: false, spread: true });
     expect(r.every((w) => w && !w.failed)).toBe(true);
-    expect(parallelLength(r.map((w) => w!.points), 20)).toBe(0);
+    expect(parallelLength(r.map((w) => w!.points), 10)).toBe(0);
   });
 });

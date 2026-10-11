@@ -90,7 +90,9 @@ function parseEnd(layout: CircuitLayout, ref: string, H: number, round = false):
   if (!local) return null;
   const r = rotate(local, part.rotation ?? 0);
   // Mối hàn tròn (chân cắm thẳng, nhìn từ trên): dây đi ra hướng nào cũng được, như chân nằm giữa thân
-  const interior = part.type !== 'lead' && (round || (!def.straightOut && Math.abs(local.x) < def.w / 2 - 30 && Math.abs(local.y) < def.h / 2 - 30));
+  // Chân đã khai hướng ra (pinDirs — VD chân linh kiện ảnh chấm trong khung ảnh) thì dây phải ra đúng hướng đó, không bò dọc hàng chân
+  const fixedDir = def.pinDirs?.[pinName] !== undefined;
+  const interior = part.type !== 'lead' && (round || (!def.straightOut && !fixedDir && Math.abs(local.x) < def.w / 2 - 30 && Math.abs(local.y) < def.h / 2 - 30));
   return { point: { x: part.x + r.x, y: part.y + r.y }, dir: pinDir(part, local, H, pinName), part, isLead: part.type === 'lead', interior };
 }
 
@@ -338,12 +340,16 @@ export function routeWires(layout: CircuitLayout, opts: { titleZones?: boolean; 
         if (nearPart[ni]) cost += 1.5;
         // Sát điểm đầu / đích: không phạt (dây phải vào được chân). Xưởng vẽ: đoạn rời chân đã dài nên chỉ miễn 1 ô
         const free = opts.spread ? 1 : 2;
-        if (steps > free && (!goal || Math.abs(nc - gc) + Math.abs(nr - gr) > free)) {
+        const nearEnds = !(steps > free && (!goal || Math.abs(nc - gc) + Math.abs(nr - gr) > free));
+        // Dây chạy sát nhau đã được phép → sát chân cũng không được chồng hẳn lên dây khác cùng hướng
+        if (opts.spread && nearEnds && !goalCell && wireCell[ni] >= 0 && onAxis[ni] & (nd === 0 || nd === 2 ? 1 : 2)) cost += 80;
+        if (!nearEnds) {
           if (opts.spread) {
             const ax = nd === 0 || nd === 2 ? 1 : 2;
             if (wireCell[ni] >= 0) cost += onAxis[ni] & ax ? 80 : 45; // chồng lên dây khác / cắt ngang
-            else if (adjAxis[ni] & ax) cost += 25; // song song cách 10px: 2 dây dính vào nhau
-            else if (nearAxis[ni] & ax) cost += 3; // song song cách 20px: sát nhưng còn khe
+            // Song song sát cạnh (cách 10px) được phép, chỉ phạt nhẹ: linh kiện nhiều chân sát nhau (ESP, IC)
+            // mà bắt dây cách xa thì dây phải vòng / nhảy lung tung
+            else if (adjAxis[ni] & ax) cost += 2;
           } else if (wireCell[ni] >= 0) cost += 12; // cắt ngang dây khác (rẻ hơn đi vòng cả khung)
           else if (wireNear[ni]) cost += 10; // chạy sát dây khác
         }
