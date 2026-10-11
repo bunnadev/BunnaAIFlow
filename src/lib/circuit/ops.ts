@@ -20,6 +20,7 @@ const PREFIX: Record<string, string> = {
   ...Object.fromEntries(CELL_KINDS.flatMap((k) => [cellType(k), ...[1, 2, 3].map((n) => holderType(k, n))].map((t) => [t, 'BAT']))),
 };
 
+// Nhãn xanh in thẳng lên ảnh mạch (khán giả nước ngoài) → luôn TIẾNG ANH, không dấu.
 const DEFAULTS: Record<string, Partial<PlacedPart>> = {
   resistor: { value: '1k', label: '1kΩ' },
   led: { marking: 'đỏ' },
@@ -40,12 +41,12 @@ const DEFAULTS: Record<string, Partial<PlacedPart>> = {
   dip24: { marking: 'MAX7219', label: 'MAX7219' },
   dip28: { marking: 'ATMEGA328P', label: 'ATmega328P' },
   dip40: { marking: 'AT89S52', label: 'AT89S52' },
-  ir_tx: { label: 'IR phát' },
-  ir_rx: { label: 'IR thu' },
+  ir_tx: { label: 'IR Transmitter' },
+  ir_rx: { label: 'IR Receiver' },
   ldr: { label: 'LDR' },
   laser: { label: 'Laser 5V' },
-  buzzer_active: { label: 'Còi 5V' },
-  buzzer_passive: { label: 'Còi' },
+  buzzer_active: { label: 'Buzzer 5V' },
+  buzzer_passive: { label: 'Buzzer' },
   sw_push: { label: 'SW' },
   mic_electret: { label: 'MIC' },
   terminal2: { label: '12V' },
