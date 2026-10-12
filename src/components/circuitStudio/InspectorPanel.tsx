@@ -5,6 +5,7 @@ import { bulbLabel, LED_COLORS } from '../../lib/circuit/lightParts';
 import { isProbe, MINI_BULB_COLORS, ohmWattLabel } from '../../lib/circuit/extraParts';
 import { ledHex } from '../../lib/circuit/parts';
 import { SENSOR_LIT_LABEL, SENSOR_PARTS } from '../../lib/circuit/sensorParts';
+import { MATRIX_PRESETS, matrixGrid, matrixValue, seg7Hex, seg7Label, SEG7_TYPES } from '../../lib/circuit/displayParts';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, parseCellType, parseHolderType, type CellKind, type HolderWiring } from '../../lib/circuit/powerParts';
 import { WIRE_COLORS } from '../../lib/circuit/render';
 import { deleteWire, duplicateParts, resetWire, rotateParts, trimBacktrack, updatePart, updateWire } from '../../lib/circuit/ops';
@@ -66,7 +67,7 @@ function batteryLabel(type: string, wiring?: HolderWiring): string | null {
 }
 
 /** Linh kiện có ô nhập riêng (không dùng ô "Chữ in trên thân" chung). */
-const OWN_FIELDS = new Set(['res_cement', 'res_power', 'cob', 'probe_red', 'probe_black', 'fan', 'motor', 'mini_bulb', 'sw_rocker2', 'sw_rocker3', ...Object.keys(SENSOR_PARTS)]);
+const OWN_FIELDS = new Set(['res_cement', 'res_power', 'cob', 'probe_red', 'probe_black', 'fan', 'motor', 'mini_bulb', 'sw_rocker2', 'sw_rocker3', ...Object.keys(SENSOR_PARTS), ...SEG7_TYPES, 'led_matrix']);
 
 const btn = 'rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10 disabled:opacity-30';
 
@@ -133,6 +134,62 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               </div>
             </>
           )}
+          {SEG7_TYPES.has(part.type) && (
+            <>
+              <div className="mb-1 text-white/50">Loại</div>
+              <div className="mb-2 flex gap-1.5">
+                {([['cathode', 'Âm chung (CC)'], ['anode', 'Dương chung (CA)']] as const).map(([c, t]) => (
+                  <button key={c} {...pick((part.common ?? 'cathode') === c)}
+                    onClick={() => set((live) => ({ common: c, ...((live.label ?? '') === seg7Label(live.type, live.common) ? { label: seg7Label(live.type, c) } : {}) }))}>{t}</button>
+                ))}
+              </div>
+              <div className="mb-2 text-white/40">
+                {(part.common ?? 'cathode') === 'cathode'
+                  ? 'Âm chung: chân COM / D nối −, cấp + vào từng đoạn a–g, dp qua điện trở riêng (≈330Ω ở 5V).'
+                  : 'Dương chung: chân COM / D nối +, từng đoạn a–g, dp nối về − qua điện trở riêng (≈330Ω ở 5V).'}
+              </div>
+              <div className="mb-1 text-white/50">Màu đoạn sáng</div>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {LED_COLORS.map((c) => (
+                  <button key={c.key} title={c.name} onClick={() => set({ color: c.key })}
+                    className="h-6 w-6 rounded-full border-2"
+                    style={{ background: c.hex, borderColor: seg7Hex(part) === c.hex ? '#F1641E' : 'rgba(255,255,255,0.15)' }} />
+                ))}
+              </div>
+              <Field label={part.type === 'seg7_4' ? 'Số hiện khi sáng (VD 12.34, 0000, HELP)' : 'Số hiện khi sáng (VD 8. hoặc A)'} value={part.value ?? ''} onCommit={(v) => set({ value: v })} />
+            </>
+          )}
+          {part.type === 'led_matrix' && (
+            <>
+              <div className="mb-1 text-white/50">Màu chấm sáng</div>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {LED_COLORS.map((c) => (
+                  <button key={c.key} title={c.name} onClick={() => set({ color: c.key })}
+                    className="h-6 w-6 rounded-full border-2"
+                    style={{ background: c.hex, borderColor: seg7Hex(part) === c.hex ? '#F1641E' : 'rgba(255,255,255,0.15)' }} />
+                ))}
+              </div>
+              <div className="mb-1 text-white/50">Hình hiện khi sáng — bấm từng chấm để bật / tắt</div>
+              <div className="mb-2 inline-grid grid-cols-8 gap-[3px] rounded-md bg-black p-1.5">
+                {matrixGrid(part.value).map((row, r) => row.map((on, c) => (
+                  <button key={`${r}-${c}`} title={`R${r + 1} C${c + 1}`}
+                    onClick={() => set((live) => {
+                      const g = matrixGrid(live.value);
+                      g[r][c] = !g[r][c];
+                      return { value: matrixValue(g), lit: true };
+                    })}
+                    className="h-4 w-4 rounded-full"
+                    style={{ background: on ? seg7Hex(part) : 'rgba(185,180,171,0.35)' }} />
+                )))}
+              </div>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {MATRIX_PRESETS.map((m) => (
+                  <button key={m.key} {...pick((part.value ?? '').toUpperCase() === m.value)} onClick={() => set({ value: m.value, lit: m.key !== 'none' || part.lit })}>{m.name}</button>
+                ))}
+              </div>
+              <div className="mb-2 text-white/40">R1–R8 là hàng (R1 trên cùng), C1–C8 là cột (C1 bên trái). Chân theo loại 1088AS phổ biến — mỗi hãng có thể khác và chiều cực (+/−) của hàng / cột cũng khác: thử bằng pin 3V nối tiếp điện trở ≈330Ω trước khi hàn.</div>
+            </>
+          )}
           {part.type === 'mini_bulb' && (
             <>
               <div className="mb-1 text-white/50">Màu kính</div>
@@ -175,7 +232,7 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               onCommit={(v) => set((live) => ({ value: v, ...((live.label ?? '') === `${(live.value ?? '').trim()}V` ? { label: v.trim() ? `${v.trim()}V` : '' } : {}) }))} />
           )}
           {isProbe(part.type) && <div className="mb-2 text-white/40">Kéo đầu kim lại gần chân linh kiện để que tự chạm vào chân đó.</div>}
-          {['led', 'bulb', 'cob', 'mini_bulb', 'fan', 'motor', 'sw_rocker2', 'sw_rocker3'].includes(part.type) && (
+          {['led', 'bulb', 'cob', 'mini_bulb', 'fan', 'motor', 'sw_rocker2', 'sw_rocker3', 'seg7_1', 'seg7_4', 'led_matrix'].includes(part.type) && (
             <label className="mb-2 flex items-center gap-2">
               <input type="checkbox" checked={!!part.lit} onChange={(e) => set({ lit: e.target.checked })} />
               {part.type === 'fan' || part.type === 'motor' ? 'Đang chạy' : part.type.startsWith('sw_') ? 'Đang bật (nhấn phía I)' : 'Đèn đang sáng'}
@@ -249,7 +306,7 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               <input type="checkbox" checked={!!part.heatsink} onChange={(e) => set({ heatsink: e.target.checked })} /> Tản nhiệt
             </label>
           )}
-          {part.type !== 'bus' && part.type !== 'psu' && part.type !== 'mini_bulb' && !battery && !isProbe(part.type) && Object.keys(PARTS[part.type]?.pins ?? {}).length > 0 && (
+          {part.type !== 'bus' && part.type !== 'psu' && part.type !== 'mini_bulb' && !SEG7_TYPES.has(part.type) && part.type !== 'led_matrix' && !battery && !isProbe(part.type) && Object.keys(PARTS[part.type]?.pins ?? {}).length > 0 && (
             <div className="mt-3 border-t border-white/10 pt-2">
               <div className="mb-1 text-white/50">Tên chân thật (VD C1815: 1 = E, 2 = C, 3 = B)</div>
               {Object.keys(PARTS[part.type].pins).map((pin) => (

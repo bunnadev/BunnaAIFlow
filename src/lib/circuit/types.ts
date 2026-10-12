@@ -41,6 +41,8 @@ export interface PlacedPart {
   lit?: boolean;
   /** Loa kiểu thật trong Xưởng vẽ: nhìn mặt trước / mặt sau. Không có = hình loa cũ. */
   view?: 'front' | 'back';
+  /** Chỉ cho LED 7 đoạn: âm chung (CC) / dương chung (CA). Không có = âm chung. */
+  common?: 'cathode' | 'anode';
   /** Chỉ cho đế pin 2–3 viên: cách mắc các viên bên trong. Không có = nối tiếp. */
   wiring?: 'series' | 'parallel';
   /** Kiểu mối hàn mặc định cho các đầu dây nối vào linh kiện này (bản cũ; nay chọn theo từng đầu dây — Wire.joints). Không có = dài. */

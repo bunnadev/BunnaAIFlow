@@ -3,6 +3,7 @@ import { resistorBands } from './bands';
 import type { PlacedPart } from './types';
 import { glow } from './lightParts';
 import { SENSOR_PARTS } from './sensorParts';
+import { DISPLAY_PARTS } from './displayParts';
 
 /**
  * Linh kiện bổ sung của Xưởng vẽ mạch: điện trở xi măng, điện trở công suất dạng
@@ -413,6 +414,7 @@ export const EXTRA_PARTS: Record<string, PartDef> = {
   sw_rocker2: rocker(2),
   sw_rocker3: rocker(3),
   ...SENSOR_PARTS,
+  ...DISPLAY_PARTS,
 };
 export const EXTRA_TYPES = new Set(Object.keys(EXTRA_PARTS));
 export const isProbe = (type: string) => type === 'probe_red' || type === 'probe_black';

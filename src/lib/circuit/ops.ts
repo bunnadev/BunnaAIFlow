@@ -15,7 +15,7 @@ const snap10 = (v: number) => Math.round(v / 10) * 10;
 const PREFIX: Record<string, string> = {
   resistor: 'R', cap_elec: 'C', cap_ceramic: 'C', pot: 'VR', trimpot: 'VR', diode: 'D',
   to92: 'Q', to220: 'Q', to3: 'Q', pentawatt: 'U', ...Object.fromEntries(DIP_SIZES.map((n) => [`dip${n}`, 'U'])),
-  ir_tx: 'IR', ir_rx: 'IR', ldr: 'LDR', laser: 'LS', buzzer_active: 'BZ', buzzer_passive: 'BZ', sw_push: 'SW', mic_electret: 'MIC',
+  ir_tx: 'IR', ir_rx: 'IR', ldr: 'LDR', laser: 'LS', buzzer_active: 'BZ', buzzer_passive: 'BZ', sw_push: 'SW', mic_electret: 'MIC', seg7_1: 'DS', seg7_4: 'DS', led_matrix: 'MX',
   led: 'LED', bulb: 'DEN', cob: 'COB', res_cement: 'R', res_power: 'R', probe_red: 'VOM', probe_black: 'VOM', fan: 'FAN', motor: 'M', mini_bulb: 'DEN', sw_rocker2: 'SW', sw_rocker3: 'SW', speaker: 'SP', jack35: 'J', mic: 'MIC', terminal2: 'PWR', lead: 'OUT', psu: 'PSU',
   ...Object.fromEntries(CELL_KINDS.flatMap((k) => [cellType(k), ...[1, 2, 3].map((n) => holderType(k, n))].map((t) => [t, 'BAT']))),
 };
@@ -49,6 +49,9 @@ const DEFAULTS: Record<string, Partial<PlacedPart>> = {
   buzzer_passive: { label: 'Buzzer' },
   sw_push: { label: 'SW' },
   mic_electret: { label: 'MIC' },
+  seg7_1: { value: '8.', color: 'red', label: '5161AS' },
+  seg7_4: { value: '12.34', color: 'red', label: '5641AS' },
+  led_matrix: { value: '66FFFFFF7E3C1800', color: 'red', label: '8x8 LED Matrix' },
   terminal2: { label: '12V' },
   lead: { label: 'OUT' },
   mic: { label: 'MIC' },
