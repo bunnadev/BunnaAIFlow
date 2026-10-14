@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../types';
-import { addBend, followEnd, leadOutOk, moveSegment, moveSegmentKeepLeads, removeCorner, segOrientation, simplify } from '../wireEdit';
+import { addBend, followEnd, leadOutOk, moveSegment, moveSegmentKeepLeads, removeCorner, segmentDelta, segOrientation, simplify } from '../wireEdit';
 
 const P = (x: number, y: number): Point => ({ x, y });
 
@@ -13,6 +13,20 @@ function orthogonal(pts: Point[]) {
 }
 
 describe('wireEdit', () => {
+  it('segmentDelta: chân lệch lưới — kéo đoạn dọc hút thẳng hàng với chân, dây hết khấc', () => {
+    // chân x=563 đi xuống, khấc sang x=560, xuống tiếp rồi rẽ phải
+    const pts = [P(563, 0), P(563, 50), P(560, 50), P(560, 100), P(300 + 563, 100)];
+    const d = segmentDelta(pts, 2, 4); // chuột lệch 4px → hút về 563 (dời 3)
+    expect(d).toBe(3);
+    expect(simplify(moveSegment(pts, 2, d))).toEqual([P(563, 0), P(563, 100), P(863, 100)]);
+  });
+
+  it('segmentDelta: xa điểm khác thì bám lưới 10 tuyệt đối', () => {
+    const pts = [P(563, 0), P(563, 50), P(560, 50), P(560, 100), P(863, 100)];
+    expect(segmentDelta(pts, 2, 33)).toBe(30); // 560+33=593 → 590
+    expect(segmentDelta([P(0, 3), P(100, 3)], 0, 12)).toBe(17); // 3+12=15 → 20
+  });
+
   it('segOrientation', () => {
     expect(segOrientation(P(0, 0), P(10, 0))).toBe('h');
     expect(segOrientation(P(0, 0), P(0, 10))).toBe('v');

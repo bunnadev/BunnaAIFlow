@@ -7,7 +7,7 @@ import {
   allPins, dropTarget, endPartId, hitPart, hitPin, hitWire, nearestSegment, previewRouted, segmentHandles, wiresOfPart,
 } from '../../lib/circuit/geometry';
 import { addWire, deleteWire, moveBusEnd, movePartsBy, resetWire, resizeBus, setWirePoints, updatePart } from '../../lib/circuit/ops';
-import { addBend, moveSegmentKeepLeads, removeCorner, segOrientation, simplify } from '../../lib/circuit/wireEdit';
+import { addBend, moveSegmentKeepLeads, removeCorner, segmentDelta, segOrientation, simplify } from '../../lib/circuit/wireEdit';
 import { snapDelta, type Guide } from '../../lib/circuit/arrange';
 import { contactSnap } from '../../lib/circuit/contacts';
 import { busCoord, busEnds, busPoint, busVertical } from '../../lib/circuit/bus';
@@ -296,7 +296,7 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
         break;
       case 'segment': {
         const o = segOrientation(drag.base[drag.seg], drag.base[drag.seg + 1]);
-        const delta = o === 'h' ? snap10(pt.y - drag.start.y) : snap10(pt.x - drag.start.x);
+        const delta = segmentDelta(drag.base, drag.seg, o === 'h' ? pt.y - drag.start.y : pt.x - drag.start.x);
         if (delta === drag.delta) break;
         // Đoạn rời chân phải đi thẳng theo hướng chân đủ dài (mối hàn không bị xoay ngang / vỏ không đè lên mối hàn)
         const rw = shownRouted[drag.wire];

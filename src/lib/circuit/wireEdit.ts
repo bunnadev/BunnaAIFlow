@@ -33,6 +33,27 @@ export function moveSegment(pts: Point[], k: number, delta: number, slide: Slide
   return out;
 }
 
+/**
+ * Độ dời khi kéo đoạn k theo chuột (raw = độ lệch chuột theo phương vuông góc với đoạn).
+ * Hút vào toạ độ của điểm khác trên dây (chân linh kiện thường lệch lưới, vd x=563) trong
+ * phạm vi `magnet` → kéo thẳng hàng được với đoạn rời chân; không thì bám lưới 10 TUYỆT ĐỐI
+ * (không phải bội 10 tính từ chỗ cũ, vì vậy dây lệch lưới không bao giờ thẳng lại được).
+ */
+export function segmentDelta(pts: Point[], k: number, raw: number, magnet = 6): number {
+  const o = segOrientation(pts[k], pts[k + 1]);
+  if (!o) return 0;
+  const coord = (p: Point) => (o === 'h' ? p.y : p.x);
+  const from = coord(pts[k]);
+  const target = from + raw;
+  let best: number | null = null;
+  pts.forEach((p, i) => {
+    if (i === k || i === k + 1) return;
+    const c = coord(p);
+    if (Math.abs(c - target) <= magnet && (best === null || Math.abs(c - target) < Math.abs(best - target))) best = c;
+  });
+  return (best ?? snap10(target)) - from;
+}
+
 /** Tách đoạn k làm 2 tại điểm gần `at` nhất — mỗi nửa kéo được riêng. */
 export function addBend(pts: Point[], k: number, at: Point): Point[] {
   const a = pts[k], b = pts[k + 1];
