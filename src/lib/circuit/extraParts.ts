@@ -401,8 +401,37 @@ const trimpot: PartDef = {
   },
 };
 
+// ─── Transistor vỏ TO-126 (BD139/BD140): thân nhựa đen có lỗ bắt vít, không tai kim loại ─
+
+const TO126_PIN_Y = 90;
+
+const to126: PartDef = {
+  desc: 'Transistor vỏ TO-126 (3 chân) — VD BD139, BD140, 13003. Thân nhựa đen có lỗ bắt vít, không có tai kim loại',
+  w: 96, h: TO126_PIN_Y * 2,
+  pins: { '1': { x: -30, y: TO126_PIN_Y }, '2': { x: 0, y: TO126_PIN_Y }, '3': { x: 30, y: TO126_PIN_Y } },
+  pinDirs: { '1': 1, '2': 1, '3': 1 },
+  pinNote: 'mặt có chữ hướng lên, lỗ bắt vít ở trên, 3 chân chĩa XUỐNG: chân 1 trái, 2 giữa, 3 phải (BD139: E C B)',
+  render: (p) => {
+    const lines = (p.marking ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 3);
+    const fs = lines.some((l) => l.length > 5) ? 14 : 16;
+    const text = lines.map((l, i) =>
+      `<text x="0" y="${-28 + i * 18}" font-size="${fs}" font-weight="700" fill="#e4e4e4" text-anchor="middle" font-family="${FONT}">${esc(l)}</text>`).join('');
+    // chân dẹt: vai rộng sát thân rồi thon lại, 2 chân ngoài bẻ xiên ra
+    const tab = (x: number) =>
+      `<path d="M${x * 0.75 - 6} -2 H${x * 0.75 + 6} V12 L${x + 3.5} 26 V${TO126_PIN_Y} H${x - 3.5} V26 L${x * 0.75 - 6} 12 Z" fill="url(#gSilver)" stroke="#6f767d" stroke-width="1"/>`;
+    return tab(-30) + tab(0) + tab(30) +
+      `<rect x="-43" y="-110" width="86" height="110" rx="4" fill="url(#gBlack)" stroke="#000" stroke-width="1"/>` +
+      `<rect x="-39" y="-106" width="78" height="8" rx="3" fill="#fff" opacity="0.1"/>` +
+      `<circle cx="0" cy="-78" r="15" fill="#0b0b0c" stroke="#3a3d42" stroke-width="2"/>` +
+      `<circle cx="0" cy="-78" r="10" fill="#6b4a2c" opacity="0.55"/>` +
+      `<rect x="-40" y="-60" width="5" height="54" rx="2.5" fill="#fff" opacity="0.08"/>` +
+      (lines.length ? upright(p, 0, -20, text) : '');
+  },
+};
+
 export const EXTRA_PARTS: Record<string, PartDef> = {
   trimpot,
+  to126,
   res_cement: resCement,
   res_power: resPower,
   cob,

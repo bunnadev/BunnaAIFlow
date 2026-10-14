@@ -22,6 +22,7 @@ export const BUILTIN_LIBRARY: LibraryItem[] = [
   { type: 'pot', name: 'Chiết áp', group: 'Cơ bản' },
   { type: 'trimpot', name: 'Biến trở tinh chỉnh', group: 'Cơ bản' },
   { type: 'to92', name: 'Transistor TO-92', group: 'Bán dẫn / IC' },
+  { type: 'to126', name: 'Transistor TO-126', group: 'Bán dẫn / IC' },
   { type: 'to220', name: 'TO-220', group: 'Bán dẫn / IC' },
   { type: 'to3', name: 'Sò TO-3', group: 'Bán dẫn / IC' },
   { type: 'pentawatt', name: 'IC Pentawatt', group: 'Bán dẫn / IC' },
