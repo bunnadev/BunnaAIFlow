@@ -766,19 +766,25 @@ export function renderScene(layout: CircuitLayout, opts: SceneOptions = {}): str
   const studio = frame === null ? studioFilterDefs(sceneFilterRegion(layout, routed)) : null;
   const fShadow = studio ? studio.shadow : 'fShadow';
   const fWire = studio ? studio.wireShadow : 'fWireShadow';
+  // Đảo chân (flip) của linh kiện không tự vẽ bản đảo: soi gương cả hình theo trục của nó
+  const mirror = (p: PlacedPart, svg: string) => {
+    const def = PARTS[p.type];
+    if (!p.flip || !svg || def.flipSelf || (def.flipAxis !== 'x' && def.flipAxis !== 'y')) return svg;
+    return `<g transform="scale(${def.flipAxis === 'x' ? '-1 1' : '1 -1'})">${svg}</g>`;
+  };
   const behind = others.map((p) => {
-    const s = PARTS[p.type].renderBehind?.(p);
+    const s = mirror(p, PARTS[p.type].renderBehind?.(p) ?? '');
     return s ? `<g transform="${tf(p)}" filter="url(#${fShadow})">${s}</g>` : '';
   }).join('');
   const busSvg = buses.map((p) => `<g transform="${tf(p)}" filter="url(#${fWire})">${PARTS.bus.render(p)}</g>`).join('');
   const partsSvg = others.map((p) => {
-    const def = PARTS[p.type], body = def.render(p);
+    const def = PARTS[p.type], body = mirror(p, def.render(p));
     return `<g transform="${tf(p)}" filter="url(#${fShadow})">${body}</g>` + (def.crisp ? `<g transform="${tf(p)}">${body}</g>` : '');
   }).join('');
   const wires = layout.wires.map((w, i) => renderWire(w, routed[i], opts.dashed?.has(i), fWire, opts.darkBg, frame === null));
   // Quầng sáng đèn đang sáng: trên lớp dây (ánh sáng tràn lên dây quanh đèn), dưới nhãn
   const glows = others.map((p) => {
-    const s = PARTS[p.type].renderGlow?.(p);
+    const s = mirror(p, PARTS[p.type].renderGlow?.(p) ?? '');
     return s ? `<g transform="${tf(p)}">${s}</g>` : '';
   }).join('');
   const placed = opts.labels ?? placeLabels(known, frame, wireSegBoxes(routed));

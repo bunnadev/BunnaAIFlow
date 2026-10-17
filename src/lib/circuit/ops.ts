@@ -2,7 +2,7 @@ import { endPartId, resolvePoint } from './geometry';
 import { busCoord, busEnds, busPoint, busVertical } from './bus';
 import { followEnd, simplify } from './wireEdit';
 import type { CircuitLayout, PlacedPart, Point, Rotation, Wire } from './types';
-import { DIP_SIZES } from './parts';
+import { DIP_SIZES, PARTS } from './parts';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, POWER_TYPES } from './powerParts';
 
 /**
@@ -153,6 +153,17 @@ export function rotateParts(layout: CircuitLayout, ids: string[], dir: 1 | -1): 
       const v = { ...w, from: busRef(w.from), to: busRef(w.to) };
       return set.has(endPartId(w.from)) || set.has(endPartId(w.to)) ? clearManual(v) : v;
     }),
+  };
+}
+
+/** Đảo 2 chân cho nhau (tụ hoá, cọc nguồn) mà giữ nguyên hướng linh kiện — dây nối vào được đi lại như khi xoay. */
+export function flipParts(layout: CircuitLayout, ids: string[]): CircuitLayout {
+  const set = new Set(layout.parts.filter((p) => ids.includes(p.id) && PARTS[p.type]?.flipAxis).map((p) => p.id));
+  if (!set.size) return layout;
+  return {
+    ...layout,
+    parts: layout.parts.map((p) => (set.has(p.id) ? { ...p, flip: p.flip ? undefined : true } : p)),
+    wires: layout.wires.map((w) => (set.has(endPartId(w.from)) || set.has(endPartId(w.to)) ? clearManual(w) : w)),
   };
 }
 

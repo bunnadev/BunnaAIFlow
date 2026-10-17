@@ -37,6 +37,14 @@ export interface PartDef {
    * Bật cờ này: bản có filter chỉ còn làm bóng, vẽ thêm 1 bản không filter đè lên cho nét.
    */
   crisp?: boolean;
+  /**
+   * Cho phép đảo chân +/− (PlacedPart.flip): 'x' soi gương trái ↔ phải, 'y' soi gương trên ↔ dưới,
+   * 'swap' chỉ đổi chỗ 2 chân cực tính (thân giữ nguyên — VD máy nguồn: jack đỏ/đen đổi chỗ).
+   * Không có flipSelf: renderScene tự soi gương cả hình (chỉ hợp khi trên thân không có chữ ngoài dấu + / −).
+   */
+  flipAxis?: 'x' | 'y' | 'swap';
+  /** render() tự vẽ bản đảo chân (giữ chữ đọc xuôi) — renderScene không soi gương nữa. */
+  flipSelf?: boolean;
   /** Vẽ phía sau linh kiện (tản nhiệt) — tuỳ chọn. */
   renderBehind?: (p: PlacedPart) => string;
 }
@@ -48,6 +56,15 @@ export interface PartDef {
 const upright = (p: PlacedPart, x: number, y: number, body: string) => {
   const r = p.rotation ?? 0;
   return r === 90 || r === 180 ? `<g transform="rotate(180 ${x} ${y})">${body}</g>` : body;
+};
+
+/**
+ * Chữ in DỌC thân (đã xoay −90°, VD tụ hoá): góc chữ thực = xoay linh kiện − 90°. Lật 180° khi tụ xoay 180/270
+ * để chữ nằm ngang đọc xuôi trái → phải, nằm dọc đọc từ dưới lên — không bao giờ lộn ngược.
+ */
+const uprightVertical = (p: PlacedPart, x: number, y: number, body: string) => {
+  const r = p.rotation ?? 0;
+  return r === 180 || r === 270 ? `<g transform="rotate(180 ${x} ${y})">${body}</g>` : body;
 };
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -81,12 +98,14 @@ const diode: PartDef = {
   w: 180, h: 44,
   pins: { A: { x: -90, y: 0 }, K: { x: 90, y: 0 } },
   pinNote: 'nằm ngang, A (anot) trái, K (katot, phía vạch bạc) phải',
+  flipAxis: 'x', flipSelf: true,
+  // Đảo chân: vạch bạc (K) sang trái, chữ vẫn đọc xuôi
   render: (p) =>
     leg(-90, 0, -46, 0, 7) + leg(46, 0, 90, 0, 7) +
     `<rect x="-48" y="-21" width="96" height="42" rx="8" fill="url(#gBlack)"/>` +
-    `<rect x="26" y="-21" width="11" height="42" fill="url(#gSilver)"/>` +
+    `<rect x="${p.flip ? -37 : 26}" y="-21" width="11" height="42" fill="url(#gSilver)"/>` +
     `<rect x="-46" y="-18" width="92" height="8" rx="4" fill="#fff" opacity="0.16"/>` +
-    (p.marking ? upright(p, -8, 1, `<text x="-8" y="7" font-size="17" font-weight="700" fill="#d9d9d9" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif">${esc(p.marking)}</text>`) : ''),
+    (p.marking ? upright(p, p.flip ? 8 : -8, 1, `<text x="${p.flip ? 8 : -8}" y="7" font-size="17" font-weight="700" fill="#d9d9d9" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif">${esc(p.marking)}</text>`) : ''),
 };
 
 /**
@@ -101,10 +120,13 @@ const capElec: PartDef = {
   pinNote: 'thân dựng đứng, 2 chân chĩa XUỐNG ở cùng một đầu: + bên trái (chân dài hơn), − bên phải (phía vạch sáng có dấu −)',
   // Kiểu tụ thật (như ảnh mẫu Samxon): thân đen bóng, vạch xám dọc phía chân âm với dấu "−",
   // đầu nhôm, đường gân thắt gần đầu, chữ in trắng dọc thân.
+  flipAxis: 'x', flipSelf: true,
   render: (p) => {
+    // Đảo chân: thân soi gương (+ sang phải, vạch âm sang trái), chữ vẫn vẽ xuôi
+    const m = p.flip ? -1 : 1;
     const marks = [-56, -30, -4, 22].map((y) => `<rect x="17" y="${y}" width="10" height="13" rx="2" fill="none" stroke="#2b2d31" stroke-width="2.4"/>` +
       `<rect x="19" y="${y + 5}" width="6" height="3" rx="1" fill="#2b2d31"/>`).join('');
-    return leg(-14, 36, -14, 104, 5) + leg(14, 36, 14, 92, 5) +
+    const body = leg(-14, 36, -14, 104, 5) + leg(14, 36, 14, 92, 5) +
       '<defs><linearGradient id="pt_capBody" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#050506"/><stop offset="0.3" stop-color="#2f3135"/><stop offset="0.5" stop-color="#43464b"/><stop offset="0.75" stop-color="#1a1b1e"/><stop offset="1" stop-color="#050506"/></linearGradient>' +
       '<linearGradient id="pt_capStripe" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9da3aa"/><stop offset="0.5" stop-color="#d9dde1"/><stop offset="1" stop-color="#8a9097"/></linearGradient></defs>' +
       // thân + đáy cao su
@@ -114,10 +136,11 @@ const capElec: PartDef = {
       `<rect x="13" y="-70" width="18" height="100" fill="url(#pt_capStripe)"/>` + marks +
       // đầu nhôm + gân thắt
       `<rect x="-34" y="-84" width="68" height="16" rx="7" fill="url(#gSilver)" stroke="#7d848c" stroke-width="1"/>` +
-      `<rect x="-34" y="-66" width="68" height="4" fill="#000" opacity="0.55"/>` +
+      `<rect x="-34" y="-66" width="68" height="4" fill="#000" opacity="0.55"/>`;
+    return (m < 0 ? `<g transform="scale(-1 1)">${body}</g>` : body) +
       `<rect x="-31" y="-60" width="7" height="88" rx="3.5" fill="#fff" opacity="0.18"/>` +
-      `<text x="-26" y="84" font-size="15" font-weight="900" fill="#ffb4b4" text-anchor="middle">+</text>` +
-      (p.marking ? upright(p, -6, -21, `<text x="0" y="0" font-size="13" font-weight="700" fill="#eef1f4" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" transform="translate(-6 -21) rotate(-90)">${esc(p.marking)}</text>`) : '');
+      `<text x="${-26 * m}" y="84" font-size="15" font-weight="900" fill="#ffb4b4" text-anchor="middle">+</text>` +
+      (p.marking ? uprightVertical(p, -6 * m, -21, `<text x="0" y="0" font-size="13" font-weight="700" fill="#eef1f4" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" transform="translate(${-6 * m} -21) rotate(-90)">${esc(p.marking)}</text>`) : '');
   },
 };
 
@@ -261,6 +284,7 @@ const led: PartDef = {
   desc: 'Đèn LED 5mm',
   w: 70, h: 150,
   pins: { A: { x: -14, y: 75 }, K: { x: 14, y: 75 } },
+  flipAxis: 'x',
   pinNote: 'bóng ở trên, 2 chân chĩa xuống: A (chân dài, dương) trái, K phải. Màu bóng lấy từ marking/value/label (đỏ, xanh lá, xanh dương, vàng, trắng)',
   render: (p) => {
     const c = ledHex(p);
@@ -278,6 +302,7 @@ const speaker: PartDef = {
   w: 320, h: 340,
   pins: { '+': { x: -40, y: -170 }, '-': { x: 40, y: -170 } },
   pinNote: '2 cọc hàn ở mép TRÊN: + trái, − phải',
+  flipAxis: 'x', flipSelf: true,
   // Loa thả từ Xưởng vẽ có "view" → vẽ kiểu thật; loa cũ (node Vẽ mạch) giữ hình cũ
   render: (p) => p.view ? speakerReal(p) :
     `<circle cx="0" cy="0" r="158" fill="url(#gMetal)" stroke="#6f767e" stroke-width="3"/>` +
@@ -286,8 +311,8 @@ const speaker: PartDef = {
     `<circle cx="0" cy="0" r="46" fill="url(#gDust)"/>` +
     `<ellipse cx="-14" cy="-16" rx="16" ry="10" fill="#fff" opacity="0.15"/>` +
     [-40, 40].map((x) => `<rect x="${x - 11}" y="-176" width="22" height="30" rx="4" fill="url(#gSilver)" stroke="#7d848c"/>`).join('') +
-    `<text x="-40" y="-186" font-size="20" font-weight="900" fill="#ff4d4d" text-anchor="middle">+</text>` +
-    `<text x="40" y="-186" font-size="22" font-weight="900" fill="#cfd6df" text-anchor="middle">−</text>`,
+    `<text x="${p.flip ? 40 : -40}" y="-186" font-size="20" font-weight="900" fill="#ff4d4d" text-anchor="middle">+</text>` +
+    `<text x="${p.flip ? -40 : 40}" y="-186" font-size="22" font-weight="900" fill="#cfd6df" text-anchor="middle">−</text>`,
 };
 
 const jack35: PartDef = {
@@ -308,11 +333,13 @@ const terminal2: PartDef = {
   w: 110, h: 150,
   pins: { '+': { x: -55, y: -32 }, '-': { x: -55, y: 32 } },
   pinNote: 'dây vào từ cạnh TRÁI: + ở trên, − ở dưới',
-  render: () =>
+  flipAxis: 'y', flipSelf: true,
+  // Đảo chân: + xuống dưới, − lên trên (dây vẫn vào từ cạnh trái)
+  render: (p) =>
     `<rect x="-50" y="-72" width="100" height="144" rx="8" fill="url(#gGreenBlock)"/>` +
     [-32, 32].map((y) => `<circle cx="0" cy="${y}" r="22" fill="url(#gScrew)" stroke="#6d747c" stroke-width="2"/><line x1="-13" y1="${y - 8}" x2="13" y2="${y + 8}" stroke="#5b6168" stroke-width="5"/>`).join('') +
-    `<text x="66" y="-20" font-size="40" font-weight="900" fill="#ff5a5a">+</text>` +
-    `<text x="68" y="46" font-size="44" font-weight="900" fill="#7fb2ff">−</text>`,
+    `<text x="66" y="${p.flip ? 44 : -20}" font-size="40" font-weight="900" fill="#ff5a5a">+</text>` +
+    `<text x="68" y="${p.flip ? -18 : 46}" font-size="44" font-weight="900" fill="#7fb2ff">−</text>`,
 };
 
 // ─── IC chân cắm DIP (nhìn từ trên, khấc bên TRÁI) ────────────────────────
@@ -368,6 +395,7 @@ const mic: PartDef = {
   w: 90, h: 160,
   pins: { '+': { x: -16, y: 80 }, '-': { x: 16, y: 80 } },
   pinNote: 'nhìn từ trên xuống mặt lưới, 2 chân chĩa XUỐNG: + trái, − phải (chân − là chân nối vỏ)',
+  flipAxis: 'x',
   render: () =>
     leg(-16, 30, -16, 80, 5) + leg(16, 30, 16, 80, 5) +
     `<circle cx="0" cy="-10" r="42" fill="url(#gSilver)" stroke="#8d949c" stroke-width="2"/>` +
@@ -421,22 +449,40 @@ export const PARTS: Record<string, PartDef> = {
   ...EXTRA_PARTS,
 };
 
-const scaledDefs = new WeakMap<PartDef, Map<number, PartDef>>();
+const scaledDefs = new WeakMap<PartDef, Map<string, PartDef>>();
 
 /**
  * Định nghĩa linh kiện cho 1 chiếc đã đặt — đã tính p.scale (khung bao, toạ độ chân).
  * render() giữ nguyên toạ độ gốc: bộ vẽ phóng to cả nhóm bằng transform scale().
  */
+/** 2 chân cực tính của linh kiện: ["+", "-"] hoặc ["A", "K"]. */
+export function polarPair(def: PartDef): [string, string] {
+  return '+' in def.pins ? ['+', '-'] : ['A', 'K'];
+}
+
 export function partDef(p: PlacedPart): PartDef | undefined {
   const def = PARTS[p.type];
-  const s = p.scale;
-  if (!def || !s || s === 1) return def;
+  const s = p.scale || 1;
+  const flip = p.flip && def?.flipAxis;
+  if (!def || (s === 1 && !flip)) return def;
   let byScale = scaledDefs.get(def);
   if (!byScale) scaledDefs.set(def, (byScale = new Map()));
-  let out = byScale.get(s);
+  const key = `${s}${flip ? 'f' : ''}`;
+  let out = byScale.get(key);
   if (!out) {
-    out = { ...def, w: def.w * s, h: def.h * s, pins: Object.fromEntries(Object.entries(def.pins).map(([k, v]) => [k, { x: v.x * s, y: v.y * s }])) };
-    byScale.set(s, out);
+    // Đảo chân: soi gương toạ độ chân + hướng ra theo trục của linh kiện (0 phải ↔ 2 trái, 1 xuống ↔ 3 lên),
+    // hoặc 'swap': chỉ đổi chỗ 2 chân cực tính (+/− hoặc A/K) kèm hướng ra của chúng
+    const mx = flip === 'x' ? -1 : 1, my = flip === 'y' ? -1 : 1;
+    const mirrorDir = (d: 0 | 1 | 2 | 3) => (flip === 'x' ? (d === 0 ? 2 : d === 2 ? 0 : d) : flip === 'y' ? (d === 1 ? 3 : d === 3 ? 1 : d) : d) as 0 | 1 | 2 | 3;
+    let pins = Object.fromEntries(Object.entries(def.pins).map(([k, v]) => [k, { x: v.x * s * mx, y: v.y * s * my }]));
+    let dirs = def.pinDirs && flip ? Object.fromEntries(Object.entries(def.pinDirs).map(([k, d]) => [k, mirrorDir(d)])) : def.pinDirs;
+    if (flip === 'swap') {
+      const [a, b] = polarPair(def);
+      pins = { ...pins, [a]: pins[b], [b]: pins[a] };
+      if (dirs) dirs = { ...dirs, [a]: dirs[b], [b]: dirs[a] };
+    }
+    out = { ...def, w: def.w * s, h: def.h * s, pinDirs: dirs, pins };
+    byScale.set(key, out);
   }
   return out;
 }

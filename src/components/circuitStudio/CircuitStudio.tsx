@@ -14,7 +14,7 @@ import { duplicateProject, emptyLayout, newProject, type CircuitProject, type Pr
 import { deleteProject, listProjects, loadProject, saveProject } from '../../lib/circuit/circuitStore';
 import { partBox, partPreviewSvg, validateLayout } from '../../lib/circuit/render';
 import { pinAutoWires, routeWorld, routingSignature } from '../../lib/circuit/world';
-import { addPart, deleteParts, duplicateParts, resetAllWires, rotateParts, deleteWire, movePartsBy } from '../../lib/circuit/ops';
+import { addPart, deleteParts, duplicateParts, flipParts, resetAllWires, rotateParts, deleteWire, movePartsBy } from '../../lib/circuit/ops';
 import { contactSnap, syncContacts } from '../../lib/circuit/contacts';
 import { alignParts, distributeParts, type AlignMode } from '../../lib/circuit/arrange';
 import { BUILTIN_LIBRARY, LIBRARY_GROUPS, type LibraryItem } from '../../lib/circuit/libraryCatalog';
@@ -278,6 +278,7 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
         return;
       }
       if (e.key.toLowerCase() === 'r' && !cmd && selection.parts.length) { commit(rotateParts(layout, selection.parts, e.shiftKey ? -1 : 1)); return; }
+      if (e.key.toLowerCase() === 'f' && !cmd && selection.parts.length) { commit(flipParts(layout, selection.parts)); return; }
       if (e.key === '0') { apiRef.current?.fit(); return; }
       if (e.key === '-') { apiRef.current?.zoomBy(1 / 1.25); return; }
       if (e.key === '=' || e.key === '+') { apiRef.current?.zoomBy(1.25); return; }

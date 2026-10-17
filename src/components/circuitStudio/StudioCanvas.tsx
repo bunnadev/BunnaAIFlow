@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { CircuitLayout, Point } from '../../lib/circuit/types';
+import type { CircuitLayout, PlacedPart, Point } from '../../lib/circuit/types';
 import type { End, RoutedWire } from '../../lib/circuit/route';
 import { labelPlacements, partBox, renderScene, svgDefs, type Box } from '../../lib/circuit/render';
 import { dotGridTileSvg, GRID_BG } from '../../lib/circuit/dotGrid';
@@ -24,6 +24,13 @@ export interface CanvasApi {
   cancelDrag(): boolean;
   /** Phóng/thu quanh giữa màn hình (nút −/+ và phím -/=). */
   zoomBy(factor: number): void;
+}
+
+/** Chỗ kéo dây ra từ thanh đồng đang chọn: cách mỗi đầu 40 (thanh ngắn thì ở giữa). */
+function busWireStarts(bus: PlacedPart): number[] {
+  const [lo, hi] = busEnds(bus);
+  if (hi - lo < 160) return [Math.round((lo + hi) / 2)];
+  return [Math.round(lo + 40), Math.round(hi - 40)];
 }
 
 interface Props {
@@ -205,6 +212,11 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
         const h = busPoint(selBus, ex);
         if (Math.hypot(pt.x - h.x, pt.y - h.y) < 16) { setDrag({ kind: 'busEnd', id: selBus.id, side, startX: ex, endX: ex }); return; }
       }
+      // chấm xanh gần 2 đầu thanh → kéo dây từ thanh này sang thanh khác (nối 2 thanh nguồn / 2 thanh mass)
+      for (const c of busWireStarts(selBus)) {
+        const h = busPoint(selBus, c);
+        if (Math.hypot(pt.x - h.x, pt.y - h.y) < 14) { setDrag({ kind: 'wire', from: `${selBus.id}@${c}`, fromPt: h, cur: pt }); return; }
+      }
     }
     // 1b. tay cầm góc dưới-phải của linh kiện đang chọn → kéo đổi cỡ
     const selOne = selection.parts.length === 1 ? layout.parts.find((p) => p.id === selection.parts[0]) : undefined;
@@ -365,7 +377,8 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
         break;
       case 'wire': {
         const to = pt && dropTarget(layout, pt);
-        if (!to || to === d.from) break;
+        // kéo từ thanh đồng thả lại chính thanh đó = không nối gì
+        if (!to || to === d.from || (d.from.includes('@') && endPartId(to) === endPartId(d.from))) break;
         const next = addWire(layout, d.from, to);
         if (next !== layout) { onCommit(next); onSelect({ parts: [], wire: next.wires.length - 1 }); }
         break;
@@ -457,6 +470,15 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
           {selBusPart && busEnds(selBusPart).map((c, i) => {
             const h = busPoint(selBusPart, c);
             return <circle key={i} cx={h.x} cy={h.y} r={11} fill="#fff" stroke={ORANGE} strokeWidth={4} />;
+          })}
+          {selBusPart && !drag && busWireStarts(selBusPart).map((c, i) => {
+            const h = busPoint(selBusPart, c);
+            return (
+              <g key={`bw${i}`}>
+                <circle cx={h.x} cy={h.y} r={10} fill="#22d3ee" stroke="#083344" strokeWidth={3} />
+                <path d={`M ${h.x - 5} ${h.y} H ${h.x + 5} M ${h.x} ${h.y - 5} V ${h.y + 5}`} stroke="#083344" strokeWidth={3} />
+              </g>
+            );
           })}
           {selWirePts && (
             <>

@@ -18,6 +18,8 @@ export interface PlacedPart {
   x: number;
   y: number;
   rotation?: Rotation;
+  /** Đảo 2 chân cho nhau mà không đổi hướng linh kiện (tụ hoá: + sang phải; cọc nguồn: + xuống dưới) — chỉ linh kiện có PartDef.flipAxis. */
+  flip?: boolean;
   /** Phóng to / thu nhỏ riêng chiếc này (1 = cỡ gốc trong thư viện). Chân và khung bao co giãn theo. */
   scale?: number;
   /** Chữ in thật trên thân (VD "2N3055", "B50K", "104"). */

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { PARTS } from '../../lib/circuit/parts';
+import { PARTS, polarPair } from '../../lib/circuit/parts';
 import { anchorContact } from '../../lib/circuit/contacts';
 import { bulbLabel, LED_COLORS } from '../../lib/circuit/lightParts';
 import { isProbe, MINI_BULB_COLORS, ohmWattLabel } from '../../lib/circuit/extraParts';
@@ -8,7 +8,7 @@ import { SENSOR_LIT_LABEL, SENSOR_PARTS } from '../../lib/circuit/sensorParts';
 import { MATRIX_PRESETS, matrixGrid, matrixValue, seg7Hex, seg7Label, SEG7_TYPES } from '../../lib/circuit/displayParts';
 import { CELL_KINDS, CELLS, cellType, holderType, holderVolts, parseCellType, parseHolderType, type CellKind, type HolderWiring } from '../../lib/circuit/powerParts';
 import { WIRE_COLORS } from '../../lib/circuit/render';
-import { deleteWire, duplicateParts, resetWire, rotateParts, trimBacktrack, updatePart, updateWire } from '../../lib/circuit/ops';
+import { deleteWire, duplicateParts, flipParts, resetWire, rotateParts, trimBacktrack, updatePart, updateWire } from '../../lib/circuit/ops';
 import type { CircuitLayout, JointStyle, PlacedPart } from '../../lib/circuit/types';
 import { jointOf } from '../../lib/circuit/route';
 import { endPartId } from '../../lib/circuit/geometry';
@@ -31,6 +31,14 @@ interface Props {
  * Ô nhập chỉ ghi khi rời ô / Enter — gõ từng chữ không làm đầy lịch sử hoàn tác.
  * Bị gỡ khi còn giá trị chưa ghi (WKWebView không bắn blur) thì ghi lúc gỡ.
  */
+/** Mũi tên nút Đảo chân theo hướng trên bàn vẽ: 2 chân cực tính nằm ngang nhau → ⇆, chồng dọc → ⇅. */
+function flipIcon(part: PlacedPart): string {
+  const def = PARTS[part.type];
+  const [a, b] = polarPair(def);
+  const side = Math.abs(def.pins[a].x - def.pins[b].x) >= Math.abs(def.pins[a].y - def.pins[b].y);
+  return side !== (part.rotation === 90 || part.rotation === 270) ? '⇆' : '⇅';
+}
+
 function Field({ label, value, onCommit }: { label: string; value: string; onCommit(v: string): void }) {
   const [v, setV] = useState(value);
   const latest = useRef({ v, value, onCommit });
@@ -285,6 +293,11 @@ export default function InspectorPanel({ layout, selection, onCommit, onSelect, 
               <span className="text-white/50">Xoay</span>
               <button className={btn} onClick={() => onCommit(rotateParts(layout, [part.id], -1))}>⟲</button>
               <button className={btn} onClick={() => onCommit(rotateParts(layout, [part.id], 1))}>⟳</button>
+              {PARTS[part.type]?.flipAxis && (
+                <button className={btn} title="Đổi chỗ 2 chân cực tính (+/− hoặc A/K) cho nhau, linh kiện giữ nguyên hướng — phím tắt F" onClick={() => onCommit(flipParts(layout, [part.id]))}>
+                  {flipIcon(part)} Đảo chân
+                </button>
+              )}
               <button className={`${btn} ml-auto`} title="Tạo thêm 1 cái giống hệt (không kèm dây) — phím tắt ⌘D" onClick={duplicate}>Nhân bản</button>
             </div>
           )}

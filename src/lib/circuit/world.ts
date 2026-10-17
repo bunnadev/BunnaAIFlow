@@ -71,7 +71,7 @@ export function routeWorld(layout: CircuitLayout): (RoutedWire | null)[] {
 export function routingSignature(layout: CircuitLayout, partsVersion = 0): string {
   return JSON.stringify([
     partsVersion,
-    layout.parts.map((p) => [p.id, p.type, p.x, p.y, p.rotation ?? 0, p.length ?? null, !!p.heatsink, p.scale ?? 1, p.joint ?? null]),
+    layout.parts.map((p) => [p.id, p.type, p.x, p.y, p.rotation ?? 0, p.length ?? null, !!p.heatsink, p.scale ?? 1, p.joint ?? null, !!p.flip]),
     layout.wires.map((w) => [w.from, w.to, w.via ?? null, !!w.manual, w.joints ?? null]),
   ]);
 }

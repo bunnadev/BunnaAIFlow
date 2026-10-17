@@ -41,6 +41,7 @@ function irLed(kind: 'tx' | 'rx'): PartDef {
     w: 70, h: 160,
     pins: { A: { x: -12, y: 80 }, K: { x: 12, y: 80 } },
     pinDirs: { A: 1, K: 1 },
+    flipAxis: 'x',
     pinNote: 'bóng ở trên, 2 chân chĩa XUỐNG: A (chân dài, dương) trái, K (phía mép vát) phải',
     render: (p) => {
       let s = DEFS + leg(-10, 4, -12, 80, 5) + leg(10, 4, 12, 72, 5);
@@ -103,6 +104,7 @@ const laser: PartDef = {
   w: 70, h: LASER_PIN_Y * 2,
   pins: { '+': { x: -14, y: LASER_PIN_Y }, '-': { x: 14, y: LASER_PIN_Y } },
   pinDirs: { '+': 1, '-': 1 },
+  flipAxis: 'x',
   pinNote: 'đầu phát tia hướng LÊN, 2 dây ra ở đuôi phía DƯỚI: + (dây đỏ) trái, − (dây xanh) phải',
   render: (p) => {
     const on = !!p.lit;
@@ -143,6 +145,7 @@ function buzzer(active: boolean): PartDef {
     w: 130, h: BUZ_PIN_Y * 2,
     pins: { '+': { x: -20, y: BUZ_PIN_Y }, '-': { x: 20, y: BUZ_PIN_Y } },
     pinDirs: { '+': 1, '-': 1 },
+    flipAxis: 'x',
     pinNote: 'nhìn chéo từ trên, 2 chân chĩa XUỐNG: + trái, − phải',
     render: (p) => {
       let s = DEFS + leg(-20, 30, -20, BUZ_PIN_Y, 5) + leg(20, 30, 20, BUZ_PIN_Y - 10, 5);
@@ -218,6 +221,7 @@ const micElectret: PartDef = {
   w: 90, h: MIC_PIN_Y * 2,
   pins: { '+': { x: -13, y: MIC_PIN_Y }, '-': { x: 13, y: MIC_PIN_Y } },
   pinDirs: { '+': 1, '-': 1 },
+  flipAxis: 'x',
   pinNote: 'mặt nỉ hướng LÊN (nhìn chéo), 2 chân chĩa XUỐNG: + trái, − phải (chân − nối vỏ nhôm)',
   render: () => {
     let s = DEFS + leg(-13, 20, -13, MIC_PIN_Y, 4) + leg(13, 20, 13, MIC_PIN_Y, 4);

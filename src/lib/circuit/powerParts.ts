@@ -82,7 +82,9 @@ function cellBody(kind: CellKind, cx: number, cy: number, flip = false, p?: Plac
     `<text x="${tx}" y="${kind === 'aaa' ? fs * 0.38 : -fs * 0.05}" font-family="${FONT}" font-size="${fs}" font-weight="900" font-style="italic" fill="#0f1a0b" text-anchor="middle">${esc(text)}</text>` +
     (kind === 'aaa' ? '' : `<text x="${tx}" y="${fs * 0.95}" font-family="${FONT}" font-size="${Math.round(fs * 0.5)}" font-weight="700" font-style="italic" fill="#1d3313" text-anchor="middle">${esc(sub)}</text>`);
   const rot = p?.rotation ?? 0;
-  const label = rot === 90 || rot === 180 ? `<g transform="rotate(180 ${tx} 0)">${words}</g>` : words;
+  const upright = rot === 90 || rot === 180 ? `<g transform="rotate(180 ${tx} 0)">${words}</g>` : words;
+  // pin trong đế đã đảo chân (cả đế soi gương trên ↔ dưới): soi gương chữ lần nữa cho đọc xuôi
+  const label = p?.flip && parseHolderType(p.type) ? `<g transform="scale(1 -1)">${upright}</g>` : upright;
   return `<g transform="translate(${cx} ${cy})"><g${flip ? ' transform="scale(-1 1)"' : ''}>${g}</g>${label}</g>`;
 }
 
@@ -94,7 +96,8 @@ function cellPart(kind: CellKind): PartDef {
     pins: { '-': { x: -L / 2, y: 0 }, '+': { x: L / 2, y: 0 } },
     pinDirs: { '-': 2, '+': 0 },
     pinNote: 'nằm ngang: − bên trái (đáy phẳng), + bên phải (núm nhô)',
-    render: (p) => DEFS + cellBody(kind, 0, 0, false, p),
+    flipAxis: 'x', flipSelf: true,
+    render: (p) => DEFS + cellBody(kind, 0, 0, !!p.flip, p),
   };
 }
 
@@ -162,6 +165,7 @@ function holderPart(kind: CellKind, n: number): PartDef {
     w: g.totalW, h: g.H,
     pins,
     pinDirs: { '+': 0, '-': 0 },
+    flipAxis: 'y', flipSelf: true,
     pinNote: 'dây đỏ (+) và đen (−) thò ra ở cạnh PHẢI',
     render: (p) => {
       const wiring: HolderWiring = p.wiring === 'parallel' ? 'parallel' : 'series';
@@ -205,7 +209,8 @@ function holderPart(kind: CellKind, n: number): PartDef {
       s += wire(pins['+'].y, '#e32b2b', '#8f1414') + wire(pins['-'].y, '#2a2a2e', '#6a6a72');
       s += `<text x="${bx1 + LEAD - 34}" y="${pins['+'].y - 12}" font-family="${FONT}" font-size="20" font-weight="900" fill="#ff6b6b" text-anchor="middle">+</text>`;
       s += `<text x="${bx1 + LEAD - 34}" y="${pins['-'].y + 26}" font-family="${FONT}" font-size="22" font-weight="900" fill="#9fb8d8" text-anchor="middle">−</text>`;
-      return s;
+      // đảo chân: cả đế soi gương trên ↔ dưới (dây đỏ xuống dưới), chữ trên pin tự soi lại cho đọc xuôi (cellBody)
+      return p.flip ? `<g transform="scale(1 -1)">${s}</g>` : s;
     },
   };
 }
@@ -233,6 +238,7 @@ const psu: PartDef = {
   pinDirs: { '+': 1, '-': 1 },
   straightOut: true,
   pinNote: 'đứng thẳng, jack đỏ (+) và đen (−) ở mặt dưới, dây đi xuống',
+  flipAxis: 'swap', flipSelf: true,
   render: (p) => {
     const { v, a, w } = psuReadout(p);
     const hw = PSU_W / 2, hh = PSU_H / 2;
@@ -283,9 +289,11 @@ const psu: PartDef = {
       `<circle cx="${x}" cy="${JACK_Y}" r="29" fill="url(#${grad})"/>` +
       `<circle cx="${x}" cy="${JACK_Y}" r="12" fill="#c9a24a" stroke="#6b5420" stroke-width="2"/>` +
       `<circle cx="${x}" cy="${JACK_Y}" r="6" fill="#1a1408"/>`;
-    s += `<text x="-40" y="164" font-family="${FONT}" font-size="30" font-weight="900" fill="#ff4d4d" text-anchor="middle">+</text>`;
-    s += `<text x="90" y="166" font-family="${FONT}" font-size="34" font-weight="900" fill="#1a1a1a" text-anchor="middle">−</text>`;
-    s += jack(-40, 'pw_gJackRed', '#3a0a0c') + jack(90, 'pw_gJackBlack', '#0a0a0b');
+    // đảo chân: jack đỏ (+) và đen (−) đổi chỗ, mặt máy giữ nguyên
+    const [xp, xn] = p.flip ? [90, -40] : [-40, 90];
+    s += `<text x="${xp}" y="164" font-family="${FONT}" font-size="30" font-weight="900" fill="#ff4d4d" text-anchor="middle">+</text>`;
+    s += `<text x="${xn}" y="166" font-family="${FONT}" font-size="34" font-weight="900" fill="#1a1a1a" text-anchor="middle">−</text>`;
+    s += jack(xp, 'pw_gJackRed', '#3a0a0c') + jack(xn, 'pw_gJackBlack', '#0a0a0b');
     s += `<text x="25" y="280" font-family="${FONT}" font-size="13" font-weight="700" fill="#e1e4e7" text-anchor="middle">0V – 30V</text>`;
     for (const x of [166, 210]) s += `<rect x="${x - 15}" y="196" width="30" height="40" rx="3" fill="#2a1a10"/><rect x="${x - 9}" y="202" width="18" height="28" rx="2" fill="#ff8c2b"/>`;
     s += `<text x="188" y="258" font-family="${FONT}" font-size="10" font-weight="700" fill="#e1e4e7" text-anchor="middle">5V 2A</text>`;

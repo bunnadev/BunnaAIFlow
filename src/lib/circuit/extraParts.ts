@@ -93,6 +93,7 @@ const cob: PartDef = {
   pins: { '+': { x: -28, y: COB_PAD_Y }, '-': { x: 28, y: COB_PAD_Y } },
   pinDirs: { '+': 1, '-': 1 },
   straightOut: true,
+  flipAxis: 'x', flipSelf: true,
   pinNote: 'bảng dựng đứng, 2 pad hàn ở đầu DƯỚI: + trái, − phải',
   render: (p) => {
     const on = !!p.lit;
@@ -100,10 +101,12 @@ const cob: PartDef = {
     // bảng nhôm, 4 góc khuyết
     s += `<path d="M -52 -210 L 52 -210 L 52 -200 L 60 -196 L 60 196 L 52 200 L 52 210 L -52 210 L -52 200 L -60 196 L -60 -196 L -52 -200 Z" fill="url(#xp_board)" stroke="#bfc1bb" stroke-width="2"/>`;
     // pad trên (trang trí) + pad dưới (chân nối)
+    // đảo chân: pad + (tròn) sang phải, pad − (vuông) sang trái; chữ in vẫn đọc xuôi
+    const m = p.flip ? -1 : 1;
     const pads = (y: number) =>
-      `<ellipse cx="-28" cy="${y}" rx="11" ry="14" fill="#d5a06a"/><rect x="18" y="${y - 13}" width="20" height="26" rx="2" fill="#d5a06a"/>` +
-      `<text x="-10" y="${y + 6}" font-family="${FONT}" font-size="15" font-weight="900" fill="#222">+</text>` +
-      `<text x="6" y="${y + 6}" font-family="${FONT}" font-size="15" font-weight="900" fill="#222">−</text>`;
+      `<ellipse cx="${-28 * m}" cy="${y}" rx="11" ry="14" fill="#d5a06a"/><rect x="${p.flip ? -38 : 18}" y="${y - 13}" width="20" height="26" rx="2" fill="#d5a06a"/>` +
+      `<text x="${p.flip ? 6 : -10}" y="${y + 6}" font-family="${FONT}" font-size="15" font-weight="900" fill="#222">+</text>` +
+      `<text x="${p.flip ? -10 : 6}" y="${y + 6}" font-family="${FONT}" font-size="15" font-weight="900" fill="#222">−</text>`;
     s += pads(-186) + pads(COB_PAD_Y);
     // 2 điện trở dán
     const smd = (y: number, t: string) =>
@@ -184,8 +187,9 @@ export function speakerReal(p: PlacedPart): string {
     s += `<ellipse cx="-12" cy="-16" rx="13" ry="8" fill="#fff" opacity="0.55"/>`;
     s += `<path d="M -6 40 L -10 64 M 6 40 L 10 64" stroke="#0a0a0b" stroke-width="5" stroke-linecap="round"/>`;
   }
-  s += `<text x="-40" y="-184" font-size="20" font-weight="900" fill="#ff4d4d" text-anchor="middle">+</text>`;
-  s += `<text x="40" y="-184" font-size="22" font-weight="900" fill="#cfd6df" text-anchor="middle">−</text>`;
+  const m = p.flip ? -1 : 1; // đảo chân: cọc hàn đối xứng, chỉ đổi dấu + / −
+  s += `<text x="${-40 * m}" y="-184" font-size="20" font-weight="900" fill="#ff4d4d" text-anchor="middle">+</text>`;
+  s += `<text x="${40 * m}" y="-184" font-size="22" font-weight="900" fill="#cfd6df" text-anchor="middle">−</text>`;
   return s;
 }
 
@@ -200,6 +204,7 @@ const fan: PartDef = {
   w: 230, h: 170,
   pins: { '+': { x: -115, y: 30 }, '-': { x: -115, y: 52 } },
   pinDirs: { '+': 2, '-': 2 },
+  flipAxis: 'swap', flipSelf: true,
   pinNote: 'nhìn thẳng mặt quạt, 2 dây đỏ (+) / đen (−) thò ra cạnh TRÁI',
   render: (p) => {
     const cx = 30; // tâm quạt (khung 170×170 lệch phải, chừa chỗ dây bên trái)
@@ -210,7 +215,8 @@ const fan: PartDef = {
       `<path d="M -55 ${y} L -100 ${y}" stroke="${dark}" stroke-width="10" stroke-linecap="round"/>` +
       `<path d="M -55 ${y} L -100 ${y}" stroke="${main}" stroke-width="7" stroke-linecap="round"/>` +
       `<path d="M -100 ${y} L -115 ${y}" stroke="#c9ced3" stroke-width="4" stroke-linecap="round"/>`;
-    s += lead(30, '#e32b2b', '#8f1414') + lead(52, '#2a2a2e', '#6a6a72');
+    // đảo chân: dây đỏ / đen đổi chỗ
+    s += lead(p.flip ? 52 : 30, '#e32b2b', '#8f1414') + lead(p.flip ? 30 : 52, '#2a2a2e', '#6a6a72');
     // khung
     s += `<rect x="${cx - 85}" y="-85" width="170" height="170" rx="12" fill="#17181b" stroke="#000" stroke-width="2"/>`;
     s += `<rect x="${cx - 82}" y="-82" width="164" height="10" rx="5" fill="#fff" opacity="0.08"/>`;
@@ -241,6 +247,7 @@ const motor: PartDef = {
   w: 280, h: 190,
   pins: { '+': { x: 70, y: -95 }, '-': { x: 70, y: 95 } },
   pinDirs: { '+': 3, '-': 1 },
+  flipAxis: 'y', flipSelf: true,
   pinNote: 'nằm ngang, trục chính bên TRÁI; 2 cọc hàn ở đầu sau bên phải: + chĩa LÊN, − chĩa XUỐNG',
   render: (p) => {
     const on = !!p.lit;
@@ -262,8 +269,9 @@ const motor: PartDef = {
     const tab = (y1: number, y2: number) => `<rect x="64" y="${Math.min(y1, y2)}" width="12" height="${Math.abs(y2 - y1)}" rx="2" fill="#d9b35a" stroke="#8a6a24" stroke-width="1.2"/>`;
     s += tab(-66, -95) + tab(66, 95);
     s += `<rect x="-82" y="-64" width="96" height="10" rx="4" fill="#fff" opacity="0.5"/>`;
-    s += `<text x="70" y="-108" font-family="${FONT}" font-size="20" font-weight="900" fill="#ff5a5a" text-anchor="middle">+</text>`;
-    s += `<text x="88" y="112" font-family="${FONT}" font-size="22" font-weight="900" fill="#9fb8d8" text-anchor="middle">−</text>`;
+    // cọc hàn đối xứng trên / dưới: đảo chân chỉ đổi dấu + / −
+    s += `<text x="${p.flip ? 88 : 70}" y="${p.flip ? 122 : -108}" font-family="${FONT}" font-size="20" font-weight="900" fill="#ff5a5a" text-anchor="middle">+</text>`;
+    s += `<text x="${p.flip ? 70 : 88}" y="${p.flip ? -102 : 112}" font-family="${FONT}" font-size="22" font-weight="900" fill="#9fb8d8" text-anchor="middle">−</text>`;
     if (on) for (const r of [22, 32]) s += `<path d="M -124 ${-r} A ${r} ${r} 0 0 0 -124 ${r}" fill="none" stroke="#ffd34d" stroke-opacity="0.8" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 6"/>`;
     return s;
   },
