@@ -329,6 +329,12 @@ export default function CircuitStudio({ onClose, geminiApiKey }: Props) {
           current={project}
           onOpen={openProject}
           onNew={createProject}
+          onRefresh={async (silent) => {
+            const known = new Set(projects.map((p) => p.id));
+            const list = await refreshList();
+            const added = list.filter((p) => !known.has(p.id)).length;
+            if (!silent || added) flash(added ? `Có ${added} mạch mới` : 'Danh sách mạch đã mới nhất');
+          }}
           onRename={async (name) => {
             if (!project) return;
             const next = { ...project, name, layout, updatedAt: new Date().toISOString() };

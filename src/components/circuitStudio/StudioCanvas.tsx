@@ -33,6 +33,14 @@ function busWireStarts(bus: PlacedPart): number[] {
   return [Math.round(lo + 40), Math.round(hi - 40)];
 }
 
+/** Chấm xanh kéo dây của đầu dây tự do đang chọn: lệch chéo lên-phải khỏi tâm (tâm dùng để dời chỗ). */
+function leadWireHandle(lead: PlacedPart, zoom: number): Point {
+  const off = Math.max(34, 24 / zoom);
+  return { x: lead.x + off, y: lead.y - off };
+}
+const leadAt = (layout: CircuitLayout, pt: Point) =>
+  [...layout.parts].reverse().find((p) => p.type === 'lead' && Math.abs(pt.x - p.x) <= 22 && Math.abs(pt.y - p.y) <= 22);
+
 interface Props {
   layout: CircuitLayout;
   routed: (RoutedWire | null)[];
@@ -248,6 +256,31 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       setDrag({ kind: 'busJoint', wire: i, which, bus: end.bus!.id, c0: c, c });
       return;
     }
+    // 2c. Đầu dây tự do: chân "p" nằm ngay tâm nên bấm đâu cũng trúng chân.
+    // Đang chọn → kéo = dời chỗ (kéo dây bằng chấm xanh bên cạnh); chưa chọn → bấm = chọn, kéo = nối dây như cũ
+    const selLead = selOne?.type === 'lead' ? selOne : undefined;
+    if (selLead) {
+      const h = leadWireHandle(selLead, zoom);
+      if (Math.hypot(pt.x - h.x, pt.y - h.y) < Math.max(14, 10 / zoom)) {
+        setDrag({ kind: 'wire', from: `${selLead.id}.p`, fromPt: { x: selLead.x, y: selLead.y }, cur: pt });
+        return;
+      }
+    }
+    const lead = leadAt(layout, pt);
+    if (lead) {
+      if (e.shiftKey) {
+        const ids = selection.parts.includes(lead.id) ? selection.parts.filter((i) => i !== lead.id) : [...selection.parts, lead.id];
+        onSelect({ parts: ids, wire: null });
+        return;
+      }
+      if (selection.parts.includes(lead.id)) {
+        setDrag({ kind: 'parts', ids: selection.parts, start: pt, dx: 0, dy: 0, guides: [] });
+        return;
+      }
+      onSelect({ parts: [lead.id], wire: null });
+      setDrag({ kind: 'wire', from: `${lead.id}.p`, fromPt: { x: lead.x, y: lead.y }, cur: pt });
+      return;
+    }
     // 3. chân → kéo dây mới
     const pin = hitPin(layout, pt);
     if (pin) { setDrag({ kind: 'wire', from: `${pin.partId}.${pin.pin}`, fromPt: { x: pin.x, y: pin.y }, cur: pt }); return; }
@@ -431,6 +464,9 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
   const selScalePart = selection.parts.length === 1 ? shown.parts.find((p) => p.id === selection.parts[0]) : undefined;
   const scaleBox = scalable(selScalePart) ? partBox(selScalePart!, true) : null;
   const hoverScale = !!(hover && scaleBox && Math.hypot(hover.x - (scaleBox.x2 + 6), hover.y - (scaleBox.y2 + 6)) < Math.max(14, 10 / zoom));
+  const selLeadPart = selScalePart?.type === 'lead' ? selScalePart : undefined;
+  const hoverLead = hover && !drag ? leadAt(shown, hover) : undefined;
+  const hoverMoveLead = !!(hoverLead && selection.parts.includes(hoverLead.id));
   const overflowSvg: React.CSSProperties = { position: 'absolute', left: 0, top: 0, overflow: 'visible' };
 
   return (
@@ -438,7 +474,7 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
       ref={viewRef}
       className="absolute inset-0 overflow-hidden select-none"
       style={{
-        cursor: space ? (drag?.kind === 'pan' ? 'grabbing' : 'grab') : drag?.kind === 'scale' || hoverScale ? 'nwse-resize' : 'default',
+        cursor: space ? (drag?.kind === 'pan' ? 'grabbing' : 'grab') : drag?.kind === 'scale' || hoverScale ? 'nwse-resize' : drag?.kind === 'parts' || hoverMoveLead ? 'move' : 'default',
         backgroundColor: GRID_BG,
         backgroundImage: GRID_TILE_URL, // nền đứng yên, không theo zoom / kéo
       }}
@@ -493,6 +529,16 @@ export default function StudioCanvas({ layout, routed, selection, onSelect, onCo
               <circle cx={p.x} cy={p.y} r={leadR * 0.35} fill="#f2b97a" />
             </g>
           ))}
+          {selLeadPart && !drag && (() => {
+            const h = leadWireHandle(selLeadPart, zoom), r = Math.max(10, 8 / zoom), a = r / 2;
+            return (
+              <g>
+                <line x1={selLeadPart.x} y1={selLeadPart.y} x2={h.x} y2={h.y} stroke="#22d3ee" strokeWidth={Math.max(2, 1.5 / zoom)} strokeDasharray="4 4" />
+                <circle cx={h.x} cy={h.y} r={r} fill="#22d3ee" stroke="#083344" strokeWidth={3} />
+                <path d={`M ${h.x - a} ${h.y} H ${h.x + a} M ${h.x} ${h.y - a} V ${h.y + a}`} stroke="#083344" strokeWidth={3} />
+              </g>
+            );
+          })()}
           {pinsToShow.map((p) => <circle key={`${p.partId}.${p.pin}`} cx={p.x} cy={p.y} r={8} fill="#22d3ee" fillOpacity={0.85} stroke="#083344" strokeWidth={2} />)}
           {hoverPin && (
             <text x={hoverPin.x + 14} y={hoverPin.y - 14} fontSize={24} fontWeight={800} fill="#fff" stroke="#000" strokeWidth={5} paintOrder="stroke">
