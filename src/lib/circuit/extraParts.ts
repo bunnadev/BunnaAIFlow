@@ -128,21 +128,27 @@ const cob: PartDef = {
 // ─── Que đo VOM ──────────────────────────────────────────────────────────
 
 const PROBE_TIP = 230;
+/** Đầu dây cáp phía trên — điểm nối dây ra đồng hồ / mạch. */
+const PROBE_CABLE = { x: -20, y: -220 };
 
 function probe(color: 'red' | 'black'): PartDef {
   return {
     desc: `Que đo đồng hồ VOM màu ${color === 'red' ? 'đỏ (+)' : 'đen (COM)'} — đầu kim chạm vào chân cần đo`,
     w: 64, h: 460,
-    pins: { tip: { x: 0, y: PROBE_TIP } },
-    pinDirs: { tip: 1 },
-    pinNote: 'dựng đứng, đầu kim chĩa XUỐNG (chân "tip"), dây cáp ra phía trên',
+    pins: { tip: { x: 0, y: PROBE_TIP }, cable: PROBE_CABLE },
+    pinDirs: { tip: 1, cable: 3 },
+    pinNote: 'dựng đứng, đầu kim chĩa XUỐNG (chân "tip"), dây cáp ra phía trên, đầu dây cáp (chân "cable") để nối dây',
     render: () => {
       const g = `url(#xp_probe_${color})`;
       const cable = color === 'red' ? ['#8f1414', '#e32b2b'] : ['#000', '#2a2a2e'];
       let s = DEFS;
       // dây cáp lượn ra phía trên
-      s += `<path d="M 0 -120 C 0 -170 -22 -190 -14 -230" fill="none" stroke="${cable[0]}" stroke-width="15" stroke-linecap="round"/>`;
-      s += `<path d="M 0 -120 C 0 -170 -22 -190 -14 -230" fill="none" stroke="${cable[1]}" stroke-width="11" stroke-linecap="round"/>`;
+      const { x: cx, y: cy } = PROBE_CABLE;
+      s += `<path d="M 0 -120 C 0 -165 ${cx} -170 ${cx} ${cy + 22}" fill="none" stroke="${cable[0]}" stroke-width="15" stroke-linecap="round"/>`;
+      s += `<path d="M 0 -120 C 0 -165 ${cx} -170 ${cx} ${cy + 22}" fill="none" stroke="${cable[1]}" stroke-width="11" stroke-linecap="round"/>`;
+      // đầu cốt kim loại ở cuối dây cáp — chỗ nối dây
+      s += `<rect x="${cx - 7}" y="${cy + 6}" width="14" height="18" rx="3" fill="${g}" stroke="#00000055" stroke-width="1"/>`;
+      s += `<rect x="${cx - 3}" y="${cy - 4}" width="6" height="12" rx="2" fill="url(#gLeg)" stroke="#6f767d" stroke-width="1"/>`;
       // đuôi chống gập + thân cầm có khía + gờ chặn ngón
       s += `<path d="M -9 -150 L 9 -150 L 13 -100 L -13 -100 Z" fill="${g}"/>`;
       s += `<rect x="-20" y="-104" width="40" height="190" rx="16" fill="${g}" stroke="#00000055" stroke-width="1"/>`;

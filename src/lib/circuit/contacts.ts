@@ -21,7 +21,11 @@ interface CPin { partId: string; pin: string; x: number; y: number; kind: Kind }
 /** Mọi chân kèm loại: pin rời, đầu que đo, hay chân linh kiện thường. */
 function contactPins(layout: CircuitLayout): CPin[] {
   const kindOf = new Map(layout.parts.map((p) => [p.id, (isCell(p.type) ? 'cell' : isProbe(p.type) ? 'probe' : 'other') as Kind]));
-  return allPins(layout).map((p) => ({ ...p, kind: kindOf.get(p.partId) ?? 'other' }));
+  // chỉ đầu kim que đo mới chạm; đầu dây cáp là chân nối dây thường
+  return allPins(layout).map((p) => {
+    const kind = kindOf.get(p.partId) ?? 'other';
+    return { ...p, kind: kind === 'probe' && p.pin !== 'tip' ? 'other' : kind };
+  });
 }
 
 /** Cặp chân được nối chạm: 2 cực pin rời, hoặc đầu que đo với chân bất kỳ (không phải que khác). */

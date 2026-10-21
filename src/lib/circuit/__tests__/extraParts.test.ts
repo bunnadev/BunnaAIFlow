@@ -58,6 +58,12 @@ describe('que đo chạm chân', () => {
     expect(syncContacts(two).wires).toEqual([]);
     expect(syncContacts(l(400, 0)).wires).toEqual([]);
   });
+
+  it('đầu dây cáp là chân nối dây, không tự chạm chân linh kiện', () => {
+    expect(PARTS.probe_red.pins.cable).toEqual({ x: -20, y: -220 });
+    expect(PARTS.probe_black.pins.cable).toEqual({ x: -20, y: -220 });
+    expect(syncContacts(l(-55, 220)).wires).toEqual([]); // đầu cáp ở (-75,0) trùng chân 1
+  });
 });
 
 describe('điểm nối kiểu thật', () => {
