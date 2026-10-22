@@ -11,6 +11,8 @@ use tauri::{AppHandle, Manager};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
+use crate::circuit_data::{custom_dir, replace_dir, CIRCUIT_DIRS};
+
 const MANIFEST: &str = "bunna-backup.json";
 /// File nằm ngay gốc thư mục dữ liệu — có 1 trong số này mới coi là bản sao lưu của app.
 const ROOT_MARKERS: [&str; 3] = [MANIFEST, "workspaces.json", "settings.json"];
@@ -57,10 +59,33 @@ fn already_compressed(rel: &Path) -> bool {
     )
 }
 
+/// Mọi file cần sao lưu: (thư mục gốc, đường dẫn trong zip). Dữ liệu Xưởng vẽ mạch nằm ở thư mục
+/// riêng thì lấy từ đó nhưng vẫn ghi vào zip như thể nằm trong thư mục app — zip giữ 1 định dạng.
+fn backup_files(src: &Path) -> io::Result<Vec<(PathBuf, PathBuf)>> {
+    let mut rels = Vec::new();
+    collect_files(src, src, &mut rels)?;
+    let circuit = custom_dir(src);
+    let is_circuit = |r: &PathBuf| r.components().next().map_or(false, |c| CIRCUIT_DIRS.iter().any(|d| c.as_os_str() == *d));
+    let mut files: Vec<(PathBuf, PathBuf)> = rels
+        .into_iter()
+        .filter(|r| circuit.is_none() || !is_circuit(r))
+        .map(|r| (src.to_path_buf(), r))
+        .collect();
+    if let Some(c) = circuit {
+        for sub in CIRCUIT_DIRS {
+            if c.join(sub).is_dir() {
+                let mut sub_rels = Vec::new();
+                collect_files(&c.join(sub), &c, &mut sub_rels)?;
+                files.extend(sub_rels.into_iter().map(|r| (c.clone(), r)));
+            }
+        }
+    }
+    files.sort_by(|a, b| a.1.cmp(&b.1));
+    Ok(files)
+}
+
 fn write_zip(src: &Path, dest: &Path) -> Result<BackupResult, String> {
-    let mut files = Vec::new();
-    collect_files(src, src, &mut files).map_err(|e| format!("Không đọc được thư mục dữ liệu: {e}"))?;
-    files.sort();
+    let files = backup_files(src).map_err(|e| format!("Không đọc được thư mục dữ liệu: {e}"))?;
     // Ghi ra file tạm rồi mới đổi tên: hỏng giữa chừng không để lại file .zip dở
     let tmp = dest.with_extension("zip.part");
     let out = File::create(&tmp).map_err(|e| format!("Không tạo được file sao lưu: {e}"))?;
@@ -74,11 +99,11 @@ fn write_zip(src: &Path, dest: &Path) -> Result<BackupResult, String> {
         });
         zip.start_file(MANIFEST, SimpleFileOptions::default()).map_err(|e| e.to_string())?;
         zip.write_all(manifest.to_string().as_bytes()).map_err(|e| e.to_string())?;
-        for rel in &files {
+        for (base, rel) in &files {
             let name = rel.components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/");
             let method = if already_compressed(rel) { CompressionMethod::Stored } else { CompressionMethod::Deflated };
             let opts = SimpleFileOptions::default().compression_method(method).large_file(true);
-            let mut f = File::open(src.join(rel)).map_err(|e| format!("{name}: {e}"))?;
+            let mut f = File::open(base.join(rel)).map_err(|e| format!("{name}: {e}"))?;
             zip.start_file(name.as_str(), opts).map_err(|e| e.to_string())?;
             bytes += io::copy(&mut f, &mut zip).map_err(|e| format!("{name}: {e}"))?;
         }
@@ -183,7 +208,26 @@ fn restore_zip(dir: &Path, src: &Path) -> Result<BackupResult, String> {
         return Err(format!("Không thay được thư mục dữ liệu: {e}"));
     }
     let _ = fs::remove_dir_all(&old);
-    Ok(BackupResult { files: count, bytes, safety_path: has_data.then(|| safety.to_string_lossy().into_owned()) })
+    let safety_path = has_data.then(|| safety.to_string_lossy().into_owned());
+
+    // 4. Cài đặt vừa khôi phục chỉ định thư mục mạch riêng → chuyển dữ liệu mạch sang đó
+    if let Some(c) = custom_dir(dir) {
+        for sub in CIRCUIT_DIRS {
+            let from = dir.join(sub);
+            if !from.exists() {
+                continue;
+            }
+            replace_dir(&from, &c.join(sub), &format!("restore-{ts}")).map_err(|e| {
+                format!(
+                    "Đã khôi phục nhưng chưa chép được dữ liệu mạch sang {}: {e}. Bản sao lưu tự động: {}",
+                    c.display(),
+                    safety_path.as_deref().unwrap_or("không có")
+                )
+            })?;
+            let _ = fs::remove_dir_all(&from);
+        }
+    }
+    Ok(BackupResult { files: count, bytes, safety_path })
 }
 
 #[tauri::command]
@@ -230,6 +274,35 @@ mod tests {
         let safety = PathBuf::from(r.safety_path.unwrap());
         let mut z = ZipArchive::new(File::open(&safety).unwrap()).unwrap();
         assert!(z.by_name("new.txt").is_ok());
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn circuit_data_in_custom_dir_is_backed_up_and_restored_there() {
+        let root = tmpdir("custom");
+        let data = root.join("dev.bunna.aiflow");
+        let ext = root.join("ext");
+        fs::create_dir_all(ext.join("circuits")).unwrap();
+        // bản cũ còn sót trong thư mục app không được lọt vào zip
+        fs::create_dir_all(data.join("circuits")).unwrap();
+        fs::write(data.join("circuits/stale.json"), "stale").unwrap();
+        fs::write(data.join("settings.json"), serde_json::json!({ "circuitDataDir": ext }).to_string()).unwrap();
+        fs::write(ext.join("circuits/x.json"), "circuit").unwrap();
+        let zip_path = root.join("b.zip");
+        write_zip(&data, &zip_path).unwrap();
+        let mut z = ZipArchive::new(File::open(&zip_path).unwrap()).unwrap();
+        assert!(z.by_name("circuits/x.json").is_ok());
+        assert!(z.by_name("circuits/stale.json").is_err());
+
+        fs::write(ext.join("circuits/x.json"), "changed").unwrap();
+        fs::write(ext.join("circuits/new.json"), "new").unwrap();
+        let r = restore_zip(&data, &zip_path).unwrap();
+        assert_eq!(fs::read_to_string(ext.join("circuits/x.json")).unwrap(), "circuit");
+        assert!(!ext.join("circuits/new.json").exists());
+        assert!(!data.join("circuits").exists());
+        // bản an toàn chứa dữ liệu mạch trước khi khôi phục (lấy từ thư mục riêng)
+        let mut z = ZipArchive::new(File::open(r.safety_path.unwrap()).unwrap()).unwrap();
+        assert!(z.by_name("circuits/new.json").is_ok());
         fs::remove_dir_all(&root).unwrap();
     }
 

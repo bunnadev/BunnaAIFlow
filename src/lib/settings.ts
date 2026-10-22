@@ -16,6 +16,8 @@ export interface AppSettings {
   psuName?: string;
   psuMaxVoltage?: number;
   psuMaxCurrent?: number;
+  /** Thư mục dữ liệu Xưởng vẽ mạch (circuits, circuit-parts, circuit-backgrounds); trống = thư mục dữ liệu app. */
+  circuitDataDir?: string;
 }
 
 export const DEFAULT_PSU = { name: 'Sugon', maxVoltage: 30, maxCurrent: 5 };

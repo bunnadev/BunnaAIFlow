@@ -22,7 +22,7 @@
     "dialog:allow-save",
     {
       "identifier": "fs:scope",
-      "allow": ["$HOME/**"]
+      "allow": ["$HOME/**", "/Volumes/**"]
     },
     {
       "identifier": "http:default",

@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { SectionLabel } from './UI';
-import { DEFAULT_PSU, type AppSettings } from '../lib/settings';
-import { createBackup, restoreBackup } from '../lib/backup';
+import { open, ask } from '@tauri-apps/plugin-dialog';
+import { DEFAULT_PSU, saveSettings, type AppSettings } from '../lib/settings';
+import { createBackup, leaveNotice, restoreBackup } from '../lib/backup';
+import { moveCircuitData } from '../lib/circuit/dataDir';
+import { resumeSaves, suspendSaves } from '../lib/saveGate';
 
 interface Props {
 settings: AppSettings;
@@ -37,8 +40,7 @@ setBackupBusy(null);
 }
 };
 
-const handleSave = () => {
-onSave({
+const collect = (): AppSettings => ({
 ...settings,
 geminiApiKey: geminiApiKey.trim(),
 licensePublicKey: licensePublicKey.trim(),
@@ -50,7 +52,42 @@ psuName: psuName.trim() || DEFAULT_PSU.name,
 psuMaxVoltage: parseFloat(psuMaxVoltage) || DEFAULT_PSU.maxVoltage,
 psuMaxCurrent: parseFloat(psuMaxCurrent) || DEFAULT_PSU.maxCurrent,
 });
+
+const handleSave = () => {
+onSave(collect());
 onClose();
+};
+
+const [circuitBusy, setCircuitBusy] = useState(false);
+const [circuitMsg, setCircuitMsg] = useState<string | null>(null);
+const changeCircuitDir = async (toDefault: boolean) => {
+let to: string | null = null;
+if (!toDefault) {
+const picked = await open({ title: 'Chọn thư mục dữ liệu Xưởng vẽ mạch', directory: true, multiple: false });
+if (!picked || Array.isArray(picked)) return;
+to = picked;
+}
+const ok = await ask(
+`Chuyển mạch đã vẽ, linh kiện tự thêm và ảnh nền sang:\n${to ?? 'thư mục mặc định của app'}\n\n` +
+'Nếu thư mục đó đã có dữ liệu mạch thì app dùng luôn dữ liệu có sẵn, không ghi đè. App sẽ tải lại sau khi chuyển.',
+{ title: 'Đổi thư mục dữ liệu', kind: 'warning', okLabel: 'Chuyển', cancelLabel: 'Huỷ' },
+);
+if (!ok) return;
+setCircuitBusy(true);
+setCircuitMsg(null);
+suspendSaves();
+try {
+// lưu luôn các ô đang sửa dở trong bảng này — app tải lại ngay sau khi chuyển
+await saveSettings(collect());
+const r = await moveCircuitData(to);
+const msg = r.kept.length ? `Thư mục mới đã có sẵn ${r.kept.join(', ')} — app dùng dữ liệu đó; bản cũ vẫn để nguyên ở chỗ cũ.` : 'Đã chuyển dữ liệu Xưởng vẽ mạch.';
+leaveNotice(msg);
+window.location.reload();
+} catch (e) {
+resumeSaves();
+setCircuitMsg(String((e as Error)?.message ?? e));
+setCircuitBusy(false);
+}
 };
 
 return (
@@ -176,6 +213,37 @@ className="w-full bg-[#050a10] border border-white/5 hover:border-[#F1641E]/30 r
 />
 <p className="text-[10px] text-[#94a3b8] leading-relaxed">
 Dùng cho node "Vbee TTS". Lấy tại tài khoản Vbee của bạn (vbee.vn) — mục tích hợp API.
+</p>
+</div>
+
+<div className="flex flex-col gap-3.5">
+<SectionLabel>Thư mục Xưởng vẽ mạch</SectionLabel>
+<p className="text-[11px] text-white font-mono break-all bg-[#050a10] border border-white/5 rounded-xl px-3 py-2.5">
+{settings.circuitDataDir || 'Mặc định (trong thư mục dữ liệu app)'}
+</p>
+<div className="flex gap-2">
+<button
+onClick={() => changeCircuitDir(false)}
+disabled={circuitBusy}
+className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-[#F1641E]/40 bg-[#F1641E]/10 hover:bg-[#F1641E]/20 text-[11px] font-bold text-white transition-all disabled:opacity-40"
+>
+<span className="material-symbols-outlined text-[16px]">folder_open</span>
+{circuitBusy ? 'Đang chuyển…' : 'Chọn thư mục…'}
+</button>
+{settings.circuitDataDir && (
+<button
+onClick={() => changeCircuitDir(true)}
+disabled={circuitBusy}
+className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[11px] font-bold text-white transition-all disabled:opacity-40"
+>
+<span className="material-symbols-outlined text-[16px]">undo</span>
+Về mặc định
+</button>
+)}
+</div>
+{circuitMsg && <p className="text-[10px] leading-relaxed break-all text-red-400">{circuitMsg}</p>}
+<p className="text-[10px] text-[#94a3b8] leading-relaxed">
+Nơi lưu mạch đã vẽ, linh kiện tự thêm và ảnh nền. Đặt ra ổ ngoài (VD /Volumes/DATA) để dữ liệu còn nguyên khi cài lại máy và để Claude Cowork đọc/ghi được.
 </p>
 </div>
 

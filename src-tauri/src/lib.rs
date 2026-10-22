@@ -1,5 +1,6 @@
 mod audio_master;
 mod backup;
+mod circuit_data;
 mod license;
 mod vectorize;
 
@@ -22,7 +23,8 @@ pub fn run() {
             vectorize::vectorize_image_to_svg,
             audio_master::master_audio,
             backup::backup_create,
-            backup::backup_restore
+            backup::backup_restore,
+            circuit_data::circuit_data_move
         ])
         .setup(|app| {
             let handle = app.handle();

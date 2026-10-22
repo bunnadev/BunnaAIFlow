@@ -1,5 +1,6 @@
-import { exists, mkdir, readDir, readFile, readTextFile, remove, rename, writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
-import { appDataDir, join } from '@tauri-apps/api/path';
+import { exists, readDir, readFile, readTextFile, remove, rename, writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { join } from '@tauri-apps/api/path';
+import { circuitSubDir } from './dataDir';
 import { bytesToBase64 } from '../assets';
 import { imagePartDef, missingPartDef, parseCustomPart, type CustomPartFile } from './imagePart';
 import { registerPart, unregisterPart } from './registry';
@@ -12,10 +13,8 @@ export interface CustomPartEntry { file: CustomPartFile; dataUrl: string }
 const DIR = 'circuit-parts';
 let cache: CustomPartEntry[] = [];
 
-async function partsDir(): Promise<string> {
-  const d = await join(await appDataDir(), DIR);
-  if (!(await exists(d))) await mkdir(d, { recursive: true });
-  return d;
+function partsDir(): Promise<string> {
+  return circuitSubDir(DIR);
 }
 
 export function listCustomParts(): CustomPartEntry[] {

@@ -1,16 +1,15 @@
-import { exists, mkdir, readDir, readTextFile, remove, rename, writeTextFile } from '@tauri-apps/plugin-fs';
-import { appDataDir, join } from '@tauri-apps/api/path';
+import { readDir, readTextFile, remove, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { join } from '@tauri-apps/api/path';
+import { circuitSubDir } from './dataDir';
 import { parseProject, type CircuitProject, type ProjectMeta } from './projectModel';
 import { savesSuspended } from '../saveGate';
 
-/** Mỗi mạch 1 file circuits/<id>.json trong thư mục dữ liệu app (tách khỏi workspaces.json). */
+/** Mỗi mạch 1 file circuits/<id>.json trong thư mục dữ liệu Xưởng vẽ mạch (xem dataDir.ts), tách khỏi workspaces.json. */
 
 const DIR = 'circuits';
 
-async function circuitsDir(): Promise<string> {
-  const d = await join(await appDataDir(), DIR);
-  if (!(await exists(d))) await mkdir(d, { recursive: true });
-  return d;
+function circuitsDir(): Promise<string> {
+  return circuitSubDir(DIR);
 }
 
 export async function listProjects(): Promise<{ projects: ProjectMeta[]; errors: string[] }> {

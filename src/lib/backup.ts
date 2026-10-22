@@ -36,7 +36,7 @@ export async function restoreBackup(): Promise<string | null> {
   try {
     const r = await invoke<BackupResult>('backup_restore', { src });
     const msg = `Đã khôi phục ${r.files} file.` + (r.safety_path ? ` Dữ liệu cũ đã được lưu tại: ${r.safety_path}` : '');
-    sessionStorage.setItem('bunna.restoreNotice', msg);
+    leaveNotice(msg);
     window.location.reload();
     return msg;
   } catch (e) {
@@ -45,7 +45,12 @@ export async function restoreBackup(): Promise<string | null> {
   }
 }
 
-/** Câu báo sau khi khôi phục (đọc 1 lần sau khi app tải lại). */
+/** Để lại câu báo cho lần tải lại app ngay sau đây. */
+export function leaveNotice(msg: string): void {
+  sessionStorage.setItem('bunna.restoreNotice', msg);
+}
+
+/** Câu báo sau khi khôi phục / đổi thư mục (đọc 1 lần sau khi app tải lại). */
 export function takeRestoreNotice(): string | null {
   try {
     const m = sessionStorage.getItem('bunna.restoreNotice');

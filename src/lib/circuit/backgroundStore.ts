@@ -1,5 +1,6 @@
-import { exists, mkdir, readDir, readFile, remove, writeFile } from '@tauri-apps/plugin-fs';
-import { appDataDir, join } from '@tauri-apps/api/path';
+import { exists, readDir, readFile, remove, writeFile } from '@tauri-apps/plugin-fs';
+import { join } from '@tauri-apps/api/path';
+import { circuitSubDir } from './dataDir';
 import { v4 as uuidv4 } from 'uuid';
 import { bytesToBase64 } from '../assets';
 
@@ -9,10 +10,8 @@ export interface BackgroundEntry { id: string; dataUrl: string }
 
 const DIR = 'circuit-backgrounds';
 
-async function bgDir(): Promise<string> {
-  const d = await join(await appDataDir(), DIR);
-  if (!(await exists(d))) await mkdir(d, { recursive: true });
-  return d;
+function bgDir(): Promise<string> {
+  return circuitSubDir(DIR);
 }
 
 export async function listBackgrounds(): Promise<BackgroundEntry[]> {
